@@ -29,6 +29,32 @@ Runtime side effects are pluggable through `ChannelBackend`. OpenHuman owns the
 actual backend implementation for REST/JWT/config storage, while this crate
 validates channel metadata and delegates operations through that trait.
 
+## Provider Features
+
+TinyChannels includes optional provider implementations that must be explicitly enabled:
+
+| Provider | Feature | Channels | Dependencies |
+|----------|---------|----------|--------------|
+| **Email** | `email` | `EmailChannel` (SMTP + IMAP) | `lettre`, `async-imap`, `mail-parser` |
+| **Lark/Feishu** | `lark` | `LarkChannel` (webhook receiver + Protobuf decoder) | `axum`, `prost` |
+| **WhatsApp Web** | `whatsapp-web` | `WhatsAppWebChannel` (multi-device via whatsapp-rust) | `whatsapp-rust`, `whatsapp-rust-tokio-transport`, `whatsapp-rust-ureq-http-client`, `wacore` |
+
+The default feature set (`default = []`) does not include these providers. To use them, add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+tinychannels = { version = "0.1", features = ["email", "lark", "whatsapp-web"] }
+```
+
+Or enable them individually as needed:
+
+```toml
+[dependencies]
+tinychannels = { version = "0.1", features = ["email"] }
+```
+
+All other providers (Telegram, Discord, Slack, Signal, iMessage, IRC, Yuanbao/钉钉, etc.) are included in the default build.
+
 ## Development
 
 ```sh
@@ -36,6 +62,9 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo build --all-targets
 cargo test
+
+# Test with all optional providers
+cargo test --features email,lark
 ```
 
 ## Repository Layout

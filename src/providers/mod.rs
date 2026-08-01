@@ -2,9 +2,11 @@
 
 pub mod dingtalk;
 pub mod discord;
+#[cfg(feature = "email")]
 pub mod email_channel;
 pub mod imessage;
 pub mod irc;
+#[cfg(feature = "lark")]
 pub mod lark;
 pub mod linq;
 pub mod mattermost;
@@ -18,9 +20,11 @@ pub mod yuanbao;
 
 pub use dingtalk::DingTalkChannel;
 pub use discord::DiscordChannel;
+#[cfg(feature = "email")]
 pub use email_channel::EmailChannel;
 pub use imessage::IMessageChannel;
 pub use irc::{IrcChannel, IrcChannelConfig};
+#[cfg(feature = "lark")]
 pub use lark::LarkChannel;
 pub use linq::{LinqChannel, verify_linq_signature};
 pub use mattermost::MattermostChannel;

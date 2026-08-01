@@ -40,8 +40,37 @@ pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
 pub use host::{ChannelHost, ChannelHostBuilder, HostCapabilities, NoopHost, ProviderContext};
 pub use providers::{
-    DingTalkChannel, DiscordChannel, EmailChannel, IMessageChannel, IrcChannel, IrcChannelConfig,
-    LarkChannel, LinqChannel, MattermostChannel, QQChannel, SignalChannel, SlackChannel,
-    TelegramChannel, WhatsAppChannel, WhatsAppWebChannel, YuanbaoChannel,
+    DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
+    MattermostChannel, QQChannel, SignalChannel, SlackChannel, TelegramChannel, WhatsAppChannel,
+    WhatsAppWebChannel, YuanbaoChannel,
 };
+// Re-exported separately so each can follow its provider's feature gate.
+#[cfg(feature = "email")]
+pub use providers::EmailChannel;
+#[cfg(feature = "lark")]
+pub use providers::LarkChannel;
 pub use traits::{Channel, ChannelMessage, ChannelSendExt, SendMessage};
+
+#[cfg(all(test, feature = "email"))]
+mod email_feature_smoke_tests {
+    use crate::EmailChannel;
+
+    #[test]
+    fn email_channel_is_available_with_email_feature() {
+        // Verify EmailChannel is exported when `email` feature is enabled.
+        // This test ensures the export is reachable at compile time.
+        let _ = std::any::type_name::<EmailChannel>();
+    }
+}
+
+#[cfg(all(test, feature = "lark"))]
+mod lark_feature_smoke_tests {
+    use crate::LarkChannel;
+
+    #[test]
+    fn lark_channel_is_available_with_lark_feature() {
+        // Verify LarkChannel is exported when `lark` feature is enabled.
+        // This test ensures the export is reachable at compile time.
+        let _ = std::any::type_name::<LarkChannel>();
+    }
+}
