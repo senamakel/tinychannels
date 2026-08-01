@@ -40,9 +40,9 @@ pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
 pub use host::{ChannelHost, ChannelHostBuilder, HostCapabilities, NoopHost, ProviderContext};
 pub use providers::{
-    DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig,
-    LinqChannel, MattermostChannel, QQChannel, SignalChannel, SlackChannel,
-    TelegramChannel, WhatsAppChannel, WhatsAppWebChannel, YuanbaoChannel,
+    DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
+    MattermostChannel, QQChannel, SignalChannel, SlackChannel, TelegramChannel, WhatsAppChannel,
+    WhatsAppWebChannel, YuanbaoChannel,
 };
 // Re-exported separately so each can follow its provider's feature gate.
 #[cfg(feature = "email")]
