@@ -83,6 +83,10 @@ whatsapp-rust-ureq-http-client = { version = "0.5", optional = true }
 wacore = { version = "0.5", optional = true, default-features = false }
 
 [dev-dependencies]
+# Dual-declared: the optional dependency above belongs to the `lark` provider,
+# but `providers/discord/api_tests.rs` spins an axum mock server to test the
+# Discord REST client — unrelated to Lark, and it must build with `lark` off.
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 tempfile = "3"
 toml = "0.9"
 wiremock = "0.6"
