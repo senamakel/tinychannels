@@ -1,0 +1,36 @@
+[package]
+name = "tinychannels-bus"
+version.workspace = true
+edition = "2024"
+license = "GPL-3.0-only"
+description = "TinyBus wire contract for TinyChannels: names, payload types, config and errors."
+repository = "https://github.com/tinyhumansai/tinychannels"
+readme = "README.md"
+keywords = ["messaging", "channels", "tinybus", "openhuman"]
+categories = ["data-structures", "api-bindings"]
+
+[dependencies]
+# Every payload that crosses the boundary is a typed Serde value.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Channel and controller config is surfaced to callers as JSON Schema.
+schemars = { version = "1", features = ["derive"] }
+# The contract owns its structured error taxonomy.
+thiserror = "2"
+# The `Channel` seam a provider implements is async.
+async-trait = "0.1"
+# Session-key derivation and relay HMAC signing. Both are rules both sides must
+# agree on exactly, so they belong to the contract rather than to either host.
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+# Timestamps on envelopes and relay tokens.
+chrono = { version = "0.4", features = ["serde"] }
+# The pairing-token store is a small in-memory set behind a lock.
+parking_lot = "0.12"
+# Pairing codes and message ids.
+rand = "0.10"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+serde_json = "1"
