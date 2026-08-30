@@ -35,6 +35,7 @@ TinyChannels includes optional provider implementations that must be explicitly 
 
 | Provider | Feature | Channels | Dependencies |
 |----------|---------|----------|--------------|
+| **Email (send only)** | `email-send` | `EmailChannel` (SMTP send) | `lettre` |
 | **Email** | `email` | `EmailChannel` (SMTP + IMAP) | `lettre`, `async-imap`, `mail-parser` |
 | **Lark/Feishu** | `lark` | `LarkChannel` (webhook receiver + Protobuf decoder) | `axum`, `prost` |
 | **WhatsApp Web** | `whatsapp-web` | `WhatsAppWebChannel` (multi-device via whatsapp-rust) | `whatsapp-rust`, `whatsapp-rust-tokio-transport`, `whatsapp-rust-ureq-http-client`, `wacore` |
@@ -52,6 +53,19 @@ Or enable them individually as needed:
 [dependencies]
 tinychannels = { version = "0.1", features = ["email"] }
 ```
+
+If you only ever *send* mail — no mailbox is polled — take `email-send` instead.
+It gives you `EmailChannel::new`, `send_message` and the `build_*_message`
+helpers on `lettre` alone, without the IMAP receive stack (18 fewer packages):
+
+```toml
+[dependencies]
+tinychannels = { version = "0.1", features = ["email-send"] }
+```
+
+`email-send` carries no `Channel` impl — a send-only build cannot `listen`, so
+the trait is gated on the full `email` feature rather than promising a
+half-working channel.
 
 All other providers (Telegram, Discord, Slack, Signal, iMessage, IRC, Yuanbao/钉钉, etc.) are included in the default build.
 

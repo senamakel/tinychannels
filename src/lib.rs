@@ -63,19 +63,22 @@ pub use tinychannels_bus::{
     outbound_intent_from_send_message,
 };
 // Re-exported separately so each can follow its provider's feature gate.
-#[cfg(feature = "email")]
+#[cfg(feature = "email-send")]
 pub use providers::EmailChannel;
 #[cfg(feature = "lark")]
 pub use providers::LarkChannel;
 
-#[cfg(all(test, feature = "email"))]
+#[cfg(all(test, feature = "email-send"))]
 mod email_feature_smoke_tests {
     use crate::EmailChannel;
 
     #[test]
     fn email_channel_is_available_with_email_feature() {
-        // Verify EmailChannel is exported when `email` feature is enabled.
-        // This test ensures the export is reachable at compile time.
+        // Verify EmailChannel is exported whenever the send half is enabled.
+        // Gated on `email-send`, not `email`: a send-only consumer keeps the
+        // established `tinychannels::EmailChannel` path, and gating the
+        // crate-root export on the full feature would silently remove the type
+        // from the root for exactly the build this split exists to serve.
         let _ = std::any::type_name::<EmailChannel>();
     }
 }

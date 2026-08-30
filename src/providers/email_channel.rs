@@ -8,37 +8,68 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::unnecessary_map_or)]
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+#[cfg(feature = "email")]
+use anyhow::anyhow;
+#[cfg(feature = "email")]
 use async_imap::Session;
+#[cfg(feature = "email")]
 use async_imap::extensions::idle::IdleResponse;
+#[cfg(feature = "email")]
 use async_imap::types::Fetch;
+#[cfg(feature = "email")]
 use async_trait::async_trait;
+#[cfg(feature = "email")]
 use futures::TryStreamExt;
 use lettre::message::{Attachment, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
+#[cfg(feature = "email")]
 use mail_parser::{MessageParser, MimeHeaders};
+#[cfg(feature = "email")]
 use rustls::{ClientConfig, RootCertStore};
+#[cfg(feature = "email")]
 use rustls_pki_types::DnsName;
+#[cfg(feature = "email")]
 use std::collections::HashSet;
+#[cfg(feature = "email")]
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+#[cfg(feature = "email")]
+use std::time::Duration;
+#[cfg(feature = "email")]
+use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(feature = "email")]
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, mpsc};
+#[cfg(feature = "email")]
+use tokio::sync::Mutex;
+#[cfg(feature = "email")]
+use tokio::sync::mpsc;
+#[cfg(feature = "email")]
 use tokio::time::{sleep, timeout};
+#[cfg(feature = "email")]
 use tokio_rustls::TlsConnector;
+#[cfg(feature = "email")]
 use tokio_rustls::client::TlsStream;
-use tracing::{debug, error, info, warn};
+use tracing::info;
+#[cfg(feature = "email")]
+use tracing::{debug, error, warn};
+#[cfg(feature = "email")]
 use uuid::Uuid;
 
 pub use crate::config::EmailConfig;
+#[cfg(feature = "email")]
 use crate::traits::{Channel, ChannelMessage, SendMessage};
 
+#[cfg(feature = "email")]
 type ImapSession = Session<TlsStream<TcpStream>>;
 
 /// Email channel — IMAP IDLE for instant push notifications, SMTP for outbound
 pub struct EmailChannel {
     pub config: EmailConfig,
+    /// Dedupe set for IMAP IDLE, which can re-report a message across
+    /// re-establishes. A send-only build never opens a mailbox, so the field
+    /// would be dead weight and a `never read` denial there.
+    #[cfg(feature = "email")]
     seen_messages: Arc<Mutex<HashSet<String>>>,
 }
 
@@ -46,6 +77,7 @@ impl EmailChannel {
     pub fn new(config: EmailConfig) -> Self {
         Self {
             config,
+            #[cfg(feature = "email")]
             seen_messages: Arc::new(Mutex::new(HashSet::new())),
         }
     }
@@ -96,6 +128,7 @@ impl EmailChannel {
     }
 
     /// Extract the sender address from a parsed email
+    #[cfg(feature = "email")]
     fn extract_sender(parsed: &mail_parser::Message) -> String {
         parsed
             .from()
@@ -106,6 +139,7 @@ impl EmailChannel {
     }
 
     /// Extract readable text from a parsed email
+    #[cfg(feature = "email")]
     fn extract_text(parsed: &mail_parser::Message) -> String {
         if let Some(text) = parsed.body_text(0) {
             return text.to_string();
@@ -127,6 +161,7 @@ impl EmailChannel {
     }
 
     /// Connect to IMAP server with TLS and authenticate
+    #[cfg(feature = "email")]
     async fn connect_imap(&self) -> Result<ImapSession> {
         let addr = format!("{}:{}", self.config.imap_host, self.config.imap_port);
         debug!("Connecting to IMAP server at {}", addr);
@@ -159,6 +194,7 @@ impl EmailChannel {
     }
 
     /// Fetch and process unseen messages from the selected mailbox
+    #[cfg(feature = "email")]
     async fn fetch_unseen(&self, session: &mut ImapSession) -> Result<Vec<ParsedEmail>> {
         // Search for unseen messages
         let uids = session.uid_search("UNSEEN").await?;
@@ -242,6 +278,7 @@ impl EmailChannel {
 
     /// Run the IDLE loop, returning when a new message arrives or timeout
     /// Note: IDLE consumes the session and returns it via done()
+    #[cfg(feature = "email")]
     async fn wait_for_changes(
         &self,
         session: ImapSession,
@@ -287,6 +324,7 @@ impl EmailChannel {
     }
 
     /// Main IDLE-based listen loop with automatic reconnection
+    #[cfg(feature = "email")]
     async fn listen_with_idle(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<()> {
         let mut backoff = Duration::from_secs(1);
         let max_backoff = Duration::from_secs(60);
@@ -311,6 +349,7 @@ impl EmailChannel {
     }
 
     /// Run a single IDLE session until error or clean shutdown
+    #[cfg(feature = "email")]
     async fn run_idle_session(&self, tx: &mpsc::Sender<ChannelMessage>) -> Result<()> {
         // Connect and authenticate
         let mut session = self.connect_imap().await?;
@@ -351,6 +390,7 @@ impl EmailChannel {
     }
 
     /// Fetch unseen messages and send to channel
+    #[cfg(feature = "email")]
     async fn process_unseen(
         &self,
         session: &mut ImapSession,
@@ -454,6 +494,7 @@ impl EmailChannel {
 }
 
 /// Internal struct for parsed email data
+#[cfg(feature = "email")]
 struct ParsedEmail {
     _uid: u32,
     msg_id: String,
@@ -463,12 +504,14 @@ struct ParsedEmail {
 }
 
 /// Result from waiting on IDLE
+#[cfg(feature = "email")]
 enum IdleWaitResult {
     NewMail,
     Timeout,
     Interrupted,
 }
 
+#[cfg(feature = "email")]
 #[async_trait]
 impl Channel for EmailChannel {
     fn name(&self) -> &str {
@@ -523,11 +566,11 @@ impl Channel for EmailChannel {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "email"))]
 #[path = "email_channel_tests.rs"]
 mod tests;
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(all(feature = "email", any(test, debug_assertions)))]
 pub mod test_support {
     //! Debug-build helpers for raw integration tests. They exercise the email
     //! parser without opening IMAP or SMTP sockets.
@@ -548,5 +591,61 @@ pub mod test_support {
             text: EmailChannel::extract_text(&parsed),
             subject: parsed.subject().map(str::to_string),
         })
+    }
+}
+
+/// The send-only surface, exercised in a build that has no IMAP stack.
+///
+/// This is the half of the split a compile check cannot state on its own: with
+/// `email-send` on and `email` off the crate builds either way, so nothing
+/// would notice if the send path quietly grew a dependency on the receive half
+/// and had to be gated along with it. `voice` in OpenHuman reaches for exactly
+/// these three items and nothing else, so this is the contract to keep.
+#[cfg(all(test, feature = "email-send", not(feature = "email")))]
+mod send_only_tests {
+    use super::EmailChannel;
+    use crate::config::EmailConfig;
+
+    fn config() -> EmailConfig {
+        EmailConfig {
+            from_address: "bot@example.com".to_string(),
+            username: "bot@example.com".to_string(),
+            password: "secret".to_string(),
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            smtp_tls: true,
+            ..Default::default()
+        }
+    }
+
+    /// `EmailChannel::new` + `build_plain_message` + `send_message` are what a
+    /// send-only host links. Building a message must not need a mailbox.
+    #[test]
+    fn a_plain_message_can_be_built_without_the_receive_half() {
+        let channel = EmailChannel::new(config());
+        let message = channel
+            .build_plain_message("someone@example.com", "Subject", "Body")
+            .expect("a well-formed plain message should build");
+        let raw = String::from_utf8(message.formatted()).expect("message should be UTF-8");
+        assert!(raw.contains("someone@example.com"));
+        assert!(raw.contains("Subject"));
+    }
+
+    /// The attachment builder is the one OpenHuman's podcast delivery uses.
+    #[test]
+    fn an_attachment_message_can_be_built_without_the_receive_half() {
+        let channel = EmailChannel::new(config());
+        let message = channel
+            .build_message_with_attachment(
+                "someone@example.com",
+                "Your podcast",
+                "Attached.",
+                "podcast.mp3",
+                "audio/mpeg".parse().expect("a valid content type"),
+                vec![0u8, 1, 2, 3],
+            )
+            .expect("a well-formed attachment message should build");
+        let raw = String::from_utf8(message.formatted()).expect("message should be UTF-8");
+        assert!(raw.contains("podcast.mp3"));
     }
 }

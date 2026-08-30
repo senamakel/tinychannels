@@ -2,7 +2,7 @@
 
 pub mod dingtalk;
 pub mod discord;
-#[cfg(feature = "email")]
+#[cfg(feature = "email-send")]
 pub mod email_channel;
 pub mod imessage;
 pub mod irc;
@@ -20,7 +20,7 @@ pub mod yuanbao;
 
 pub use dingtalk::DingTalkChannel;
 pub use discord::DiscordChannel;
-#[cfg(feature = "email")]
+#[cfg(feature = "email-send")]
 pub use email_channel::EmailChannel;
 pub use imessage::IMessageChannel;
 pub use irc::{IrcChannel, IrcChannelConfig};

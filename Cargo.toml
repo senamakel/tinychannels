@@ -28,11 +28,24 @@ default = []
 # `tokio/net` are now unconditional dependencies (the ported channel providers
 # use them directly), so this feature no longer needs to pull them in.
 relay-websocket = []
-# Email provider (`providers::email_channel`) — IMAP receive + SMTP send.
+# SMTP send only (`EmailChannel::new` + `send_message` / `build_*_message`).
+#
+# Split out of `email` because sending and receiving have very different costs
+# and very different consumers. A host that only ever *delivers* mail — OpenHuman
+# emails a generated podcast as an attachment and never reads a mailbox — needs
+# `lettre` and nothing else. Bundling the two meant that host also linked the
+# IMAP receive stack, 13 crates it could never call, and once the channel
+# providers move into the `tinychannels` bus module that would have been the
+# whole of the shed the move was supposed to buy.
+#
+# This carries no `Channel` impl: a send-only build cannot `listen`, so
+# advertising the trait would promise a half-working channel.
+email-send = ["dep:lettre"]
+# Full email provider (`providers::email_channel`) — IMAP receive + SMTP send.
 # Off by default: it is the single heaviest provider in the crate, pulling the
-# lettre/async-imap/mail-parser stack (18 crates). Downstreams that expose an
-# email channel opt in.
-email = ["dep:lettre", "dep:async-imap", "dep:mail-parser"]
+# lettre/async-imap/mail-parser stack. Downstreams that expose an email channel
+# opt in; downstreams that only send want `email-send` above.
+email = ["email-send", "dep:async-imap", "dep:mail-parser"]
 # Lark/Feishu provider (`providers::lark`) — runs its own axum webhook receiver
 # and decodes protobuf events, so it owns both `axum` (5 crates) and `prost`
 # (4 crates). Off by default for the same reason.
