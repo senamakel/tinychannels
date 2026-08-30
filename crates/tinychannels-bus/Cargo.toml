@@ -47,5 +47,10 @@ tokio = { version = "1", default-features = false, features = ["sync", "rt"] }
 
 [dev-dependencies]
 serde_json = "1"
+# Test-only. The normal `tokio` dependency above is deliberately `sync` + `rt`;
+# `#[tokio::test]` additionally needs the macros and a multi-thread scheduler.
+# Keep this split — widening the normal dependency to satisfy a test would put a
+# scheduler into every host that only decodes payloads.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 toml = "0.9"
 tempfile = "3"
