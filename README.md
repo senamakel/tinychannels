@@ -35,6 +35,7 @@ TinyChannels includes optional provider implementations that must be explicitly 
 
 | Provider | Feature | Channels | Dependencies |
 |----------|---------|----------|--------------|
+| **Email (send only)** | `email-send` | `EmailChannel` (SMTP send) | `lettre` |
 | **Email** | `email` | `EmailChannel` (SMTP + IMAP) | `lettre`, `async-imap`, `mail-parser` |
 | **Lark/Feishu** | `lark` | `LarkChannel` (webhook receiver + Protobuf decoder) | `axum`, `prost` |
 | **WhatsApp Web** | `whatsapp-web` | `WhatsAppWebChannel` (multi-device via whatsapp-rust) | `whatsapp-rust`, `whatsapp-rust-tokio-transport`, `whatsapp-rust-ureq-http-client`, `wacore` |
