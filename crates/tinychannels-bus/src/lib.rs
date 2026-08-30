@@ -27,6 +27,25 @@
 //! key that a host writes to its conversation store. It lives here for the same
 //! reason `tinywallet-bus` owns address validation: both sides must agree
 //! exactly, and a drifted copy silently regroups existing user data.
+//!
+//! # `traits` and `security` are in-process seams, not wire vocabulary
+//!
+//! Everything else here is transport-free. These two are not, and the
+//! distinction is worth keeping visible rather than quietly averaging away:
+//!
+//! - [`traits::Channel`] hands a provider a `tokio::sync::mpsc::Sender` to
+//!   publish received messages on. That is an *embedding* seam — a provider
+//!   compiled into the same binary — and it has no bus equivalent, because a
+//!   module delivers inbound traffic by calling the host's
+//!   [`names::HOST_BUS_NAME`] object instead.
+//! - [`security`] runs its constant-time pairing compare on the blocking pool.
+//!
+//! They live here because hosts that only ever name them still need them
+//! always-on, and splitting a third crate off for two items would cost more
+//! than the honesty is worth. The `tokio` dependency is pinned to `sync` + `rt`
+//! for exactly this reason: no scheduler, no I/O driver, no timers. Do not
+//! reach for a wider tokio feature here — if something needs one, it belongs in
+//! the `tinychannels` crate.
 
 pub mod adapters;
 pub mod channel;
