@@ -46,6 +46,7 @@ const UNKNOWN_CHANNEL_ERROR: &str = "ai.tinyhumans.tinychannels.Error.UnknownCha
 const ALREADY_RUNNING_ERROR: &str = "ai.tinyhumans.tinychannels.Error.AlreadyRunning";
 const NOT_CONFIGURED_ERROR: &str = "ai.tinyhumans.tinychannels.Error.NotConfigured";
 const SEND_FAILED_ERROR: &str = "ai.tinyhumans.tinychannels.Error.SendFailed";
+const NO_INGRESS_ERROR: &str = "ai.tinyhumans.tinychannels.Error.NoWebhookIngress";
 
 /// Bound on the inbound queue between a provider and the forwarding task.
 ///
@@ -116,6 +117,37 @@ impl Channels {
                 name: NOT_CONFIGURED_ERROR.to_owned(),
                 message: format!("channel {name} is not present in the supplied config"),
             })?;
+
+        // Refuse the providers whose inbound path this module cannot serve.
+        //
+        // Linq and the WhatsApp *Cloud API* variant are push-based: their
+        // `listen` implementations sleep forever, because messages arrive at an
+        // HTTPS webhook the host operates. The module exports no route or bus
+        // member that can feed such a payload into the channel, so starting one
+        // here would report success and then deliver nothing, for ever — the
+        // worst failure shape available.
+        //
+        // Failing loudly is deliberately preferred to a silent no-op. When
+        // webhook ingress is added to the contract this check is what gets
+        // relaxed. (WhatsApp *Web* is unaffected: it has a real listen loop.
+        // Both variants report `name() == "whatsapp"`, so the config shape is
+        // what distinguishes them, not the name.)
+        let webhook_backed = name == "linq"
+            || (name == "whatsapp"
+                && config
+                    .whatsapp
+                    .as_ref()
+                    .is_some_and(|wa| wa.backend_type() == "cloud"));
+        if webhook_backed {
+            return Err(BusError::MethodFailed {
+                name: NO_INGRESS_ERROR.to_owned(),
+                message: format!(
+                    "channel {name} receives inbound traffic through an external webhook, \
+                     and this module has no ingress for it; run this provider in-process \
+                     or serve its webhook host-side"
+                ),
+            });
+        }
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(INBOUND_QUEUE);
 
