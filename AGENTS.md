@@ -2,11 +2,25 @@
 
 ## Project Structure & Module Organization
 
-TinyChannels is a Rust 2024 library crate rooted at `Cargo.toml`. Public API
-exports live in `src/lib.rs`, with the crate-wide error type in `src/error.rs`.
-The initial scaffold reserves two top-level module directories: `src/channel/`
-for channel-side messaging abstractions and `src/harness/` for harness-facing
-communication boundaries.
+TinyChannels is a Rust 2024 **workspace** rooted at `Cargo.toml`, split into a
+contract crate and an implementation crate:
+
+| Crate | Path | Holds |
+| --- | --- | --- |
+| `tinychannels-bus` | `crates/tinychannels-bus/` | The wire contract: envelopes, outbound intents, `ChannelsConfig`, controller metadata, relay frames + HMAC auth, pairing helpers, session-key rules, and the bus names in `src/names.rs`. Transport-free and dependency-light. |
+| `tinychannels` | `.` (root) | The implementation: the provider stack (`src/providers/`), the relay transport loop, delivery, and the host boundary. Depends on the contract crate and re-exports it whole. |
+
+**The split is not cosmetic — put new code on the right side of it.** A type that
+crosses a boundary goes in the contract crate; anything that opens a socket,
+spawns a task or touches a database goes in the root crate. The root crate
+re-exports every contract module at the path it has always occupied
+(`tinychannels::channel::…`, `tinychannels::config::…`), so downstream paths keep
+resolving — but new code should prefer naming `tinychannels_bus` directly when
+it only needs the vocabulary.
+
+Public API exports live in `src/lib.rs` and
+`crates/tinychannels-bus/src/lib.rs`, with the crate-wide error type in
+`crates/tinychannels-bus/src/error.rs`.
 
 Prefer small, focused modules that do one thing clearly. New feature areas
 should live in module directories instead of accumulating broad multi-purpose
@@ -28,8 +42,11 @@ top-level architecture reference.
 - `cargo build --all-targets`: compile all crate targets.
 - `cargo test`: run the full test suite.
 
-Run commands from the repository root unless a future workspace layout changes
-the crate location.
+Run commands from the repository root; they cover both workspace members. Use
+`cargo test -p tinychannels-bus` to exercise the contract crate alone, and
+`cargo check -p tinychannels-bus` to confirm it still builds without the
+implementation crate's dependencies — that is the check which catches a
+transport dependency leaking into the contract.
 
 ## Coding Style & Naming Conventions
 
