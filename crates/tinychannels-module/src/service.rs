@@ -191,9 +191,12 @@ impl Channels {
     /// reconciling desired against actual state should be able to call this
     /// unconditionally.
     async fn stop_channel(&self, name: String) -> BusResult<()> {
-        if let Some(running) = self.running.lock().await.remove(&name) {
+        // Taken out of the map before the report so the lock is not held across
+        // the enqueue, which can block on a full outbox.
+        let running = self.running.lock().await.remove(&name);
+        if let Some(running) = running {
             running.shutdown();
-            self.host.report_status(&name, "stopped", None);
+            self.host.report_status(&name, "stopped", None).await;
         }
         Ok(())
     }
