@@ -21,6 +21,12 @@ jobs:
           # This job executes repo code (cargo build/test); don't persist the
           # token in git config.
           persist-credentials: false
+          # `crates/tinychannels-module` has a path dependency on
+          # `vendor/tinybus`, and cargo resolves every workspace member before
+          # it builds any of them — so without the submodule even
+          # `cargo check -p tinychannels` fails, with a bare
+          # `No such file or directory (os error 2)` that names nothing useful.
+          submodules: true
 
       - uses: dtolnay/rust-toolchain@stable
         with:

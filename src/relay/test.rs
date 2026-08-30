@@ -985,3 +985,38 @@ mod websocket_loopback {
         server.await.expect("join server");
     }
 }
+// Pins the public paths previous releases published.
+//
+// The crate split moved these types to `tinychannels-bus`. Re-exporting them
+// only from `tinychannels::relay` would silently break every consumer that
+// names `tinychannels::relay::transport::…`, which compiles here and fails
+// downstream — so name both spellings explicitly.
+#[test]
+fn the_relay_transport_module_path_still_resolves() {
+    use std::any::TypeId;
+
+    // The `transport::` spelling is the one a previous release published.
+    assert_eq!(
+        TypeId::of::<crate::relay::transport::RelayIdentity>(),
+        TypeId::of::<crate::relay::RelayIdentity>(),
+    );
+    assert_eq!(
+        TypeId::of::<crate::relay::transport::RelayTransportError>(),
+        TypeId::of::<crate::relay::RelayTransportError>(),
+    );
+    assert_eq!(
+        TypeId::of::<crate::relay::transport::RelayTransportTimeouts>(),
+        TypeId::of::<crate::relay::RelayTransportTimeouts>(),
+    );
+    assert_eq!(
+        TypeId::of::<crate::relay::transport::RelayReconnectPolicy>(),
+        TypeId::of::<crate::relay::RelayReconnectPolicy>(),
+    );
+
+    // Traits have no `TypeId`; naming them in a path is the assertion.
+    fn _accepts(_: &dyn crate::relay::transport::RelayFrameIo) {}
+    fn _dialer(_: &dyn crate::relay::transport::RelayFrameDialer) {}
+    fn _inbound(_: &dyn crate::relay::transport::RelayInboundHandler) {}
+    fn _passthrough(_: &dyn crate::relay::transport::RelayPassthroughHandler) {}
+    fn _interrupt(_: &dyn crate::relay::transport::RelayInterruptInboundHandler) {}
+}

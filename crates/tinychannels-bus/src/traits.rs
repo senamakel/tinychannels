@@ -1,7 +1,12 @@
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 /// A message received from or sent to a channel
-#[derive(Debug, Clone)]
+///
+/// Serde-derived because this type crosses the bus: the module forwards it to
+/// the host's `DeliverInbound` callback. Field names are the wire contract —
+/// renaming one is a decode failure at the far end, not a compile error.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelMessage {
     pub id: String,
     pub sender: String,
@@ -15,7 +20,10 @@ pub struct ChannelMessage {
 }
 
 /// Message to send through a channel
-#[derive(Debug, Clone)]
+///
+/// Serde-derived for the same reason as [`ChannelMessage`]: it is the payload
+/// of the module's `SendMessage` member.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendMessage {
     pub content: String,
     pub recipient: String,

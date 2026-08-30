@@ -1,4 +1,7 @@
-/target/
+# Unanchored on purpose. This is a workspace now, and an anchored `/target/`
+# would not ignore a `crates/*/target/` that a stray cargo invocation leaves
+# behind — which then gets committed as build output.
+target/
 **/*.rs.bk
 
 # Local secrets — never commit; copy .env.example to .env
