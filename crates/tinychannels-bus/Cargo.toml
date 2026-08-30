@@ -33,6 +33,17 @@ parking_lot = "0.12"
 # Pairing codes and message ids.
 rand = "0.10"
 uuid = { version = "1", features = ["v4"] }
+# Hex encoding for relay signatures and message digests.
+hex = "0.4"
+# Diagnostics on the pairing path.
+tracing = "0.1"
+# NOT a general runtime dependency. Two items need it and only these two: the
+# `Channel` seam hands a provider a `tokio::sync::mpsc::Sender` to publish
+# received messages on, and pairing verification runs its constant-time compare
+# on the blocking pool. Both are in-process seams that sit beside the wire
+# vocabulary rather than crossing a bus. Kept to `sync` + `rt` so a host that
+# only decodes payloads does not inherit a scheduler, an I/O driver or timers.
+tokio = { version = "1", default-features = false, features = ["sync", "rt"] }
 
 [dev-dependencies]
 serde_json = "1"
