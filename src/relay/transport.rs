@@ -11,11 +11,7 @@ pub use tinychannels_bus::relay::transport::{
     RelayTransportError, RelayTransportTimeouts,
 };
 
-use crate::relay::{
-    CapabilityDescriptor, ConnectorToGatewayFrame, GatewayToConnectorFrame, RelayFrameDialer,
-    RelayFrameIo, RelayIdentity, RelayInboundHandler, RelayInterruptInboundHandler,
-    RelayPassthroughHandler, RelayReconnectPolicy, RelayTransportError, RelayTransportTimeouts,
-};
+use crate::relay::{CapabilityDescriptor, ConnectorToGatewayFrame, GatewayToConnectorFrame};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
