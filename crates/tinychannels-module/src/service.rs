@@ -86,7 +86,7 @@ impl Channels {
     async fn start_channel(&self, name: String, config: ChannelsConfig) -> BusResult<()> {
         let mut running = self.running.lock().await;
         if running.contains_key(&name) {
-            return Err(BusError::Failed {
+            return Err(BusError::MethodFailed {
                 name: ALREADY_RUNNING_ERROR.to_owned(),
                 message: format!("channel {name} is already running"),
             });
@@ -96,12 +96,12 @@ impl Channels {
         // for. Building the set is cheap (no I/O) and keeps a single
         // config-to-provider mapping rather than a second one here that could
         // disagree about, say, which WhatsApp backend a stanza describes.
-        let noop: Arc<dyn ChannelHost> = NoopHost::shared();
+        let noop: Arc<dyn ChannelHost> = NoopHost::arc();
         let built = build_channels(&config, &noop, &DefaultHttpClients);
         let channel = built
             .into_iter()
             .find(|candidate| candidate.name() == name)
-            .ok_or_else(|| BusError::Failed {
+            .ok_or_else(|| BusError::MethodFailed {
                 name: NOT_CONFIGURED_ERROR.to_owned(),
                 message: format!("channel {name} is not present in the supplied config"),
             })?;
@@ -172,13 +172,13 @@ impl Channels {
             running
                 .get(&name)
                 .map(|entry| Arc::clone(&entry.channel))
-                .ok_or_else(|| BusError::Failed {
+                .ok_or_else(|| BusError::MethodFailed {
                     name: UNKNOWN_CHANNEL_ERROR.to_owned(),
                     message: format!("channel {name} is not running"),
                 })?
         };
 
-        channel.send(&message).await.map_err(|error| BusError::Failed {
+        channel.send(&message).await.map_err(|error| BusError::MethodFailed {
             name: SEND_FAILED_ERROR.to_owned(),
             message: error.to_string(),
         })
@@ -198,7 +198,7 @@ impl Channels {
         let Some(channel) = channel else {
             return Ok("stopped".to_owned());
         };
-        Ok(if channel.health_check().await.unwrap_or(false) {
+        Ok(if channel.health_check().await {
             "connected".to_owned()
         } else {
             "unhealthy".to_owned()
