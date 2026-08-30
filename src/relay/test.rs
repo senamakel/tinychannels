@@ -985,12 +985,12 @@ mod websocket_loopback {
         server.await.expect("join server");
     }
 }
-//! Pins the public paths previous releases published.
-//!
-//! The crate split moved these types to `tinychannels-bus`. Re-exporting them
-//! only from `tinychannels::relay` would silently break every consumer that
-//! names `tinychannels::relay::transport::…`, which compiles here and fails
-//! downstream — so name both spellings explicitly.
+// Pins the public paths previous releases published.
+//
+// The crate split moved these types to `tinychannels-bus`. Re-exporting them
+// only from `tinychannels::relay` would silently break every consumer that
+// names `tinychannels::relay::transport::…`, which compiles here and fails
+// downstream — so name both spellings explicitly.
 #[test]
 fn the_relay_transport_module_path_still_resolves() {
     use std::any::TypeId;
