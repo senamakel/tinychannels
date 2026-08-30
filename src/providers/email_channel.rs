@@ -116,6 +116,7 @@ impl EmailChannel {
     }
 
     /// Extract the sender address from a parsed email
+    #[cfg(feature = "email")]
     fn extract_sender(parsed: &mail_parser::Message) -> String {
         parsed
             .from()
@@ -126,6 +127,7 @@ impl EmailChannel {
     }
 
     /// Extract readable text from a parsed email
+    #[cfg(feature = "email")]
     fn extract_text(parsed: &mail_parser::Message) -> String {
         if let Some(text) = parsed.body_text(0) {
             return text.to_string();
@@ -147,6 +149,7 @@ impl EmailChannel {
     }
 
     /// Connect to IMAP server with TLS and authenticate
+    #[cfg(feature = "email")]
     async fn connect_imap(&self) -> Result<ImapSession> {
         let addr = format!("{}:{}", self.config.imap_host, self.config.imap_port);
         debug!("Connecting to IMAP server at {}", addr);
@@ -179,6 +182,7 @@ impl EmailChannel {
     }
 
     /// Fetch and process unseen messages from the selected mailbox
+    #[cfg(feature = "email")]
     async fn fetch_unseen(&self, session: &mut ImapSession) -> Result<Vec<ParsedEmail>> {
         // Search for unseen messages
         let uids = session.uid_search("UNSEEN").await?;
@@ -262,6 +266,7 @@ impl EmailChannel {
 
     /// Run the IDLE loop, returning when a new message arrives or timeout
     /// Note: IDLE consumes the session and returns it via done()
+    #[cfg(feature = "email")]
     async fn wait_for_changes(
         &self,
         session: ImapSession,
@@ -307,6 +312,7 @@ impl EmailChannel {
     }
 
     /// Main IDLE-based listen loop with automatic reconnection
+    #[cfg(feature = "email")]
     async fn listen_with_idle(&self, tx: mpsc::Sender<ChannelMessage>) -> Result<()> {
         let mut backoff = Duration::from_secs(1);
         let max_backoff = Duration::from_secs(60);
@@ -331,6 +337,7 @@ impl EmailChannel {
     }
 
     /// Run a single IDLE session until error or clean shutdown
+    #[cfg(feature = "email")]
     async fn run_idle_session(&self, tx: &mpsc::Sender<ChannelMessage>) -> Result<()> {
         // Connect and authenticate
         let mut session = self.connect_imap().await?;
@@ -371,6 +378,7 @@ impl EmailChannel {
     }
 
     /// Fetch unseen messages and send to channel
+    #[cfg(feature = "email")]
     async fn process_unseen(
         &self,
         session: &mut ImapSession,
@@ -474,6 +482,7 @@ impl EmailChannel {
 }
 
 /// Internal struct for parsed email data
+#[cfg(feature = "email")]
 struct ParsedEmail {
     _uid: u32,
     msg_id: String,
@@ -483,12 +492,14 @@ struct ParsedEmail {
 }
 
 /// Result from waiting on IDLE
+#[cfg(feature = "email")]
 enum IdleWaitResult {
     NewMail,
     Timeout,
     Interrupted,
 }
 
+#[cfg(feature = "email")]
 #[async_trait]
 impl Channel for EmailChannel {
     fn name(&self) -> &str {
@@ -543,11 +554,11 @@ impl Channel for EmailChannel {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "email"))]
 #[path = "email_channel_tests.rs"]
 mod tests;
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(all(feature = "email", any(test, debug_assertions)))]
 pub mod test_support {
     //! Debug-build helpers for raw integration tests. They exercise the email
     //! parser without opening IMAP or SMTP sockets.
