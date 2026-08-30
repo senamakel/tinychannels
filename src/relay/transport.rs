@@ -1,4 +1,15 @@
 //! Relay frame transport loop.
+//!
+//! The vocabulary this loop speaks — identities, timeouts, the error taxonomy
+//! and the handler traits — moved to `tinychannels-bus`. It is re-exported here
+//! rather than merely imported, because `tinychannels::relay::transport::…` is a
+//! path previous releases published and consumers still name. Importing these
+//! privately would compile fine here and break every one of them.
+pub use tinychannels_bus::relay::transport::{
+    RelayFrameDialer, RelayFrameIo, RelayIdentity, RelayInboundHandler,
+    RelayInterruptInboundHandler, RelayPassthroughHandler, RelayReconnectPolicy,
+    RelayTransportError, RelayTransportTimeouts,
+};
 
 use crate::relay::{
     CapabilityDescriptor, ConnectorToGatewayFrame, GatewayToConnectorFrame, RelayFrameDialer,
