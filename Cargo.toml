@@ -1,6 +1,9 @@
 [workspace]
-members = ["crates/tinychannels-bus"]
-default-members = [".", "crates/tinychannels-bus"]
+members = ["crates/tinychannels-bus", "crates/tinychannels-module"]
+default-members = [".", "crates/tinychannels-bus", "crates/tinychannels-module"]
+# The bus is a submodule with its own workspace; it is a path dependency of the
+# module crate, not a member here.
+exclude = ["vendor/tinybus"]
 resolver = "3"
 
 [workspace.package]
