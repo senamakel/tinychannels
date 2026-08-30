@@ -54,6 +54,15 @@ jobs:
       - name: Clippy email,lark features
         run: cargo clippy --all-targets --features email,lark -- -D warnings
 
+      # `-p` and `--no-default-features` are both load-bearing. The lanes above
+      # run at the workspace root, where `tinychannels-module` depends on this
+      # crate with `features = ["email", "lark", "whatsapp-web"]`; cargo unifies
+      # those in, so `--features email` at the root is really an all-features
+      # build and cannot observe a gate being off. Scoping to the package is
+      # what makes this lane test the send-only surface it names.
+      - name: Clippy email-send only (send half, no IMAP stack)
+        run: cargo clippy -p tinychannels --all-targets --no-default-features --features email-send -- -D warnings
+
       - name: Build
         run: cargo build --all-targets
 
@@ -69,6 +78,9 @@ jobs:
       - name: Build email,lark features
         run: cargo build --all-targets --features email,lark
 
+      - name: Build email-send only (send half, no IMAP stack)
+        run: cargo build -p tinychannels --all-targets --no-default-features --features email-send
+
       - name: Test
         run: cargo test
 
@@ -83,3 +95,6 @@ jobs:
 
       - name: Test email,lark features
         run: cargo test --features email,lark
+
+      - name: Test email-send only (send half, no IMAP stack)
+        run: cargo test -p tinychannels --no-default-features --features email-send
