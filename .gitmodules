@@ -1,3 +1,7 @@
 [submodule "wiki"]
 	path = wiki
 	url = https://github.com/tinyhumansai/tinychannels.wiki.git
+[submodule "vendor/tinybus"]
+	path = vendor/tinybus
+	url = https://github.com/tinyhumansai/tinybus
+	branch = main
