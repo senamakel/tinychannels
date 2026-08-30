@@ -43,6 +43,20 @@ top-level architecture reference.
 - `cargo build --all-targets`: compile all crate targets.
 - `cargo test`: run the full test suite.
 
+**Clone recursively.** `crates/tinychannels-module` has a path dependency on
+`vendor/tinybus`, a submodule, and cargo resolves every workspace member before
+it builds any of them — so without it even `cargo check -p tinychannels` fails,
+with a bare `No such file or directory (os error 2)` that names nothing useful:
+
+```bash
+git submodule update --init --recursive
+```
+
+This does **not** affect a host that consumes this crate by path (OpenHuman
+does): there `tinychannels` is a package, not a workspace root, so its sibling
+members are never resolved. Verified by removing `vendor/tinybus` and confirming
+`cargo metadata` still succeeds in the OpenHuman checkout.
+
 **`cargo test` at the workspace root no longer exercises the providers-off
 state.** Cargo unions features across the packages it selects, and
 `tinychannels-module` requires `tinychannels/email` + `tinychannels/lark`, so a
