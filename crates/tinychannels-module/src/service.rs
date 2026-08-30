@@ -1,0 +1,247 @@
+//! The TinyBus service boundary for the channel surface.
+//!
+//! One object, `/ai/tinyhumans/tinychannels/Channels`, exporting five methods:
+//!
+//! ```text
+//! StartChannel(name, ChannelsConfig) -> ()
+//! StopChannel(name)                  -> ()
+//! SendMessage(name, SendMessage)     -> ()
+//! ListChannels()                     -> Vec<String>
+//! ChannelStatus(name)                -> ChannelState
+//! ```
+//!
+//! # This module is stateful, unlike the document one
+//!
+//! `tinydocs` holds nothing between calls: a document is generated and handed
+//! back. A channel provider is the opposite — it owns a live connection and a
+//! listen loop that outlives every call. So this object keeps a registry of
+//! running providers, and `StopChannel` is not optional politeness: without it
+//! a provider's task and socket leak until the process exits.
+//!
+//! # Config arrives per call, not at load
+//!
+//! `StartChannel` takes the whole [`ChannelsConfig`] rather than reading one
+//! handed over at load time, because a desktop host changes it at runtime — a
+//! user pastes a bot token and expects the channel to come up. Reading a
+//! load-time config would mean a module restart per edit.
+//!
+//! Credentials in it are expected to be **already hydrated** by the host; see
+//! `tinychannels::factory`. This module has no keyring and cannot resolve a
+//! placeholder.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use tinybus::{Connection, Error as BusError, Result as BusResult};
+use tinychannels::factory::{DefaultHttpClients, build_channels};
+use tinychannels::host::ChannelHost;
+use tinychannels::{Channel, NoopHost};
+use tinychannels_bus::{BUS_NAME, ChannelsConfig, OBJECT_PATH, SendMessage};
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+
+use crate::host::HostChannels;
+
+const UNKNOWN_CHANNEL_ERROR: &str = "ai.tinyhumans.tinychannels.Error.UnknownChannel";
+const ALREADY_RUNNING_ERROR: &str = "ai.tinyhumans.tinychannels.Error.AlreadyRunning";
+const NOT_CONFIGURED_ERROR: &str = "ai.tinyhumans.tinychannels.Error.NotConfigured";
+const SEND_FAILED_ERROR: &str = "ai.tinyhumans.tinychannels.Error.SendFailed";
+
+/// Bound on the inbound queue between a provider and the forwarding task.
+///
+/// A provider that outruns the host is dropping messages either way; a bounded
+/// channel makes that visible at a known point instead of growing until the
+/// process is killed.
+const INBOUND_QUEUE: usize = 256;
+
+/// One running provider.
+struct Running {
+    channel: Arc<dyn Channel>,
+    /// The listen loop and the forwarding task, aborted together on stop.
+    tasks: Vec<JoinHandle<()>>,
+}
+
+impl Running {
+    fn shutdown(self) {
+        for task in self.tasks {
+            task.abort();
+        }
+    }
+}
+
+/// The served object.
+struct Channels {
+    host: HostChannels,
+    running: Mutex<HashMap<String, Running>>,
+}
+
+#[allow(
+    clippy::unused_async,
+    clippy::unused_async_trait_impl,
+    reason = "tinybus::interface requires every method to be `async fn`"
+)]
+#[tinybus::interface(name = "ai.tinyhumans.tinychannels.Channels")]
+impl Channels {
+    /// Connect `name` from `config` and start receiving.
+    async fn start_channel(&self, name: String, config: ChannelsConfig) -> BusResult<()> {
+        let mut running = self.running.lock().await;
+        if running.contains_key(&name) {
+            return Err(BusError::Failed {
+                name: ALREADY_RUNNING_ERROR.to_owned(),
+                message: format!("channel {name} is already running"),
+            });
+        }
+
+        // The factory builds every *configured* provider; we take the one asked
+        // for. Building the set is cheap (no I/O) and keeps a single
+        // config-to-provider mapping rather than a second one here that could
+        // disagree about, say, which WhatsApp backend a stanza describes.
+        let noop: Arc<dyn ChannelHost> = NoopHost::shared();
+        let built = build_channels(&config, &noop, &DefaultHttpClients);
+        let channel = built
+            .into_iter()
+            .find(|candidate| candidate.name() == name)
+            .ok_or_else(|| BusError::Failed {
+                name: NOT_CONFIGURED_ERROR.to_owned(),
+                message: format!("channel {name} is not present in the supplied config"),
+            })?;
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel(INBOUND_QUEUE);
+
+        let listen_channel = Arc::clone(&channel);
+        let listen_name = name.clone();
+        let listen_host = self.host.clone();
+        let listener = tokio::spawn(async move {
+            listen_host.report_status(&listen_name, "connecting", None);
+            match listen_channel.listen(tx).await {
+                Ok(()) => listen_host.report_status(&listen_name, "stopped", None),
+                Err(error) => {
+                    // The listen loop ending is the provider's terminal state.
+                    // Reporting it is what lets a host decide to retry; the
+                    // module deliberately does not reconnect on its own, because
+                    // a backoff policy that disagreed with the host's would be
+                    // invisible from the host side.
+                    tracing::warn!("[tinychannels:module] {listen_name} listen ended: {error}");
+                    listen_host.report_status(&listen_name, "failed", Some(error.to_string()));
+                }
+            }
+        });
+
+        let forward_name = name.clone();
+        let forward_host = self.host.clone();
+        let forwarder = tokio::spawn(async move {
+            while let Some(message) = rx.recv().await {
+                match serde_json::to_value(&message) {
+                    Ok(value) => forward_host.deliver_inbound(&forward_name, &value),
+                    Err(error) => tracing::warn!(
+                        "[tinychannels:module] {forward_name} inbound message not serialisable: {error}"
+                    ),
+                }
+            }
+        });
+
+        running.insert(
+            name,
+            Running {
+                channel,
+                tasks: vec![listener, forwarder],
+            },
+        );
+        Ok(())
+    }
+
+    /// Disconnect `name` and drop its tasks.
+    ///
+    /// Stopping a channel that is not running is **not** an error: a host
+    /// reconciling desired against actual state should be able to call this
+    /// unconditionally.
+    async fn stop_channel(&self, name: String) -> BusResult<()> {
+        if let Some(running) = self.running.lock().await.remove(&name) {
+            running.shutdown();
+            self.host.report_status(&name, "stopped", None);
+        }
+        Ok(())
+    }
+
+    /// Send one outbound message through a running provider.
+    async fn send_message(&self, name: String, message: SendMessage) -> BusResult<()> {
+        // Cloned out of the map so the send does not hold the registry lock for
+        // the duration of a network round trip.
+        let channel = {
+            let running = self.running.lock().await;
+            running
+                .get(&name)
+                .map(|entry| Arc::clone(&entry.channel))
+                .ok_or_else(|| BusError::Failed {
+                    name: UNKNOWN_CHANNEL_ERROR.to_owned(),
+                    message: format!("channel {name} is not running"),
+                })?
+        };
+
+        channel.send(&message).await.map_err(|error| BusError::Failed {
+            name: SEND_FAILED_ERROR.to_owned(),
+            message: error.to_string(),
+        })
+    }
+
+    /// The providers currently running, in no particular order.
+    async fn list_channels(&self) -> BusResult<Vec<String>> {
+        Ok(self.running.lock().await.keys().cloned().collect())
+    }
+
+    /// Whether `name` is running, and whether the provider reports itself healthy.
+    async fn channel_status(&self, name: String) -> BusResult<String> {
+        let channel = {
+            let running = self.running.lock().await;
+            running.get(&name).map(|entry| Arc::clone(&entry.channel))
+        };
+        let Some(channel) = channel else {
+            return Ok("stopped".to_owned());
+        };
+        Ok(if channel.health_check().await.unwrap_or(false) {
+            "connected".to_owned()
+        } else {
+            "unhealthy".to_owned()
+        })
+    }
+}
+
+async fn setup(connection: Connection) -> BusResult<()> {
+    let channels = Channels {
+        host: HostChannels::new(connection.clone()),
+        running: Mutex::new(HashMap::new()),
+    };
+    connection
+        .serve_at(OBJECT_PATH.try_into()?, channels)
+        .await?;
+    connection.request_name(BUS_NAME).await?;
+    Ok(())
+}
+
+// Isolate the generated public C symbols so the lint exception cannot hide
+// undocumented Rust API. Their contract is TinyBus ABI v1.
+#[allow(
+    missing_docs,
+    unreachable_pub,
+    reason = "generated C ABI symbols are documented by the TinyBus module SDK"
+)]
+mod exports {
+    tinybus_module::module_export! {
+        setup = super::setup,
+        worker_threads = 4,
+        provides = ["ai.tinyhumans.tinychannels.Channels"],
+        methods = [
+            "StartChannel",
+            "StopChannel",
+            "SendMessage",
+            "ListChannels",
+            "ChannelStatus",
+        ],
+        signals = [],
+        // The host callback object is resolved per call, not required at load:
+        // an outbound-only host that serves nothing is supported.
+        requires = [],
+        optional = ["ai.tinyhumans.tinychannels.ChannelsHost"],
+        lazy = false,
+    }
+}
