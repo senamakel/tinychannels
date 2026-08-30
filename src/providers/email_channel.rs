@@ -9,31 +9,51 @@
 #![allow(clippy::unnecessary_map_or)]
 
 use anyhow::{Result, anyhow};
+#[cfg(feature = "email")]
 use async_imap::Session;
+#[cfg(feature = "email")]
 use async_imap::extensions::idle::IdleResponse;
+#[cfg(feature = "email")]
 use async_imap::types::Fetch;
 use async_trait::async_trait;
+#[cfg(feature = "email")]
 use futures::TryStreamExt;
 use lettre::message::{Attachment, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
+#[cfg(feature = "email")]
 use mail_parser::{MessageParser, MimeHeaders};
+#[cfg(feature = "email")]
 use rustls::{ClientConfig, RootCertStore};
+#[cfg(feature = "email")]
 use rustls_pki_types::DnsName;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
+#[cfg(feature = "email")]
+use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(feature = "email")]
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::Mutex;
+#[cfg(feature = "email")]
+use tokio::sync::mpsc;
+#[cfg(feature = "email")]
 use tokio::time::{sleep, timeout};
+#[cfg(feature = "email")]
 use tokio_rustls::TlsConnector;
+#[cfg(feature = "email")]
 use tokio_rustls::client::TlsStream;
-use tracing::{debug, error, info, warn};
+use tracing::info;
+#[cfg(feature = "email")]
+use tracing::{debug, error, warn};
+#[cfg(feature = "email")]
 use uuid::Uuid;
 
 pub use crate::config::EmailConfig;
+#[cfg(feature = "email")]
 use crate::traits::{Channel, ChannelMessage, SendMessage};
 
+#[cfg(feature = "email")]
 type ImapSession = Session<TlsStream<TcpStream>>;
 
 /// Email channel — IMAP IDLE for instant push notifications, SMTP for outbound
