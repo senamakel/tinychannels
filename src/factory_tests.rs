@@ -6,9 +6,9 @@
 //! the host, so "does a config stanza produce a provider" was only ever
 //! answered by starting the real thing.
 
+use crate::NoopHost;
 use crate::factory::{DefaultHttpClients, build_channels};
 use crate::host::ChannelHost;
-use crate::NoopHost;
 use std::sync::Arc;
 use tinychannels_bus::ChannelsConfig;
 use tinychannels_bus::config::{DiscordConfig, TelegramConfig, WhatsAppConfig};
