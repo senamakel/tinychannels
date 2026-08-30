@@ -66,6 +66,10 @@ fn is_webhook_backed(name: &str, config: &ChannelsConfig) -> bool {
 /// process is killed.
 const INBOUND_QUEUE: usize = 256;
 
+/// How long a stopping provider's forwarder gets to hand over what it already
+/// accepted before it is abandoned.
+const FORWARDER_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// One running provider.
 struct Running {
     channel: Arc<dyn Channel>,
@@ -82,13 +86,28 @@ impl Running {
         self.forwarder.abort();
     }
 
-    /// Stop only the forwarder.
+    /// Let the forwarder finish, then stop it if it will not.
     ///
-    /// Held separately because the listener removes its own entry when it ends,
-    /// and aborting itself from inside itself would drop the rest of that
-    /// cleanup — including the status report the host is waiting for.
-    fn abort_forwarder(self) {
-        self.forwarder.abort();
+    /// Used by the listener when it ends. **Not** an abort: `listen` owns the
+    /// sender, so its return closes the channel and the forwarder drains what is
+    /// left and exits on its own. Aborting instead would discard inbound
+    /// messages the provider had already accepted — exactly the traffic a host
+    /// is least willing to lose, and most likely to be holding when the host
+    /// callback is the slow part.
+    ///
+    /// The timeout is the backstop for the case where the host callback is
+    /// wedged: a drain that cannot finish must not keep the task alive for ever.
+    async fn drain_forwarder(self) {
+        if tokio::time::timeout(FORWARDER_DRAIN_TIMEOUT, self.forwarder)
+            .await
+            .is_err()
+        {
+            tracing::warn!(
+                "[tinychannels:module] forwarder did not drain within {:?}; \
+                 remaining inbound messages are dropped",
+                FORWARDER_DRAIN_TIMEOUT
+            );
+        }
     }
 }
 
@@ -176,7 +195,7 @@ impl Channels {
             // Dropped rather than aborted: this task is the listener, and
             // `Running::shutdown` would abort it from inside itself.
             if let Some(entry) = listen_registry.lock().await.remove(&listen_name) {
-                entry.abort_forwarder();
+                entry.drain_forwarder().await;
             }
 
             match outcome {
