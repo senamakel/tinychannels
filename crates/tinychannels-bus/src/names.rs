@@ -50,10 +50,7 @@ pub const METHODS: [&str; 5] = [
 ];
 
 /// All host-callback method names in declaration order.
-pub const HOST_METHODS: [&str; 2] = [
-    host_methods::DELIVER_INBOUND,
-    host_methods::REPORT_STATUS,
-];
+pub const HOST_METHODS: [&str; 2] = [host_methods::DELIVER_INBOUND, host_methods::REPORT_STATUS];
 
 #[cfg(test)]
 mod tests {

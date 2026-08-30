@@ -45,20 +45,20 @@ pub mod routes;
 pub mod runtime;
 
 pub use backend::{ChannelBackend, ChannelManager};
-pub use tinychannels_bus::{
-    BUS_NAME, CONTRACT_VERSION, Channel, ChannelAuthMode, ChannelDefinition, ChannelInboundEnvelope,
-    ChannelMessage, ChannelOutboundIntent, ChannelSendExt, ChannelsConfig, DeliveryDurability,
-    HOST_BUS_NAME, HOST_OBJECT_PATH, METHODS, OBJECT_PATH, OutboundPayload, Result, SendMessage,
-    TinyChannelsError, build_session_key_for_inbound_envelope,
-    inbound_envelope_from_legacy_message, is_compatible, legacy_message_from_inbound_envelope,
-    legacy_message_value_from_outbound_intent, methods, outbound_intent_from_legacy_message,
-    outbound_intent_from_send_message,
-};
 pub use host::{ChannelHost, ChannelHostBuilder, HostCapabilities, NoopHost, ProviderContext};
 pub use providers::{
     DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
     MattermostChannel, QQChannel, SignalChannel, SlackChannel, TelegramChannel, WhatsAppChannel,
     WhatsAppWebChannel, YuanbaoChannel,
+};
+pub use tinychannels_bus::{
+    BUS_NAME, CONTRACT_VERSION, Channel, ChannelAuthMode, ChannelDefinition,
+    ChannelInboundEnvelope, ChannelMessage, ChannelOutboundIntent, ChannelSendExt, ChannelsConfig,
+    DeliveryDurability, HOST_BUS_NAME, HOST_OBJECT_PATH, METHODS, OBJECT_PATH, OutboundPayload,
+    Result, SendMessage, TinyChannelsError, build_session_key_for_inbound_envelope,
+    inbound_envelope_from_legacy_message, is_compatible, legacy_message_from_inbound_envelope,
+    legacy_message_value_from_outbound_intent, methods, outbound_intent_from_legacy_message,
+    outbound_intent_from_send_message,
 };
 // Re-exported separately so each can follow its provider's feature gate.
 #[cfg(feature = "email")]

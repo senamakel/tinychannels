@@ -13,7 +13,6 @@ use tokio::sync::{Mutex, Notify, RwLock, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, sleep, timeout};
 
-
 /// Hermes-compatible relay transport loop over a frame I/O implementation.
 pub struct RelayTransport {
     identities: Vec<RelayIdentity>,
