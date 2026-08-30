@@ -2593,6 +2593,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
+ "tinychannels-bus",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
@@ -2607,6 +2608,24 @@ dependencies = [
  "whatsapp-rust-tokio-transport",
  "whatsapp-rust-ureq-http-client",
  "wiremock",
+]
+
+[[package]]
+name = "tinychannels-bus"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "chrono",
+ "hmac",
+ "parking_lot",
+ "rand 0.10.2",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
 ]
 
 [[package]]

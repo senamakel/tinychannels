@@ -1,35 +1,30 @@
-//! Relay connector contract primitives.
+//! Relay connector transport.
+//!
+//! The contract primitives — frames, HMAC auth, the capability descriptor, and
+//! the identities/timeouts/handler traits the loop speaks — live in
+//! [`tinychannels_bus::relay`] and are re-exported here. What remains in this
+//! crate is the part that needs a runtime: the frame transport loop and the
+//! WebSocket dialer.
 
-pub mod actions;
-pub mod auth;
-pub mod descriptor;
-pub mod frames;
 pub mod transport;
 #[cfg(feature = "relay-websocket")]
 pub mod websocket;
 
-pub use actions::relay_send_action_from_outbound_intent;
-pub use auth::{
-    DEFAULT_MAX_SKEW_SECONDS, DEFAULT_UPGRADE_TTL_SECONDS, DELIVERY_SIG_HEADER, DELIVERY_TS_HEADER,
-    delivery_payload, make_token, make_token_at, make_upgrade_token, make_upgrade_token_at, sign,
-    verify_delivery_signature, verify_delivery_signature_at, verify_signature, verify_token,
-    verify_token_at,
-};
-pub use descriptor::{
-    CONTRACT_VERSION, CapabilityDescriptor, DEFAULT_MAX_MESSAGE_LENGTH, RelayDescriptorOptions,
-    RelayPlatformEntry,
-};
-pub use frames::{
+pub use tinychannels_bus::relay::{
+    CONTRACT_VERSION, CapabilityDescriptor, DEFAULT_MAX_MESSAGE_LENGTH, DEFAULT_MAX_SKEW_SECONDS,
+    DEFAULT_UPGRADE_TTL_SECONDS, DELIVERY_SIG_HEADER, DELIVERY_TS_HEADER,
     AuthenticatedRelayInboundEvent, ConnectorToGatewayFrame, FRAME_DESCRIPTOR, FRAME_GOING_IDLE,
     FRAME_GOING_IDLE_ACK, FRAME_HELLO, FRAME_INBOUND, FRAME_INBOUND_ACK, FRAME_INTERRUPT,
     FRAME_INTERRUPT_INBOUND, FRAME_OUTBOUND, FRAME_OUTBOUND_RESULT, FRAME_PASSTHROUGH_FORWARD,
-    GatewayToConnectorFrame, PassthroughForward,
+    GatewayToConnectorFrame, PassthroughForward, RelayDescriptorOptions, RelayFrameDialer,
+    RelayFrameIo, RelayIdentity, RelayInboundHandler, RelayInterruptInboundHandler,
+    RelayPassthroughHandler, RelayPlatformEntry, RelayReconnectPolicy, RelayTransportError,
+    RelayTransportTimeouts, actions, auth, delivery_payload, descriptor, frames, make_token,
+    make_token_at, make_upgrade_token, make_upgrade_token_at,
+    relay_send_action_from_outbound_intent, sign, verify_delivery_signature,
+    verify_delivery_signature_at, verify_signature, verify_token, verify_token_at,
 };
-pub use transport::{
-    RelayFrameDialer, RelayFrameIo, RelayIdentity, RelayInboundHandler,
-    RelayInterruptInboundHandler, RelayPassthroughHandler, RelayReconnectHandle,
-    RelayReconnectPolicy, RelayTransport, RelayTransportError, RelayTransportTimeouts,
-};
+pub use transport::{RelayReconnectHandle, RelayTransport};
 #[cfg(feature = "relay-websocket")]
 pub use websocket::{
     WebSocketRelayConfig, WebSocketRelayDialer, WebSocketRelayIo, connect_websocket_relay_io,
