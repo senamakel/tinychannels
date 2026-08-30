@@ -198,10 +198,11 @@ pub fn build_channels(
     }
 
     if let Some(lq) = config.linq.as_ref() {
-        channels.push(Arc::new(LinqChannel::new(
+        channels.push(Arc::new(LinqChannel::with_http_client(
             lq.api_token.clone(),
             lq.from_phone.clone(),
             lq.allowed_senders.clone(),
+            http.client_for("channel.linq"),
         )));
     }
 

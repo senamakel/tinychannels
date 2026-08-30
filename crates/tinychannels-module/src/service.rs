@@ -57,22 +57,34 @@ const INBOUND_QUEUE: usize = 256;
 /// One running provider.
 struct Running {
     channel: Arc<dyn Channel>,
-    /// The listen loop and the forwarding task, aborted together on stop.
-    tasks: Vec<JoinHandle<()>>,
+    /// The provider's `listen` loop.
+    listener: JoinHandle<()>,
+    /// Drains the inbound queue into the host callback.
+    forwarder: JoinHandle<()>,
 }
 
 impl Running {
+    /// Stop both tasks. Used by `StopChannel`, from outside either of them.
     fn shutdown(self) {
-        for task in self.tasks {
-            task.abort();
-        }
+        self.listener.abort();
+        self.forwarder.abort();
+    }
+
+    /// Stop only the forwarder.
+    ///
+    /// Held separately because the listener removes its own entry when it ends,
+    /// and aborting itself from inside itself would drop the rest of that
+    /// cleanup — including the status report the host is waiting for.
+    fn abort_forwarder(self) {
+        self.forwarder.abort();
     }
 }
 
 /// The served object.
 struct Channels {
     host: HostChannels,
-    running: Mutex<HashMap<String, Running>>,
+    /// Shared with each listener task so it can retire its own entry.
+    running: Arc<Mutex<HashMap<String, Running>>>,
 }
 
 #[allow(
@@ -110,18 +122,35 @@ impl Channels {
         let listen_channel = Arc::clone(&channel);
         let listen_name = name.clone();
         let listen_host = self.host.clone();
+        let listen_registry = Arc::clone(&self.running);
         let listener = tokio::spawn(async move {
-            listen_host.report_status(&listen_name, "connecting", None);
-            match listen_channel.listen(tx).await {
-                Ok(()) => listen_host.report_status(&listen_name, "stopped", None),
+            listen_host.report_status(&listen_name, "connecting", None).await;
+            let outcome = listen_channel.listen(tx).await;
+
+            // The listen loop returning is the provider's terminal state, so the
+            // registry entry has to go with it. Leaving it behind was a real bug:
+            // `ListChannels` kept advertising a dead provider, `StartChannel`
+            // rejected every retry as `AlreadyRunning`, and `ChannelStatus` could
+            // still answer "connected" off an HTTP health check that knows
+            // nothing about the receive loop.
+            //
+            // Dropped rather than aborted: this task is the listener, and
+            // `Running::shutdown` would abort it from inside itself.
+            if let Some(entry) = listen_registry.lock().await.remove(&listen_name) {
+                entry.abort_forwarder();
+            }
+
+            match outcome {
+                Ok(()) => listen_host.report_status(&listen_name, "stopped", None).await,
                 Err(error) => {
-                    // The listen loop ending is the provider's terminal state.
-                    // Reporting it is what lets a host decide to retry; the
-                    // module deliberately does not reconnect on its own, because
-                    // a backoff policy that disagreed with the host's would be
-                    // invisible from the host side.
+                    // The module deliberately does not reconnect on its own: a
+                    // backoff policy that disagreed with the host's would be
+                    // invisible from the host side. Reporting is what lets the
+                    // host decide to retry — and the entry is gone, so it can.
                     tracing::warn!("[tinychannels:module] {listen_name} listen ended: {error}");
-                    listen_host.report_status(&listen_name, "failed", Some(error.to_string()));
+                    listen_host
+                        .report_status(&listen_name, "failed", Some(error.to_string()))
+                        .await;
                 }
             }
         });
@@ -131,7 +160,7 @@ impl Channels {
         let forwarder = tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
                 match serde_json::to_value(&message) {
-                    Ok(value) => forward_host.deliver_inbound(&forward_name, &value),
+                    Ok(value) => forward_host.deliver_inbound(&forward_name, value).await,
                     Err(error) => tracing::warn!(
                         "[tinychannels:module] {forward_name} inbound message not serialisable: {error}"
                     ),
@@ -143,7 +172,8 @@ impl Channels {
             name,
             Running {
                 channel,
-                tasks: vec![listener, forwarder],
+                listener,
+                forwarder,
             },
         );
         Ok(())
@@ -211,7 +241,7 @@ impl Channels {
 async fn setup(connection: Connection) -> BusResult<()> {
     let channels = Channels {
         host: HostChannels::new(connection.clone()),
-        running: Mutex::new(HashMap::new()),
+        running: Arc::new(Mutex::new(HashMap::new())),
     };
     connection
         .serve_at(OBJECT_PATH.try_into()?, channels)
