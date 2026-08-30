@@ -77,7 +77,6 @@ struct Channels {
 
 #[allow(
     clippy::unused_async,
-    clippy::unused_async_trait_impl,
     reason = "tinybus::interface requires every method to be `async fn`"
 )]
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.Channels")]

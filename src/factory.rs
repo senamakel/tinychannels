@@ -190,7 +190,7 @@ pub fn build_channels(
             "cloud" => tracing::warn!(
                 "[channels] whatsapp cloud configured but missing phone_number_id, access_token or verify_token"
             ),
-            "web" => build_whatsapp_web(wa, host, &mut channels),
+            "web" => channels.extend(build_whatsapp_web(wa, host)),
             _ => tracing::warn!(
                 "[channels] whatsapp config invalid: neither phone_number_id (Cloud API) nor session_path (Web) is set"
             ),
@@ -262,31 +262,40 @@ pub fn build_channels(
 
 /// The WhatsApp Web arm, split out so the feature gate does not sit inside a
 /// `match` arm where the `else` branch would need its own `#[cfg]`.
-#[allow(unused_variables, reason = "host is unused when the gate is off")]
+///
+/// Returns rather than pushing into the caller's vector: with the gate off the
+/// body can never produce a provider, and a `&mut Vec` parameter that is never
+/// written to is both a clippy warning and a lie about what the function does.
+#[allow(
+    unused_variables,
+    reason = "both arguments are unused when the gate is off"
+)]
 fn build_whatsapp_web(
     wa: &crate::config::WhatsAppConfig,
     host: &Arc<dyn ChannelHost>,
-    channels: &mut Vec<Arc<dyn Channel>>,
-) {
+) -> Option<Arc<dyn Channel>> {
     #[cfg(feature = "whatsapp-web")]
     {
-        if wa.is_web_config() {
-            let mut channel = crate::WhatsAppWebChannel::new(
-                wa.session_path.clone().unwrap_or_default(),
-                wa.pair_phone.clone(),
-                wa.pair_code.clone(),
-                wa.allowed_numbers.clone(),
-            );
-            if let Some(lifecycle) = host.lifecycle() {
-                channel = channel.with_lifecycle(lifecycle);
-            }
-            channels.push(Arc::new(channel));
-        } else {
+        if !wa.is_web_config() {
             tracing::warn!("[channels] whatsapp web configured but session_path not set");
+            return None;
         }
+        let mut channel = crate::WhatsAppWebChannel::new(
+            wa.session_path.clone().unwrap_or_default(),
+            wa.pair_phone.clone(),
+            wa.pair_code.clone(),
+            wa.allowed_numbers.clone(),
+        );
+        if let Some(lifecycle) = host.lifecycle() {
+            channel = channel.with_lifecycle(lifecycle);
+        }
+        Some(Arc::new(channel))
     }
     #[cfg(not(feature = "whatsapp-web"))]
-    tracing::warn!(
-        "[channels] whatsapp web backend requires the `whatsapp-web` feature; rebuild with it enabled"
-    );
+    {
+        tracing::warn!(
+            "[channels] whatsapp web backend requires the `whatsapp-web` feature; rebuild with it enabled"
+        );
+        None
+    }
 }
