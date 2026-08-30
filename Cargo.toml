@@ -20,6 +20,10 @@ repository = "https://github.com/tinyhumansai/tinychannels"
 readme = "README.md"
 keywords = ["messaging", "channels", "openhuman", "harness"]
 categories = ["asynchronous", "api-bindings"]
+# Consumers depend on this crate via GitHub (git dependency / vendored
+# submodule), not crates.io, so there is nothing to publish. See the
+# equivalent note in crates/tinychannels-bus/Cargo.toml.
+publish = false
 
 [features]
 default = []
