@@ -43,8 +43,10 @@ fn a_default_config_builds_no_channels() {
 
 #[test]
 fn a_configured_provider_is_built() {
-    let mut config = ChannelsConfig::default();
-    config.telegram = Some(telegram());
+    let config = ChannelsConfig {
+        telegram: Some(telegram()),
+        ..ChannelsConfig::default()
+    };
     assert_eq!(names(&config), vec!["telegram".to_owned()]);
 }
 
@@ -52,19 +54,21 @@ fn a_configured_provider_is_built() {
 /// should see the same sequence across runs and across the two hosts.
 #[test]
 fn providers_are_returned_in_declaration_order() {
-    let mut config = ChannelsConfig::default();
-    config.discord = Some(DiscordConfig {
-        bot_token: "token".to_owned(),
-        guild_id: None,
-        channel_id: None,
-        allowed_users: Vec::new(),
-        listen_to_bots: false,
-        mention_only: false,
-    });
-    config.telegram = Some(telegram());
+    // Discord is written first here on purpose: the assertion below proves the
+    // factory's declaration order wins, not the order these fields were set.
+    let config = ChannelsConfig {
+        discord: Some(DiscordConfig {
+            bot_token: "token".to_owned(),
+            guild_id: None,
+            channel_id: None,
+            allowed_users: Vec::new(),
+            listen_to_bots: false,
+            mention_only: false,
+        }),
+        telegram: Some(telegram()),
+        ..ChannelsConfig::default()
+    };
 
-    // Telegram is declared before Discord in the factory, so it comes first
-    // regardless of the order the fields were set here.
     assert_eq!(
         names(&config),
         vec!["telegram".to_owned(), "discord".to_owned()]
@@ -78,20 +82,22 @@ fn providers_are_returned_in_declaration_order() {
 /// other channel.
 #[test]
 fn an_unusable_whatsapp_stanza_is_skipped_without_disturbing_others() {
-    let mut config = ChannelsConfig::default();
-    config.telegram = Some(telegram());
-    // Neither `phone_number_id` (Cloud) nor `session_path` (Web) is set, so
-    // `backend_type()` reports neither shape.
-    config.whatsapp = Some(WhatsAppConfig {
-        access_token: None,
-        phone_number_id: None,
-        verify_token: None,
-        app_secret: None,
-        session_path: None,
-        pair_phone: None,
-        pair_code: None,
-        allowed_numbers: Vec::new(),
-    });
+    let config = ChannelsConfig {
+        telegram: Some(telegram()),
+        // Neither `phone_number_id` (Cloud) nor `session_path` (Web) is set, so
+        // `backend_type()` reports neither shape.
+        whatsapp: Some(WhatsAppConfig {
+            access_token: None,
+            phone_number_id: None,
+            verify_token: None,
+            app_secret: None,
+            session_path: None,
+            pair_phone: None,
+            pair_code: None,
+            allowed_numbers: Vec::new(),
+        }),
+        ..ChannelsConfig::default()
+    };
 
     assert_eq!(names(&config), vec!["telegram".to_owned()]);
 }
