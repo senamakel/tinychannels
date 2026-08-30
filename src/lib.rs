@@ -37,6 +37,7 @@ pub use tinychannels_bus::{
 
 pub mod backend;
 pub mod delivery;
+pub mod factory;
 pub mod harness;
 pub mod host;
 pub mod providers;
@@ -45,6 +46,7 @@ pub mod routes;
 pub mod runtime;
 
 pub use backend::{ChannelBackend, ChannelManager};
+pub use factory::{DefaultHttpClients, HttpClientFactory, build_channels};
 pub use host::{ChannelHost, ChannelHostBuilder, HostCapabilities, NoopHost, ProviderContext};
 pub use providers::{
     DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
