@@ -71,7 +71,9 @@ pub struct HostChannels {
 
 impl std::fmt::Debug for HostChannels {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("HostChannels").finish_non_exhaustive()
+        formatter
+            .debug_struct("HostChannels")
+            .finish_non_exhaustive()
     }
 }
 

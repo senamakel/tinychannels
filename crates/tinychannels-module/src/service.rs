@@ -124,7 +124,9 @@ impl Channels {
         let listen_host = self.host.clone();
         let listen_registry = Arc::clone(&self.running);
         let listener = tokio::spawn(async move {
-            listen_host.report_status(&listen_name, "connecting", None).await;
+            listen_host
+                .report_status(&listen_name, "connecting", None)
+                .await;
             let outcome = listen_channel.listen(tx).await;
 
             // The listen loop returning is the provider's terminal state, so the
@@ -141,7 +143,11 @@ impl Channels {
             }
 
             match outcome {
-                Ok(()) => listen_host.report_status(&listen_name, "stopped", None).await,
+                Ok(()) => {
+                    listen_host
+                        .report_status(&listen_name, "stopped", None)
+                        .await
+                }
                 Err(error) => {
                     // The module deliberately does not reconnect on its own: a
                     // backoff policy that disagreed with the host's would be
