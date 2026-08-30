@@ -30,7 +30,9 @@ use mail_parser::{MessageParser, MimeHeaders};
 use rustls::{ClientConfig, RootCertStore};
 #[cfg(feature = "email")]
 use rustls_pki_types::DnsName;
+#[cfg(feature = "email")]
 use std::collections::HashSet;
+#[cfg(feature = "email")]
 use std::sync::Arc;
 #[cfg(feature = "email")]
 use std::time::Duration;
@@ -38,6 +40,7 @@ use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(feature = "email")]
 use tokio::net::TcpStream;
+#[cfg(feature = "email")]
 use tokio::sync::Mutex;
 #[cfg(feature = "email")]
 use tokio::sync::mpsc;
