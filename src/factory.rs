@@ -299,3 +299,7 @@ fn build_whatsapp_web(
         None
     }
 }
+
+#[cfg(test)]
+#[path = "factory_tests.rs"]
+mod factory_tests;
