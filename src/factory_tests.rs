@@ -55,8 +55,8 @@ fn providers_are_returned_in_declaration_order() {
     let mut config = ChannelsConfig::default();
     config.discord = Some(DiscordConfig {
         bot_token: "token".to_owned(),
-        guild_id: String::new(),
-        channel_id: String::new(),
+        guild_id: None,
+        channel_id: None,
         allowed_users: Vec::new(),
         listen_to_bots: false,
         mention_only: false,
@@ -80,7 +80,18 @@ fn providers_are_returned_in_declaration_order() {
 fn an_unusable_whatsapp_stanza_is_skipped_without_disturbing_others() {
     let mut config = ChannelsConfig::default();
     config.telegram = Some(telegram());
-    config.whatsapp = Some(WhatsAppConfig::default());
+    // Neither `phone_number_id` (Cloud) nor `session_path` (Web) is set, so
+    // `backend_type()` reports neither shape.
+    config.whatsapp = Some(WhatsAppConfig {
+        access_token: None,
+        phone_number_id: None,
+        verify_token: None,
+        app_secret: None,
+        session_path: None,
+        pair_phone: None,
+        pair_code: None,
+        allowed_numbers: Vec::new(),
+    });
 
     assert_eq!(names(&config), vec!["telegram".to_owned()]);
 }
