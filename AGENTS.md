@@ -8,7 +8,8 @@ contract crate and an implementation crate:
 | Crate | Path | Holds |
 | --- | --- | --- |
 | `tinychannels-bus` | `crates/tinychannels-bus/` | The wire contract: envelopes, outbound intents, `ChannelsConfig`, controller metadata, relay frames + HMAC auth, pairing helpers, session-key rules, and the bus names in `src/names.rs`. Transport-free and dependency-light. |
-| `tinychannels` | `.` (root) | The implementation: the provider stack (`src/providers/`), the relay transport loop, delivery, and the host boundary. Depends on the contract crate and re-exports it whole. |
+| `tinychannels` | `.` (root) | The implementation: the provider stack (`src/providers/`), the relay transport loop, delivery, the `factory` that turns a `ChannelsConfig` into providers, and the host boundary. Depends on the contract crate and re-exports it whole. |
+| `tinychannels-module` | `crates/tinychannels-module/` | The loadable TinyBus `cdylib`. Serves `ai.tinyhumans.tinychannels.Channels` and calls the host's `ChannelsHost` object for inbound traffic. Private (`publish = false`); its output is the artifact attached to a release. |
 
 **The split is not cosmetic — put new code on the right side of it.** A type that
 crosses a boundary goes in the contract crate; anything that opens a socket,
@@ -42,7 +43,19 @@ top-level architecture reference.
 - `cargo build --all-targets`: compile all crate targets.
 - `cargo test`: run the full test suite.
 
-Run commands from the repository root; they cover both workspace members. Use
+**`cargo test` at the workspace root no longer exercises the providers-off
+state.** Cargo unions features across the packages it selects, and
+`tinychannels-module` requires `tinychannels/email` + `tinychannels/lark`, so a
+workspace-wide run builds the root crate with both gates ON (844 tests instead
+of 750). That is not a bug, but it means the *off* state — the one that catches
+a `#[cfg]` mistake — needs its own invocation:
+
+```bash
+cargo test -p tinychannels          # providers OFF: 750 tests, no lettre/axum
+cargo test                          # whole workspace, providers ON
+```
+
+Run commands from the repository root; they cover all three workspace members. Use
 `cargo test -p tinychannels-bus` to exercise the contract crate alone, and
 `cargo check -p tinychannels-bus` to confirm it still builds without the
 implementation crate's dependencies — that is the check which catches a

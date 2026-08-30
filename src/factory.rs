@@ -94,11 +94,18 @@ pub fn build_channels(
             mention_only = tg.mention_only,
             "[channels] telegram enabled (bot token not logged)"
         );
-        let mut telegram =
-            TelegramChannel::new(tg.bot_token.clone(), tg.allowed_users.clone(), tg.mention_only)
-                .with_streaming(tg.stream_mode, tg.draft_update_interval_ms, tg.silent_streaming)
-                .with_chat_id(tg.chat_id.clone())
-                .with_http_client(http.client_for("channel.telegram"));
+        let mut telegram = TelegramChannel::new(
+            tg.bot_token.clone(),
+            tg.allowed_users.clone(),
+            tg.mention_only,
+        )
+        .with_streaming(
+            tg.stream_mode,
+            tg.draft_update_interval_ms,
+            tg.silent_streaming,
+        )
+        .with_chat_id(tg.chat_id.clone())
+        .with_http_client(http.client_for("channel.telegram"));
         // Each is optional — telegram degrades gracefully without them.
         if let Some(transcriber) = host.transcriber() {
             telegram = telegram.with_transcriber(transcriber);
@@ -200,7 +207,9 @@ pub fn build_channels(
 
     #[cfg(feature = "email")]
     if let Some(email_cfg) = config.email.as_ref() {
-        channels.push(Arc::new(crate::providers::EmailChannel::new(email_cfg.clone())));
+        channels.push(Arc::new(crate::providers::EmailChannel::new(
+            email_cfg.clone(),
+        )));
     }
 
     if let Some(irc_cfg) = config.irc.as_ref() {

@@ -178,10 +178,13 @@ impl Channels {
                 })?
         };
 
-        channel.send(&message).await.map_err(|error| BusError::MethodFailed {
-            name: SEND_FAILED_ERROR.to_owned(),
-            message: error.to_string(),
-        })
+        channel
+            .send(&message)
+            .await
+            .map_err(|error| BusError::MethodFailed {
+                name: SEND_FAILED_ERROR.to_owned(),
+                message: error.to_string(),
+            })
     }
 
     /// The providers currently running, in no particular order.
