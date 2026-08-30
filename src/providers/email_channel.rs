@@ -8,13 +8,16 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::unnecessary_map_or)]
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+#[cfg(feature = "email")]
+use anyhow::anyhow;
 #[cfg(feature = "email")]
 use async_imap::Session;
 #[cfg(feature = "email")]
 use async_imap::extensions::idle::IdleResponse;
 #[cfg(feature = "email")]
 use async_imap::types::Fetch;
+#[cfg(feature = "email")]
 use async_trait::async_trait;
 #[cfg(feature = "email")]
 use futures::TryStreamExt;
@@ -29,6 +32,7 @@ use rustls::{ClientConfig, RootCertStore};
 use rustls_pki_types::DnsName;
 use std::collections::HashSet;
 use std::sync::Arc;
+#[cfg(feature = "email")]
 use std::time::Duration;
 #[cfg(feature = "email")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -59,6 +63,10 @@ type ImapSession = Session<TlsStream<TcpStream>>;
 /// Email channel — IMAP IDLE for instant push notifications, SMTP for outbound
 pub struct EmailChannel {
     pub config: EmailConfig,
+    /// Dedupe set for IMAP IDLE, which can re-report a message across
+    /// re-establishes. A send-only build never opens a mailbox, so the field
+    /// would be dead weight and a `never read` denial there.
+    #[cfg(feature = "email")]
     seen_messages: Arc<Mutex<HashSet<String>>>,
 }
 
@@ -66,6 +74,7 @@ impl EmailChannel {
     pub fn new(config: EmailConfig) -> Self {
         Self {
             config,
+            #[cfg(feature = "email")]
             seen_messages: Arc::new(Mutex::new(HashSet::new())),
         }
     }
