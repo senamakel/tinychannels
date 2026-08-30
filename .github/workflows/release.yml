@@ -39,19 +39,6 @@ jobs:
           # Required to resolve the workspace: see the note in ci.yml.
           submodules: true
 
-      # Fail fast, before the version bump/tag/push below mutates `main` and
-      # burns a version number. Without this, a missing secret is only
-      # discovered in the "Publish to crates.io" step, by which point the
-      # release commit and tag already exist upstream and cannot be reused.
-      - name: Verify crates.io token is configured
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          if [[ -z "$CARGO_REGISTRY_TOKEN" ]]; then
-            echo "::error::CARGO_REGISTRY_TOKEN secret is empty or unset in the 'Production' environment. Add it before running this workflow." >&2
-            exit 1
-          fi
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
