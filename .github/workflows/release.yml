@@ -164,7 +164,18 @@ jobs:
       - name: Publish to crates.io
         run: |
           set -euo pipefail
-          cargo publish --locked --package tinychannels-bus
+
+          # Idempotent for the same reason the root publish below is: a release
+          # re-run after a partial failure would otherwise die here, under
+          # `set -e`, before the root crate is ever attempted.
+          if ! output="$(cargo publish --locked --package tinychannels-bus 2>&1)"; then
+            echo "$output"
+            grep -qi "already .*uploaded\|crate version .* is already being published" <<<"$output" \
+              || exit 1
+            echo "Contract crate is already published at this version; continuing."
+          else
+            echo "$output"
+          fi
 
           for attempt in $(seq 1 30); do
             if output="$(cargo publish --locked --package tinychannels 2>&1)"; then
