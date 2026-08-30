@@ -1,11 +1,9 @@
 //! Relay frame transport loop.
 
 use crate::relay::{
-    AuthenticatedRelayInboundEvent, CapabilityDescriptor, ConnectorToGatewayFrame,
-    GatewayToConnectorFrame, PassthroughForward, RelayFrameDialer, RelayFrameIo,
-    RelayIdentity, RelayInboundHandler, RelayInterruptInboundHandler,
-    RelayPassthroughHandler, RelayTransportError, RelayTransportTimeouts,
-    RelayReconnectPolicy,
+    CapabilityDescriptor, ConnectorToGatewayFrame, GatewayToConnectorFrame, RelayFrameDialer,
+    RelayFrameIo, RelayIdentity, RelayInboundHandler, RelayInterruptInboundHandler,
+    RelayPassthroughHandler, RelayReconnectPolicy, RelayTransportError, RelayTransportTimeouts,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
