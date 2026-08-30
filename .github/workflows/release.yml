@@ -140,12 +140,34 @@ jobs:
           git commit -m "Release ${RELEASE_TAG}"
           git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
 
+      # Consumers point at this repo via GitHub (git dependency / vendored
+      # submodule) rather than crates.io, so both `tinychannels` and its
+      # contract crate `tinychannels-bus` carry `publish = false`. Packaging or
+      # publishing either always fails against that, so skip both steps
+      # instead of hard-failing the whole release (which also blocks the
+      # version-bump tag from ever being pushed). Checking the root crate's
+      # `publish` field is enough: both crates are set the same way and are
+      # meant to move together.
+      - name: Check crates.io publishability
+        id: publishable
+        run: |
+          set -euo pipefail
+
+          publish="$(cargo metadata --no-deps --format-version 1 | jq -r --arg crate "$CRATE_NAME" '.packages[] | select(.name == $crate) | .publish')"
+          if [[ "$publish" == "[]" ]]; then
+            echo "publishable=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${CRATE_NAME} has publish = false; skipping crates.io package/publish steps."
+          else
+            echo "publishable=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # Only the contract crate can be packaged here. `cargo package` rewrites a
       # path dependency to a registry lookup, so packaging the root crate fails
       # until `tinychannels-bus` is actually in the index — which happens in the
       # publish step below. `tinychannels-module` is `publish = false` and is
       # skipped entirely.
       - name: Package the bus contract
+        if: steps.publishable.outputs.publishable == 'true'
         run: cargo package --locked --package tinychannels-bus
 
       - name: Push release commit and tag
@@ -167,6 +189,7 @@ jobs:
       # version is treated as success so a retry after a partial failure is not
       # itself fatal.
       - name: Publish to crates.io
+        if: steps.publishable.outputs.publishable == 'true'
         run: |
           set -euo pipefail
 
