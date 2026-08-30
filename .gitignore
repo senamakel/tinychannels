@@ -4,6 +4,11 @@
 target/
 **/*.rs.bk
 
+# Release staging built by the `native-bundles` job. Local runs of that
+# packaging step leave a multi-megabyte `cdylib` and its archive here, and an
+# auto-commit hook will happily commit them.
+dist/
+
 # Local secrets — never commit; copy .env.example to .env
 .env
 .DS_Store
