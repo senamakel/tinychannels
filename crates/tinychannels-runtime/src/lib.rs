@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use rand::RngExt as _;
 use tinychannels_bus::{Channel, ChannelMessage};
+use tokio_util::sync::CancellationToken;
 
 /// Maximum reconnect jitter added to a listener retry.
 pub const MAX_JITTER_MS: u64 = 1_000;
@@ -147,6 +148,37 @@ pub fn jitter_millis(backoff_secs: u64) -> u64 {
     (window != 0)
         .then(|| rand::rng().random_range(0..window))
         .unwrap_or(0)
+}
+
+/// Log a failed worker join without imposing host-specific error reporting.
+pub fn log_worker_join_result(result: Result<(), tokio::task::JoinError>) {
+    if let Err(error) = result {
+        tracing::error!("Channel message worker crashed: {error}");
+    }
+}
+
+/// Maintain a typing indicator until `cancellation_token` is cancelled.
+pub fn spawn_scoped_typing_task(
+    channel: Arc<dyn Channel>,
+    recipient: String,
+    cancellation_token: CancellationToken,
+    refresh_interval: Duration,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                () = cancellation_token.cancelled() => break,
+                _ = tokio::time::sleep(refresh_interval) => {
+                    if let Err(error) = channel.start_typing(&recipient).await {
+                        tracing::debug!(channel = channel.name(), "typing start failed: {error}");
+                    }
+                }
+            }
+        }
+        if let Err(error) = channel.stop_typing(&recipient).await {
+            tracing::debug!(channel = channel.name(), "typing stop failed: {error}");
+        }
+    })
 }
 
 #[cfg(test)]
