@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/tinychannels-bus", "crates/tinychannels-module"]
-default-members = [".", "crates/tinychannels-bus", "crates/tinychannels-module"]
+members = ["crates/tinychannels-bus", "crates/tinychannels-runtime", "crates/tinychannels-module"]
+default-members = [".", "crates/tinychannels-bus", "crates/tinychannels-runtime", "crates/tinychannels-module"]
 # The bus is a submodule with its own workspace; it is a path dependency of the
 # module crate, not a member here.
 exclude = ["vendor/tinybus"]
@@ -69,6 +69,7 @@ whatsapp-web = [
 # provider stack below is the implementation of that contract; a host that
 # only names channel types depends on the bus crate alone.
 tinychannels-bus = { version = "0.1.2", path = "crates/tinychannels-bus" }
+tinychannels-runtime = { version = "0.1.2", path = "crates/tinychannels-runtime" }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"

@@ -2684,6 +2684,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tinychannels-bus",
+ "tinychannels-runtime",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
@@ -2736,6 +2737,19 @@ dependencies = [
  "tinychannels",
  "tinychannels-bus",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "tinychannels-runtime"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "rand 0.10.2",
+ "tinychannels-bus",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -2826,6 +2840,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]
