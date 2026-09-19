@@ -145,9 +145,11 @@ pub fn spawn_supervised_listener(
 /// Sample full reconnect jitter, bounded to avoid dwarfing the base retry.
 pub fn jitter_millis(backoff_secs: u64) -> u64 {
     let window = backoff_secs.saturating_mul(1_000).min(MAX_JITTER_MS);
-    (window != 0)
-        .then(|| rand::rng().random_range(0..window))
-        .unwrap_or(0)
+    if window != 0 {
+        rand::rng().random_range(0..window)
+    } else {
+        0
+    }
 }
 
 /// Log a failed worker join without imposing host-specific error reporting.
