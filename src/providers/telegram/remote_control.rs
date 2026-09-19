@@ -15,7 +15,7 @@ pub const SESSIONS_LIST_LIMIT: usize = 8;
 /// Parse a Telegram remote-control command, accepting bot mentions and case
 /// differences in the same way as Telegram's command surface.
 pub fn parse_telegram_remote_command(content: &str) -> Option<TelegramRemoteCommand> {
-    let command = content.trim().split_whitespace().next()?;
+    let command = content.split_whitespace().next()?;
     let command = command
         .strip_prefix('/')?
         .split('@')

@@ -31,8 +31,6 @@ async-trait = "0.1"
 sha2 = "0.10"
 hmac = "0.12"
 base64 = "0.22"
-# Timestamps on envelopes and relay tokens.
-chrono = { version = "0.4", features = ["serde"] }
 # The pairing-token store is a small in-memory set behind a lock.
 parking_lot = "0.12"
 # Pairing codes and message ids.
@@ -57,5 +55,4 @@ serde_json = "1"
 # Keep this split — widening the normal dependency to satisfy a test would put a
 # scheduler into every host that only decodes payloads.
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
-toml = "0.9"
-tempfile = "3"
+toml = "1"
