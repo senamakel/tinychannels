@@ -135,11 +135,11 @@ pub fn derive_inbound_thread_id(
         key.push_str(reply_target);
     }
     let provider = channel.split(':').next().unwrap_or("");
-    if !matches!(provider, "telegram" | "tg") {
-        if let Some(thread_ts) = thread_ts.and_then(nonempty) {
-            key.push_str("#thread:");
-            key.push_str(thread_ts);
-        }
+    if !matches!(provider, "telegram" | "tg")
+        && let Some(thread_ts) = thread_ts.and_then(nonempty)
+    {
+        key.push_str("#thread:");
+        key.push_str(thread_ts);
     }
     key
 }
