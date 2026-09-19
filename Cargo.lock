@@ -211,7 +211,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
- "sha1",
+ "sha1 0.10.7",
  "sync_wrapper",
  "tokio",
  "tokio-tungstenite",
@@ -632,6 +632,7 @@ dependencies = [
  "block-buffer 0.12.1",
  "const-oid",
  "crypto-common 0.2.2",
+ "ctutils",
 ]
 
 [[package]]
@@ -1097,7 +1098,7 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
 dependencies = [
- "hmac",
+ "hmac 0.12.1",
 ]
 
 [[package]]
@@ -1107,6 +1108,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.7",
+]
+
+[[package]]
+name = "hmac"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6303bc9732ae41b04cb554b844a762b4115a61bfaa81e3e83050991eeb56863f"
+dependencies = [
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -1680,7 +1690,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
  "digest 0.10.7",
- "hmac",
+ "hmac 0.12.1",
 ]
 
 [[package]]
@@ -2400,13 +2410,24 @@ dependencies = [
 
 [[package]]
 name = "sha1"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
+checksum = "a978451301f4db1d02937a4ab3ccce137717b81826e79b7d49ffe3244a13c3b8"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.2.17",
  "digest 0.10.7",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -2713,7 +2734,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
- "hmac",
+ "hmac 0.13.0",
  "lettre",
  "mail-parser",
  "parking_lot",
@@ -2726,7 +2747,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "sha1",
+ "sha1 0.11.0",
  "sha2 0.11.0",
  "tempfile",
  "thiserror 2.0.18",
@@ -2756,7 +2777,7 @@ dependencies = [
  "async-trait",
  "base64",
  "hex",
- "hmac",
+ "hmac 0.13.0",
  "parking_lot",
  "rand 0.10.2",
  "schemars",
@@ -3084,7 +3105,7 @@ dependencies = [
  "rand 0.9.4",
  "rustls",
  "rustls-pki-types",
- "sha1",
+ "sha1 0.10.7",
  "thiserror 2.0.18",
 ]
 
@@ -3258,7 +3279,7 @@ dependencies = [
  "futures",
  "hex",
  "hkdf",
- "hmac",
+ "hmac 0.12.1",
  "log",
  "md5",
  "once_cell",
@@ -3268,7 +3289,7 @@ dependencies = [
  "serde",
  "serde-big-array",
  "serde_json",
- "sha1",
+ "sha1 0.10.7",
  "sha2 0.10.9",
  "thiserror 2.0.18",
  "typed-builder",
@@ -3345,12 +3366,12 @@ dependencies = [
  "ghash 0.6.0",
  "hex",
  "hkdf",
- "hmac",
+ "hmac 0.12.1",
  "log",
  "prost",
  "rand 0.10.2",
  "serde",
- "sha1",
+ "sha1 0.10.7",
  "sha2 0.10.9",
  "subtle",
  "thiserror 2.0.18",
