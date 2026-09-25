@@ -18,7 +18,7 @@ pub mod host;
 mod service;
 
 /// Constructs this module for registration with an in-process TinyBus host.
-#[cfg(feature = "linked")]
+#[cfg(feature = "static-link")]
 pub use service::exports::linked_module;
 
 pub use host::HostChannels;

@@ -37,4 +37,5 @@ serde_json = "1"
 
 [features]
 default = []
-linked = []
+linked = ["static-link"]
+static-link = []
