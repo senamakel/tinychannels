@@ -32,7 +32,8 @@ pub use tinychannels_bus;
 // are `pub use` of the *same* items, not copies — there is exactly one
 // `ChannelInboundEnvelope` in the build.
 pub use tinychannels_bus::{
-    adapters, channel, config, context, controllers, error, names, security, text, traits, version,
+    adapters, capabilities, channel, config, context, controllers, error, names, security, text,
+    traits, version,
 };
 
 pub mod backend;

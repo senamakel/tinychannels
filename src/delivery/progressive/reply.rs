@@ -18,7 +18,7 @@ pub struct ProgressiveReply {
     sender: Arc<dyn ProgressiveSender>,
     channel: String,
     progressive_ui: bool,
-    state: StreamingState,
+    pub(super) state: StreamingState,
     typing: TypingState,
 }
 

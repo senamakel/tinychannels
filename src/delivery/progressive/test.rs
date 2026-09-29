@@ -95,7 +95,7 @@ fn unavailable() -> ProgressiveSendError {
     ProgressiveSendError::Unavailable
 }
 
-fn reply(channel: &str) -> (Arc<FakeSender>, ProgressiveReply) {
+fn turn(channel: &str) -> (Arc<FakeSender>, ProgressiveReply) {
     let sender = Arc::new(FakeSender::default());
     let reply = ProgressiveReply::new(sender.clone(), channel);
     (sender, reply)
@@ -116,7 +116,7 @@ fn progressive_ui_is_an_allowlist_failing_safe_for_unknown_channels() {
 
 #[tokio::test]
 async fn channels_without_progressive_ui_get_no_bubbles_but_still_a_reply() {
-    let (sender, mut reply) = reply("discord:guild-1");
+    let (sender, mut reply) = turn("discord:guild-1");
     reply.on_text_delta("partial");
     reply.on_thinking_delta("reasoning");
     reply.edit_tick().await;
@@ -240,7 +240,7 @@ fn edit_capability_latches_per_provider_not_per_chat() {
 
 #[tokio::test]
 async fn draft_is_posted_once_then_edited_then_finalized_in_place() {
-    let (sender, mut reply) = reply("telegram:1");
+    let (sender, mut reply) = turn("telegram:1");
     reply.on_tool_call("search");
     reply.on_text_delta("Hel");
     reply.edit_tick().await;
@@ -263,7 +263,7 @@ async fn draft_is_posted_once_then_edited_then_finalized_in_place() {
 
 #[tokio::test]
 async fn transient_edit_failures_disable_edits_after_budget() {
-    let (sender, mut reply) = reply("telegram:2");
+    let (sender, mut reply) = turn("telegram:2");
     reply.on_text_delta("a");
     reply.edit_tick().await;
     FakeSender::script(&sender.edits, Outcome::Err(other));
@@ -279,7 +279,7 @@ async fn transient_edit_failures_disable_edits_after_budget() {
 
 #[tokio::test]
 async fn message_gone_on_edit_forgets_the_draft_and_finalize_sends_fresh() {
-    let (sender, mut reply) = reply("telegram:3");
+    let (sender, mut reply) = turn("telegram:3");
     reply.on_text_delta("a");
     reply.edit_tick().await;
     FakeSender::script(&sender.edits, Outcome::Err(gone));
@@ -293,7 +293,7 @@ async fn message_gone_on_edit_forgets_the_draft_and_finalize_sends_fresh() {
 
 #[tokio::test]
 async fn edit_route_absence_latches_provider_and_finalize_replaces_the_draft() {
-    let (sender, mut reply) = reply("tg:latch-route");
+    let (sender, mut reply) = turn("tg:latch-route");
     reply.on_text_delta("a");
     reply.edit_tick().await;
     FakeSender::script(&sender.edits, Outcome::Err(unsupported));
@@ -317,7 +317,7 @@ async fn finalize_edit_failures_each_recover_with_a_visible_reply() {
         (other as fn() -> ProgressiveSendError, true),
         (gone as fn() -> ProgressiveSendError, false),
     ] {
-        let (sender, mut reply) = reply("telegram:4");
+        let (sender, mut reply) = turn("telegram:4");
         reply.on_text_delta("a");
         reply.edit_tick().await;
         FakeSender::script(&sender.edits, Outcome::Err(err));
@@ -330,7 +330,7 @@ async fn finalize_edit_failures_each_recover_with_a_visible_reply() {
 
 #[tokio::test]
 async fn finalize_edit_route_absence_marks_the_latch() {
-    let (sender, mut reply) = reply("latch-final:1");
+    let (sender, mut reply) = turn("latch-final:1");
     // Force progressive state as if the draft had been posted.
     reply.state.message_id = Some("d1".into());
     FakeSender::script(&sender.edits, Outcome::Err(unsupported));
@@ -344,7 +344,7 @@ async fn finalize_edit_route_absence_marks_the_latch() {
 
 #[tokio::test]
 async fn unavailable_sender_leaves_the_draft_in_place() {
-    let (sender, mut reply) = reply("telegram:5");
+    let (sender, mut reply) = turn("telegram:5");
     reply.on_text_delta("a");
     reply.edit_tick().await;
     FakeSender::script(&sender.edits, Outcome::Err(unavailable));
@@ -354,7 +354,7 @@ async fn unavailable_sender_leaves_the_draft_in_place() {
 
 #[tokio::test]
 async fn id_less_initial_draft_disables_edits() {
-    let (sender, mut reply) = reply("telegram:6");
+    let (sender, mut reply) = turn("telegram:6");
     FakeSender::script(&sender.sends, Outcome::Ok(json!({"success": true})));
     reply.on_text_delta("a");
     reply.edit_tick().await;
@@ -364,7 +364,7 @@ async fn id_less_initial_draft_disables_edits() {
 
 #[tokio::test]
 async fn failed_initial_draft_sends_count_against_the_budget() {
-    let (sender, mut reply) = reply("telegram:7");
+    let (sender, mut reply) = turn("telegram:7");
     FakeSender::script(&sender.sends, Outcome::Err(other));
     FakeSender::script(&sender.sends, Outcome::Err(other));
     reply.on_text_delta("a");
@@ -377,7 +377,7 @@ async fn failed_initial_draft_sends_count_against_the_budget() {
 
 #[tokio::test]
 async fn thinking_bubble_is_posted_edited_and_deleted_with_fillers() {
-    let (sender, mut reply) = reply("telegram:8");
+    let (sender, mut reply) = turn("telegram:8");
     reply.on_thinking_delta("step one");
     reply.edit_tick().await;
     reply.on_thinking_delta(" and two");
@@ -399,7 +399,7 @@ async fn thinking_bubble_is_posted_edited_and_deleted_with_fillers() {
 
 #[tokio::test]
 async fn thinking_edit_failures_follow_the_same_recoveries() {
-    let (sender, mut reply) = reply("telegram:9");
+    let (sender, mut reply) = turn("telegram:9");
     reply.on_thinking_delta("x");
     reply.edit_tick().await;
     FakeSender::script(&sender.edits, Outcome::Err(gone));
@@ -408,7 +408,7 @@ async fn thinking_edit_failures_follow_the_same_recoveries() {
     assert_eq!(reply.state().thinking_message_id, None);
     assert!(reply.state().thinking_edit_disabled);
 
-    let (sender, mut reply) = reply("tg-think:1");
+    let (sender, mut reply) = turn("tg-think:1");
     reply.state.thinking_message_id = Some("t1".into());
     reply.state.thinking_accumulator = "x".into();
     reply.state.thinking_dirty = true;
@@ -419,13 +419,13 @@ async fn thinking_edit_failures_follow_the_same_recoveries() {
 
 #[tokio::test]
 async fn thinking_send_failure_or_missing_id_stops_thinking_flushes() {
-    let (sender, mut reply) = reply("telegram:10");
+    let (sender, mut reply) = turn("telegram:10");
     FakeSender::script(&sender.sends, Outcome::Err(other));
     reply.on_thinking_delta("x");
     reply.edit_tick().await;
     assert!(reply.state().thinking_edit_disabled);
 
-    let (sender, mut reply) = reply("telegram:11");
+    let (sender, mut reply) = turn("telegram:11");
     FakeSender::script(&sender.sends, Outcome::Ok(json!({})));
     reply.on_thinking_delta("x");
     reply.edit_tick().await;
@@ -434,7 +434,7 @@ async fn thinking_send_failure_or_missing_id_stops_thinking_flushes() {
 
 #[tokio::test]
 async fn filler_failures_disable_fillers() {
-    let (sender, mut reply) = reply("telegram:12");
+    let (sender, mut reply) = turn("telegram:12");
     FakeSender::script(&sender.sends, Outcome::Err(other));
     FakeSender::script(&sender.sends, Outcome::Err(other));
     reply.filler_tick().await;
@@ -446,7 +446,7 @@ async fn filler_failures_disable_fillers() {
 
 #[tokio::test]
 async fn typing_indicator_latches_after_repeated_failures_and_recovers_before() {
-    let (sender, mut reply) = reply("discord:1");
+    let (sender, mut reply) = turn("discord:1");
     FakeSender::script(&sender.typings, Outcome::Err(other));
     reply.typing_tick().await;
     reply.typing_tick().await; // recovers
@@ -460,7 +460,7 @@ async fn typing_indicator_latches_after_repeated_failures_and_recovers_before() 
 
 #[tokio::test]
 async fn delete_failures_are_tolerated_during_cleanup() {
-    let (sender, mut reply) = reply("telegram:13");
+    let (sender, mut reply) = turn("telegram:13");
     reply.state.filler_message_ids = vec!["f1".into(), "f2".into()];
     FakeSender::script(&sender.deletes, Outcome::Err(gone));
     FakeSender::script(&sender.deletes, Outcome::Err(other));
@@ -478,7 +478,7 @@ async fn delete_failures_are_tolerated_during_cleanup() {
 
 #[tokio::test]
 async fn send_reply_is_standalone() {
-    let (sender, reply) = reply("slack:1");
+    let (sender, reply) = turn("slack:1");
     FakeSender::script(&sender.sends, Outcome::Err(unavailable));
     reply.send_reply("sorry").await;
     reply.send_reply("sorry again").await;
