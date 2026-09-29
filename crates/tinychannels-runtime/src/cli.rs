@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use tokio::io::{self, AsyncBufRead, AsyncBufReadExt, BufReader};
 use uuid::Uuid;
 
-use crate::traits::{Channel, ChannelMessage, SendMessage};
+use tinychannels_bus::{Channel, ChannelMessage, SendMessage};
 
 /// Console channel. `/quit` or `/exit` ends the listen loop.
 #[derive(Debug, Default, Clone, Copy)]
@@ -70,4 +70,5 @@ impl Channel for CliChannel {
 }
 
 #[cfg(test)]
-mod test;
+#[path = "cli_tests.rs"]
+mod tests;
