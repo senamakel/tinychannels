@@ -5,7 +5,7 @@ pub mod dingtalk;
 pub mod discord;
 #[cfg(feature = "email-send")]
 pub mod email_channel;
-#[cfg(feature = "email-send")]
+#[cfg(feature = "email")]
 pub mod email_verify;
 pub mod imessage;
 pub mod irc;
@@ -26,7 +26,7 @@ pub use dingtalk::DingTalkChannel;
 pub use discord::DiscordChannel;
 #[cfg(feature = "email-send")]
 pub use email_channel::EmailChannel;
-#[cfg(feature = "email-send")]
+#[cfg(feature = "email")]
 pub use email_verify::verify_email_credentials;
 pub use imessage::IMessageChannel;
 pub use irc::{IrcChannel, IrcChannelConfig};
