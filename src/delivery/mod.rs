@@ -1,6 +1,7 @@
-//! Durable outbound delivery queue.
+//! Outbound delivery: the durable queue and progressive reply streaming.
 
 pub mod policy;
+pub mod progressive;
 pub mod queue;
 pub mod types;
 
