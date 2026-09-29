@@ -6,6 +6,7 @@
 //! crate is the part that needs a runtime: the frame transport loop and the
 //! WebSocket dialer.
 
+pub mod runtime;
 pub mod transport;
 #[cfg(feature = "relay-websocket")]
 pub mod websocket;
@@ -23,6 +24,10 @@ pub use tinychannels_bus::relay::{
     delivery_payload, descriptor, frames, make_token, make_token_at, make_upgrade_token,
     make_upgrade_token_at, relay_send_action_from_outbound_intent, sign, verify_delivery_signature,
     verify_delivery_signature_at, verify_signature, verify_token, verify_token_at,
+};
+pub use runtime::{
+    current_relay_transport, register_relay_transport, relay_runtime_fronts_channel,
+    send_outbound_intent, unregister_relay_transport,
 };
 pub use transport::{RelayReconnectHandle, RelayTransport};
 #[cfg(feature = "relay-websocket")]
