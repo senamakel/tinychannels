@@ -2,10 +2,14 @@
 
 pub mod credentials;
 pub mod definitions;
+pub mod forms;
 pub mod schemas;
 pub mod types;
 
 pub use credentials::{channel_credential_provider, parse_allowed_users};
+pub use forms::{
+    build_email_config, parse_email_senders, parse_optional_bool, parse_port_field,
+};
 pub use definitions::{
     AuthModeSpec, ChannelAuthMode, ChannelCapability, ChannelDefinition, FieldRequirement,
     all_channel_definitions, channel_config_connected, find_channel_definition,
