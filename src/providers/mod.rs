@@ -1,5 +1,6 @@
 //! Portable channel provider implementations.
 
+pub mod cli;
 pub mod dingtalk;
 pub mod discord;
 #[cfg(feature = "email-send")]
@@ -18,6 +19,7 @@ pub mod whatsapp;
 pub mod whatsapp_web;
 pub mod yuanbao;
 
+pub use cli::CliChannel;
 pub use dingtalk::DingTalkChannel;
 pub use discord::DiscordChannel;
 #[cfg(feature = "email-send")]

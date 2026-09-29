@@ -49,7 +49,7 @@ pub use backend::{ChannelBackend, ChannelManager};
 pub use factory::{DefaultHttpClients, HttpClientFactory, build_channels};
 pub use host::{ChannelHost, ChannelHostBuilder, HostCapabilities, NoopHost, ProviderContext};
 pub use providers::{
-    DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
+    CliChannel, DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
     MattermostChannel, QQChannel, SignalChannel, SlackChannel, TelegramChannel, WhatsAppChannel,
     WhatsAppWebChannel, YuanbaoChannel,
 };
