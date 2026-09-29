@@ -89,11 +89,11 @@ cargo test --features email,lark
   parsing and backend response types (`controllers/`), and conversation keys
   (`context.rs`).
 - `crates/tinychannels-runtime/` holds listener supervision, the bounded
-  dispatch loop, logout-scoped sessions and channel health checks.
+  dispatch loop, logout-scoped sessions, channel health checks and the
+  console `CliChannel`.
 - `crates/tinychannels-module/` is the loadable TinyBus module.
 - `src/lib.rs` exports the crate surface and re-exports the contract.
-- `src/providers/` holds the provider transports, including the console
-  `CliChannel`.
+- `src/providers/` holds the provider transports.
 - `src/delivery/` holds the durable outbound queue and `progressive/`, the
   streaming reply driver (draft, thinking and filler bubbles) over a
   host-supplied `ProgressiveSender`.
