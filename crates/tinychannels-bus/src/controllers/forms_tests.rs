@@ -112,3 +112,16 @@ fn parse_email_senders_defaults_and_dedup() {
         vec!["@x.com".to_string(), "a@y.com".to_string()]
     );
 }
+
+#[test]
+fn parse_optional_bool_accepts_loose_forms() {
+    for truthy in [json!(true), json!(1), json!("yes"), json!(" ON "), json!("true")] {
+        assert_eq!(parse_optional_bool(Some(&truthy)), Some(true), "{truthy}");
+    }
+    for falsy in [json!(false), json!(0), json!("no"), json!("off"), json!("0")] {
+        assert_eq!(parse_optional_bool(Some(&falsy)), Some(false), "{falsy}");
+    }
+    assert_eq!(parse_optional_bool(Some(&json!("maybe"))), None);
+    assert_eq!(parse_optional_bool(Some(&json!([]))), None);
+    assert_eq!(parse_optional_bool(None), None);
+}
