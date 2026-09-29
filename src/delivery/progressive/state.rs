@@ -146,19 +146,20 @@ pub fn extract_message_id(resp: &serde_json::Value) -> Option<String> {
 /// Pull the most recent `MAX_FILLER_CHARS` Unicode scalars out of the
 /// thinking accumulator so we can surface a live snapshot of the agent's
 /// reasoning as a filler. Returns `None` when there's nothing to show
-/// yet. Trims any partial leading word so the snippet reads cleanly.
+/// yet. When the tail is truncated, drops the partial leading word so the
+/// snippet reads cleanly.
 pub fn latest_thinking_snippet(state: &StreamingState) -> Option<String> {
     let acc = state.thinking_accumulator.trim();
     if acc.is_empty() {
         return None;
     }
     let total = acc.chars().count();
-    let snippet: String = if total <= MAX_FILLER_CHARS {
-        acc.to_string()
-    } else {
-        acc.chars().skip(total - MAX_FILLER_CHARS).collect()
-    };
-    let trimmed = snippet
+    if total <= MAX_FILLER_CHARS {
+        return Some(acc.to_string());
+    }
+    // Only a truncated tail can start mid-word; drop that partial word.
+    let tail: String = acc.chars().skip(total - MAX_FILLER_CHARS).collect();
+    let trimmed = tail
         .trim_start_matches(|c: char| !c.is_whitespace())
         .trim_start()
         .to_string();
