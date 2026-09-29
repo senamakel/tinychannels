@@ -24,9 +24,7 @@ mod state;
 use async_trait::async_trait;
 use serde_json::Value;
 
-pub use latch::{
-    channel_edits_unsupported, edit_capability_key, mark_channel_edits_unsupported,
-};
+pub use latch::{channel_edits_unsupported, edit_capability_key, mark_channel_edits_unsupported};
 pub use reply::ProgressiveReply;
 pub use state::{StreamingState, TypingState, extract_message_id, latest_thinking_snippet};
 

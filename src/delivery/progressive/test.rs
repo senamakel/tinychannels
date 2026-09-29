@@ -158,7 +158,10 @@ fn route_absence_keeps_ids_and_message_absence_forgets_them() {
 
 #[test]
 fn extract_message_id_handles_every_backend_shape() {
-    assert_eq!(extract_message_id(&json!({"id": "a"})).as_deref(), Some("a"));
+    assert_eq!(
+        extract_message_id(&json!({"id": "a"})).as_deref(),
+        Some("a")
+    );
     assert_eq!(
         extract_message_id(&json!({"messageId": 1456, "success": true})).as_deref(),
         Some("1456")
@@ -414,7 +417,10 @@ async fn thinking_edit_failures_follow_the_same_recoveries() {
     reply.state.thinking_dirty = true;
     FakeSender::script(&sender.edits, Outcome::Err(other));
     reply.edit_tick().await;
-    assert!(!reply.state().thinking_edit_disabled, "transient keeps trying");
+    assert!(
+        !reply.state().thinking_edit_disabled,
+        "transient keeps trying"
+    );
 }
 
 #[tokio::test]

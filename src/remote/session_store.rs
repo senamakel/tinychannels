@@ -161,7 +161,10 @@ fn with_cached<R>(
     let lock = STORE.get_or_init(|| Mutex::new(None));
     let mut guard = lock.lock().unwrap_or_else(|e| e.into_inner());
     let expected_path = workspace_dir.join(STORE_FILE);
-    if guard.as_ref().is_none_or(|store| store.path != expected_path) {
+    if guard
+        .as_ref()
+        .is_none_or(|store| store.path != expected_path)
+    {
         *guard = Some(RemoteSessionStore::load(workspace_dir)?);
     }
     let store = guard

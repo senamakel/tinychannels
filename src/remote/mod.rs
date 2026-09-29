@@ -216,7 +216,13 @@ async fn status(host: &dyn RemoteControlHost, ctx: &RemoteCommandContext) -> Str
         }
         None => "Thread: _(none — send `/new` to bind a thread)_".to_string(),
     };
-    build_status_response(&thread_line, &route.provider, &route.model, history_len, busy)
+    build_status_response(
+        &thread_line,
+        &route.provider,
+        &route.model,
+        history_len,
+        busy,
+    )
 }
 
 async fn sessions(host: &dyn RemoteControlHost, ctx: &RemoteCommandContext) -> String {

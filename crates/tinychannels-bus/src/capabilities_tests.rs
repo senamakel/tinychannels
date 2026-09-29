@@ -12,20 +12,35 @@ fn telegram_and_its_alias_share_capabilities() {
 
 #[test]
 fn chat_providers_get_remote_control_and_approvals_but_not_edits() {
-    for provider in ["discord", "slack", "mattermost", "imessage", "signal", "whatsapp", "irc"] {
+    for provider in [
+        "discord",
+        "slack",
+        "mattermost",
+        "imessage",
+        "signal",
+        "whatsapp",
+        "irc",
+    ] {
         let caps = capabilities_for(provider);
         assert!(caps.remote_control, "{provider} remote_control");
         assert!(caps.chat_approvals, "{provider} chat_approvals");
         assert!(!caps.progressive_edits, "{provider} progressive_edits");
         assert!(!caps.history_key_ignores_thread, "{provider} thread key");
     }
-    assert_eq!(capabilities_for("discord:guild/chan"), ChannelCapabilities::CHAT);
+    assert_eq!(
+        capabilities_for("discord:guild/chan"),
+        ChannelCapabilities::CHAT
+    );
 }
 
 #[test]
 fn unknown_and_non_conversational_providers_fail_safe() {
     for provider in ["email", "cli", "webhook", "brand-new", ""] {
-        assert_eq!(capabilities_for(provider), ChannelCapabilities::NONE, "{provider}");
+        assert_eq!(
+            capabilities_for(provider),
+            ChannelCapabilities::NONE,
+            "{provider}"
+        );
     }
 }
 

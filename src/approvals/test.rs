@@ -78,7 +78,10 @@ async fn every_chat_provider_gets_its_prompt_in_the_originating_chat() {
         let ch = RecordingChannel::new(channel);
         let s = surface(&[Arc::clone(&ch)]);
         s.record_inbound(channel, "alice", "chat-42", thread_ts);
-        assert!(matches!(s.surface(&prompt(channel, key)).await, SurfaceOutcome::Sent), "{channel}");
+        assert!(
+            matches!(s.surface(&prompt(channel, key)).await, SurfaceOutcome::Sent),
+            "{channel}"
+        );
         let sent = ch.sent();
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0].recipient, "chat-42");

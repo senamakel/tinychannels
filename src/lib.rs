@@ -52,9 +52,9 @@ pub use backend::{ChannelBackend, ChannelManager};
 pub use factory::{DefaultHttpClients, HttpClientFactory, build_channels};
 pub use host::{ChannelHost, ChannelHostBuilder, HostCapabilities, NoopHost, ProviderContext};
 pub use providers::{
-    CliChannel, DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig, LinqChannel,
-    MattermostChannel, QQChannel, SignalChannel, SlackChannel, TelegramChannel, WhatsAppChannel,
-    WhatsAppWebChannel, YuanbaoChannel,
+    CliChannel, DingTalkChannel, DiscordChannel, IMessageChannel, IrcChannel, IrcChannelConfig,
+    LinqChannel, MattermostChannel, QQChannel, SignalChannel, SlackChannel, TelegramChannel,
+    WhatsAppChannel, WhatsAppWebChannel, YuanbaoChannel,
 };
 pub use tinychannels_bus::{
     BUS_NAME, CONTRACT_VERSION, Channel, ChannelAuthMode, ChannelDefinition,

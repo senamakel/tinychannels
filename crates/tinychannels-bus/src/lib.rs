@@ -61,6 +61,7 @@ pub mod text;
 pub mod traits;
 pub mod version;
 
+pub use capabilities::{ChannelCapabilities, capabilities_for, provider_id};
 pub use channel::{
     ChannelInboundEnvelope, ChannelOutboundIntent, DeliveryDurability, OutboundPayload,
     build_session_key_for_inbound_envelope, derive_inbound_client_id, derive_inbound_thread_id,
@@ -68,7 +69,6 @@ pub use channel::{
     legacy_message_value_from_outbound_intent, outbound_intent_from_legacy_message,
     outbound_intent_from_send_message,
 };
-pub use capabilities::{ChannelCapabilities, capabilities_for, provider_id};
 pub use config::ChannelsConfig;
 pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
