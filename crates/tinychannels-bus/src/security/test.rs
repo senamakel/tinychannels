@@ -144,7 +144,9 @@ async fn is_token_hash_detects_hash_vs_plaintext() {
     assert!(!is_token_hash(""));
 }
 
+// ── constant_time_eq ─────────────────────────────────────
 
+#[test]
 async fn constant_time_eq_same() {
     assert!(constant_time_eq("abc", "abc"));
     assert!(constant_time_eq("", ""));
