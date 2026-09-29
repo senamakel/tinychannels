@@ -1,6 +1,7 @@
 //! Outbound delivery: the durable queue, retry policy, and reply segmentation.
 
 pub mod policy;
+pub mod progressive;
 pub mod queue;
 pub mod segment;
 pub mod types;

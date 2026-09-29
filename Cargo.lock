@@ -2550,11 +2550,14 @@ dependencies = [
 name = "tinychannels-runtime"
 version = "0.1.4"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "rand 0.10.2",
  "tinychannels-bus",
  "tokio",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
