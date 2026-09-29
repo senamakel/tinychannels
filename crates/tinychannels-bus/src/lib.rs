@@ -48,6 +48,7 @@
 //! the `tinychannels` crate.
 
 pub mod adapters;
+pub mod capabilities;
 pub mod channel;
 pub mod config;
 pub mod context;
@@ -67,6 +68,7 @@ pub use channel::{
     legacy_message_value_from_outbound_intent, outbound_intent_from_legacy_message,
     outbound_intent_from_send_message,
 };
+pub use capabilities::{ChannelCapabilities, capabilities_for, provider_id};
 pub use config::ChannelsConfig;
 pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
