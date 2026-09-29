@@ -9,6 +9,9 @@ const MIN_SEGMENT_CHARS: usize = 40;
 /// Upper bound on delivered bubbles; overflow is merged into the last one.
 const MAX_SEGMENTS: usize = 5;
 
+/// Decide whether and how to split a response into multiple chat bubbles.
+///
+/// Rules (applied in order):
 /// - Short messages (< 80 chars) are never split.
 /// - Messages containing code fences (```) are never split.
 /// - Messages that are predominantly structured (lists, tables, headers)
@@ -235,7 +238,3 @@ pub fn segment_delay(segment: &str) -> u64 {
     let per_char: u64 = 2; // ~1.5-2ms per char for a natural reading pace
     std::cmp::min(base + (segment.len() as u64) * per_char, 1400)
 }
-
-// ── Reactions ────────────────────────────────────────────────────────────────
-
-/// Ask the local model for an emoji reaction to the user's message.
