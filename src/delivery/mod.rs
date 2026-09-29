@@ -1,8 +1,9 @@
-//! Outbound delivery: the durable queue and progressive reply streaming.
+//! Outbound delivery: the durable queue, retry policy, and reply segmentation.
 
 pub mod policy;
 pub mod progressive;
 pub mod queue;
+pub mod segment;
 pub mod types;
 
 pub use policy::{
@@ -16,6 +17,7 @@ pub use queue::{
     mark_delivery_platform_outcome_unknown, mark_delivery_platform_send_attempt_started,
     move_to_failed, recover_pending_deliveries,
 };
+pub use segment::{segment_delay, segment_for_delivery};
 pub use types::{
     ActiveDeliveryClaimResult, DeliveryAttemptFailure, DeliveryAttemptResult,
     DeliveryAttemptSuccess, DeliveryQueueError, DeliveryQueueHandler, DeliveryQueueStore,
