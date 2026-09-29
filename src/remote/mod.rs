@@ -253,7 +253,13 @@ async fn sessions(host: &dyn RemoteControlHost, ctx: &RemoteCommandContext) -> S
 fn channel_display_name(channel: &str) -> String {
     crate::controllers::find_channel_definition(channel)
         .map(|definition| definition.display_name.to_string())
-        .unwrap_or_else(|| channel.to_string())
+        .unwrap_or_else(|| {
+            let mut chars = channel.chars();
+            chars
+                .next()
+                .map(|first| first.to_uppercase().chain(chars).collect())
+                .unwrap_or_default()
+        })
 }
 
 async fn new_session(
