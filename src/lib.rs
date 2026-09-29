@@ -36,6 +36,7 @@ pub use tinychannels_bus::{
     traits, version,
 };
 
+pub mod approvals;
 pub mod backend;
 pub mod delivery;
 pub mod factory;
@@ -43,6 +44,7 @@ pub mod harness;
 pub mod host;
 pub mod providers;
 pub mod relay;
+pub mod remote;
 pub mod routes;
 pub mod runtime;
 
