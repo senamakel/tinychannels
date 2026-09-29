@@ -81,5 +81,5 @@ pub fn capabilities_for(channel: &str) -> ChannelCapabilities {
 }
 
 #[cfg(test)]
-#[path = "capabilities_test.rs"]
+#[path = "capabilities_tests.rs"]
 mod test;
