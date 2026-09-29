@@ -238,3 +238,7 @@ pub fn segment_delay(segment: &str) -> u64 {
     let per_char: u64 = 2; // ~1.5-2ms per char for a natural reading pace
     std::cmp::min(base + (segment.len() as u64) * per_char, 1400)
 }
+
+#[cfg(test)]
+#[path = "segment_test.rs"]
+mod tests;
