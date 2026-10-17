@@ -16,3 +16,9 @@ These names are declared by the implementation modules that use them. The bus
 contract aggregates those declarations; host grants should consume that value
 instead of copying the inventory. The audited implementation currently creates
 no indexes, streams, blobs, or secret resources for these stores.
+
+[`proofs/storage-needs-consumer`](../../proofs/storage-needs-consumer) builds
+outside the TinyChannels workspace and assigns the exported declaration to the
+canonical `StorageNeeds` type. CI runs that consumer on Rust 1.94 and checks its
+locked normal/build dependency graph to keep storage clients, drivers, TinyBus,
+and non-sync Tokio features out of this contract boundary.

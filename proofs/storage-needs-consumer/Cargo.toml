@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+
+[package]
+name = "tinychannels-storage-needs-consumer"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[dependencies]
+tinychannels-bus = { path = "../../../crates/tinychannels-bus" }
+tinystoragedrivers-bus = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "c525a17d5153fc95e67e3cd44bcde1d90be60a71", default-features = false }
