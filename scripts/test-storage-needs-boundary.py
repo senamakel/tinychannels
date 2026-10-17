@@ -89,7 +89,9 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
         errors = BOUNDARY.violations(
             fixture(storage_features=("client",)), tree_output()
         )
-        self.assertIn("tinystoragedrivers-bus client feature is enabled", errors)
+        self.assertTrue(
+            any("tinystoragedrivers-bus features must be empty" in error for error in errors)
+        )
 
     def test_non_sync_tokio_features_are_rejected(self):
         for extra in ("io-std", "signal", "rt", "macros"):
