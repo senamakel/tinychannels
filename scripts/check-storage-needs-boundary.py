@@ -88,6 +88,8 @@ def reachable_normal_build(metadata):
             )
             continue
         reachable.add(package_id)
+        if not isinstance(node.get("features"), list):
+            errors.append(f"resolved node {package_id} has no feature evidence")
         dependencies = node.get("deps")
         if not isinstance(dependencies, list):
             errors.append(f"resolved node {package_id} has no dependency evidence")
@@ -99,6 +101,13 @@ def reachable_normal_build(metadata):
             kinds = dependency.get("dep_kinds")
             if not isinstance(kinds, list) or not kinds:
                 errors.append(f"resolved dependency from {package_id} has no kind evidence")
+                continue
+            if any(
+                not isinstance(kind, dict)
+                or kind.get("kind") not in {None, "normal", "dev", "build"}
+                for kind in kinds
+            ):
+                errors.append(f"resolved dependency from {package_id} has malformed kind evidence")
                 continue
             if not any(
                 isinstance(kind, dict) and kind.get("kind") in NORMAL_BUILD_KINDS
@@ -146,8 +155,11 @@ def violations(metadata, tree_output):
         features = node.get("features")
         if not isinstance(features, list):
             errors.append("storage bus resolve node is missing feature evidence")
-        elif "client" in features:
-            errors.append("tinystoragedrivers-bus client feature is enabled")
+        elif features:
+            errors.append(
+                "tinystoragedrivers-bus features must be empty; found "
+                + ", ".join(features)
+            )
 
     tokio = [package for package in packages if package["name"] == "tokio"]
     if not tokio:
