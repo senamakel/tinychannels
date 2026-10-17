@@ -51,23 +51,39 @@ def fixture(extra_packages=(), tokio_features=("sync",), storage_features=()):
     return {"packages": packages, "resolve": {"root": "proof", "nodes": nodes}}
 
 
+def tree_output(extra_lines=()):
+    return "\n".join(
+        [
+            "tinychannels-storage-needs-consumer v0.1.0",
+            "tinychannels-bus v0.1.34",
+            "tinystoragedrivers-bus v1.5.0",
+            "tokio v1.0.0",
+            *extra_lines,
+        ]
+    )
+
+
 class StorageNeedsBoundaryTests(unittest.TestCase):
     def test_existing_sync_only_tokio_baseline_is_allowed(self):
-        self.assertEqual(BOUNDARY.violations(fixture(), ""), [])
+        self.assertEqual(BOUNDARY.violations(fixture(), tree_output()), [])
 
     def test_tinybus_dependency_is_rejected(self):
         metadata = fixture(extra_packages=[{"id": "tinybus", "name": "tinybus", "version": "0.1.0"}])
-        self.assertTrue(any("tinybus" in error for error in BOUNDARY.violations(metadata, "")))
+        self.assertTrue(
+            any("tinybus" in error for error in BOUNDARY.violations(metadata, tree_output()))
+        )
 
     def test_storage_bus_client_feature_is_rejected(self):
-        errors = BOUNDARY.violations(fixture(storage_features=("client",)), "")
+        errors = BOUNDARY.violations(
+            fixture(storage_features=("client",)), tree_output()
+        )
         self.assertIn("tinystoragedrivers-bus client feature is enabled", errors)
 
     def test_non_sync_tokio_features_are_rejected(self):
         for extra in ("io-std", "signal", "rt", "macros"):
             with self.subTest(feature=extra):
                 errors = BOUNDARY.violations(
-                    fixture(tokio_features=("sync", extra)), ""
+                    fixture(tokio_features=("sync", extra)), tree_output()
                 )
                 self.assertTrue(any(extra in error for error in errors))
 
@@ -76,7 +92,7 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
         metadata["resolve"]["nodes"] = [
             node for node in metadata["resolve"]["nodes"] if node["id"] != "tokio"
         ]
-        errors = BOUNDARY.violations(metadata, "")
+        errors = BOUNDARY.violations(metadata, tree_output())
         self.assertTrue(any("missing resolved normal/build node" in error for error in errors))
 
     def test_tag_source_with_matching_commit_suffix_is_rejected(self):
@@ -85,7 +101,7 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
             "git+https://github.com/tinyhumansai/tinystoragedrivers"
             "?tag=v1.5.0#" + BOUNDARY.PIN
         )
-        errors = BOUNDARY.violations(metadata, "")
+        errors = BOUNDARY.violations(metadata, tree_output())
         self.assertIn("storage bus source ID is not the exact canonical revision", errors)
 
     def test_truncated_revision_source_is_rejected(self):
@@ -94,7 +110,7 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
             "git+https://github.com/tinyhumansai/tinystoragedrivers"
             f"?rev={BOUNDARY.PIN[:8]}#{BOUNDARY.PIN}"
         )
-        errors = BOUNDARY.violations(metadata, "")
+        errors = BOUNDARY.violations(metadata, tree_output())
         self.assertIn("storage bus source ID is not the exact canonical revision", errors)
 
     def test_incomplete_normal_build_resolution_fails_closed(self):
@@ -102,11 +118,13 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
         metadata["resolve"]["nodes"] = [
             node for node in metadata["resolve"]["nodes"] if node["id"] != "channels"
         ]
-        errors = BOUNDARY.violations(metadata, "")
+        errors = BOUNDARY.violations(metadata, tree_output())
         self.assertTrue(any("missing resolved normal/build node" in error for error in errors))
 
     def test_normal_and_build_tree_is_checked_too(self):
-        errors = BOUNDARY.violations(fixture(), "tinychannels-storage-needs-consumer v0.1.0\ntinychannels-runtime v0.1.0")
+        errors = BOUNDARY.violations(
+            fixture(), tree_output(("tinychannels-runtime v0.1.0",))
+        )
         self.assertTrue(any("normal/build cargo tree: tinychannels-runtime" in error for error in errors))
 
 
