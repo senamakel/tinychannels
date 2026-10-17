@@ -20,7 +20,7 @@ native-e2e = []
 
 [dev-dependencies]
 async-trait = "0.1"
-tinybus = { workspace = true, features = ["modules"] }
+tinybus = { workspace = true, features = ["macros", "modules"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 
 [[test]]
