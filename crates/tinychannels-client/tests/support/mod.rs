@@ -8,13 +8,12 @@ use std::{
 };
 
 use tinybus::{
-    Connection, Error, Interface, InterfaceName, MemberName, ObjectPath, Proxy,
+    Connection, Interface, InterfaceName, MemberName, ObjectPath, Proxy,
     broker::Broker,
     module::{
         AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, ModuleAccess,
-        ModuleCallError, ModuleHost, ProxyFailure, ReleaseAsset, ReleaseRecord,
+        ModuleCallError, ModuleCallFailure, ModuleHost, ProxyFailure, ReleaseAsset, ReleaseRecord,
     },
-    service::Interface as _,
     transport::memory::MemoryBus,
 };
 use tinychannels_client::TinyChannelsClient;
@@ -118,6 +117,38 @@ impl ModuleAccess for Access {
     }
 }
 
+struct SharedAccess(Arc<Access>);
+
+impl ModuleAccess for SharedAccess {
+    fn find(&self, id: &str) -> Option<&'static ReleaseRecord> {
+        self.0.find(id)
+    }
+
+    fn enabled(&self) -> bool {
+        self.0.enabled()
+    }
+
+    fn reporter(&self) -> &FailureReporter {
+        self.0.reporter()
+    }
+
+    fn ensure_loaded<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        self.0.ensure_loaded(id)
+    }
+
+    fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        self.0.prepare_attested(id)
+    }
+
+    fn proxy<'a>(
+        &'a self,
+        bus_name: &'a str,
+        object_path: &'a str,
+    ) -> AccessFuture<'a, Result<Proxy, ProxyFailure>> {
+        self.0.proxy(bus_name, object_path)
+    }
+}
+
 struct WrongPinAccess {
     access: Arc<Access>,
     record: &'static ReleaseRecord,
@@ -177,14 +208,14 @@ pub(crate) async fn fixture() -> Fixture {
     let probe = Connection::connect(bus.connect().await.expect("probe transport"))
         .await
         .expect("probe connection");
-    let record = record(Pin::Correct);
+    let release_record = record(Pin::Correct);
     let release = cached_release();
     let reports = Arc::new(Reports::default());
     let access = Arc::new(Access {
         host: Arc::clone(&host),
         connection: probe.clone(),
         loaded: Arc::new(OnceCell::new()),
-        record,
+        record: release_record,
         release,
         reporter: FailureReporter::new(reports.clone()),
     });
@@ -192,7 +223,7 @@ pub(crate) async fn fixture() -> Fixture {
         .ensure_loaded(MODULE_ID)
         .await
         .expect("cached pinned module should load without network access");
-    host.ensure_ready(record.bus_name)
+    host.ensure_ready(release_record.bus_name)
         .await
         .expect("cached pinned module should become ready");
 
@@ -207,7 +238,7 @@ pub(crate) async fn fixture() -> Fixture {
             record: record(Pin::WrongLibrary),
         }));
     Fixture {
-        client: TinyChannelsClient::new(tinybus::module::ModuleClient::new(access)),
+        client: TinyChannelsClient::new(tinybus::module::ModuleClient::new(SharedAccess(access))),
         wrong_archive_client,
         wrong_library_client,
         probe,
