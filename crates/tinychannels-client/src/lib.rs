@@ -1,10 +1,11 @@
 //! Typed host calls to confidential TinyChannels module operations.
 
 use serde::de::DeserializeOwned;
-use tinybus::module::{ModuleCallFailure, ModuleCallError, ModuleClient};
+use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
-    controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel}, methods,
+    controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
+    methods,
 };
 
 /// Typed host client for the TinyChannels module.

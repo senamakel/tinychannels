@@ -1,16 +1,14 @@
 use super::*;
 
-use std::{
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 use tinybus::{
     Connection, InterfaceName, MemberName, ObjectPath,
     broker::Broker,
     module::{
-        AccessFuture, FailureReport, FailureReporter, FailureSink, ModuleAccess,
-        ProxyFailure, ReleaseAsset, ReleaseRecord,
+        AccessFuture, FailureReport, FailureReporter, FailureSink, ModuleAccess, ProxyFailure,
+        ReleaseAsset, ReleaseRecord,
     },
     service::Interface,
     transport::memory::MemoryBus,
@@ -40,7 +38,11 @@ impl Interface for RecordingModule {
             .collect()
     }
 
-    async fn call(&self, member: &MemberName, _args: serde_json::Value) -> tinybus::Result<serde_json::Value> {
+    async fn call(
+        &self,
+        member: &MemberName,
+        _args: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
         self.0
             .lock()
             .map_err(|_| tinybus::Error::failed("call log poisoned"))?
@@ -162,22 +164,23 @@ fn discord_replies_decode_only_the_matching_raw_projection() {
         "value":{"raw":[]}
     }))
     .unwrap();
-    assert!(TinyChannelsClient::decode_discord::<Vec<DiscordGuild>>(
-        wrong_projection,
-        DiscordReply::Guilds
-    )
-    .is_none());
+    assert!(
+        TinyChannelsClient::decode_discord::<Vec<DiscordGuild>>(
+            wrong_projection,
+            DiscordReply::Guilds
+        )
+        .is_none()
+    );
 
     let malformed: ChannelControllerResult = serde_json::from_value(json!({
         "result":"discord_guilds",
         "value":{"raw":[{"id":"guild-1"}]}
     }))
     .unwrap();
-    assert!(TinyChannelsClient::decode_discord::<Vec<DiscordGuild>>(
-        malformed,
-        DiscordReply::Guilds
-    )
-    .is_none());
+    assert!(
+        TinyChannelsClient::decode_discord::<Vec<DiscordGuild>>(malformed, DiscordReply::Guilds)
+            .is_none()
+    );
 }
 
 #[test]
@@ -258,11 +261,7 @@ async fn discord_credentials_never_fall_back_when_peer_proof_is_missing() {
         )
         .await;
     let health = client
-        .check_health(
-            ChannelsConfig::default(),
-            HttpProxyPolicy::default(),
-            1_000,
-        )
+        .check_health(ChannelsConfig::default(), HttpProxyPolicy::default(), 1_000)
         .await;
 
     for error in [
