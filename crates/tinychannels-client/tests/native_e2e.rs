@@ -189,8 +189,17 @@ async fn malformed_public_responses_report_one_sanitized_module_fault() {
         .check_health(config(), proxy("test:malformed-payload"), 12_345)
         .await
         .expect_err("wrong health payload shape is malformed");
-    assert_sanitized_failure(&health);
-    assert_one_module_fault(&fixture.reports);
+    assert_eq!(health.kind, ModuleCallError::IncompatibleContract);
+    assert!(!format!("{health:?}").contains("fixture-private-token"));
+    assert!(!health.to_string().contains("fixture-private-token"));
+    assert_eq!(
+        fixture.reports.entries(),
+        [(
+            "tinychannels".into(),
+            "0.1.36".into(),
+            "incompatible_contract".into()
+        )]
+    );
 }
 
 #[tokio::test]
