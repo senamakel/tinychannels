@@ -52,22 +52,31 @@ pub const WHATSAPP_COLLECTIONS: [&str; 8] = [
 
 static COLLECTIONS: LazyLock<[CollectionSpec; 14]> = LazyLock::new(|| {
     [
-        CollectionSpec::new(DELIVERY_PENDING_COLLECTION),
-        CollectionSpec::new(DELIVERY_FAILED_COLLECTION),
-        CollectionSpec::new(DELIVERY_RESULTS_COLLECTION),
-        CollectionSpec::new(REMOTE_BINDINGS_COLLECTION),
-        CollectionSpec::new(REMOTE_BUSY_COLLECTION),
-        CollectionSpec::new(REMOTE_META_COLLECTION),
-        CollectionSpec::new(WHATSAPP_DEVICE_COLLECTION),
-        CollectionSpec::new(WHATSAPP_IDENTITY_COLLECTION),
-        CollectionSpec::new(WHATSAPP_SESSION_COLLECTION),
-        CollectionSpec::new(WHATSAPP_PREKEY_COLLECTION),
-        CollectionSpec::new(WHATSAPP_SIGNED_PREKEY_COLLECTION),
-        CollectionSpec::new(WHATSAPP_SENDER_KEY_COLLECTION),
-        CollectionSpec::new(WHATSAPP_SYNC_KEY_COLLECTION),
-        CollectionSpec::new(WHATSAPP_LID_MAPPING_COLLECTION),
+        collection(DELIVERY_PENDING_COLLECTION),
+        collection(DELIVERY_FAILED_COLLECTION),
+        collection(DELIVERY_RESULTS_COLLECTION),
+        collection(REMOTE_BINDINGS_COLLECTION),
+        collection(REMOTE_BUSY_COLLECTION),
+        collection(REMOTE_META_COLLECTION),
+        collection(WHATSAPP_DEVICE_COLLECTION),
+        collection(WHATSAPP_IDENTITY_COLLECTION),
+        collection(WHATSAPP_SESSION_COLLECTION),
+        collection(WHATSAPP_PREKEY_COLLECTION),
+        collection(WHATSAPP_SIGNED_PREKEY_COLLECTION),
+        collection(WHATSAPP_SENDER_KEY_COLLECTION),
+        collection(WHATSAPP_SYNC_KEY_COLLECTION),
+        collection(WHATSAPP_LID_MAPPING_COLLECTION),
     ]
 });
+
+fn collection(name: &str) -> CollectionSpec {
+    CollectionSpec {
+        name: name.into(),
+        indexes: Vec::new(),
+        ttl_field: None,
+        search: None,
+    }
+}
 
 /// Resources TinyChannels requires from the host storage port.
 ///
