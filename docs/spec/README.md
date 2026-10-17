@@ -27,6 +27,8 @@ state remain outside this crate until they can be split behind transport traits.
 
 ## Research and Porting Specs
 
+- [Storage needs](storage-needs.md) — the bus contract's declared collection
+  inventory for delivery, remote sessions, and WhatsApp Web persistence.
 - [OpenClaw and Hermes channel porting](openclaw-hermes-channel-porting.md) —
   source-level audit of both upstreams (verified against pinned 2026-07-04
   checkouts) and the proposed TinyChannels contract.
