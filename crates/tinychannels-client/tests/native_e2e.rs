@@ -59,6 +59,27 @@ async fn all_public_wrappers_route_to_the_pinned_peer_and_decode_typed_results()
     let fixture = support::fixture().await;
     let record = support::record(support::Pin::Correct);
     let before = support::calls(&fixture.probe).await;
+    // Observe the admitted peer's public proof metadata; each actual operation
+    // below still traverses TinyChannelsClient's strict ModuleClient call.
+    let peer = fixture
+        .probe
+        .name_owner(record.bus_name)
+        .await
+        .expect("module owner lookup")
+        .expect("fixture is serving");
+    assert!(peer.is_unique());
+    let proof = fixture
+        .probe
+        .attestation(peer)
+        .await
+        .expect("public peer proof lookup")
+        .expect("cached release is attested");
+    assert_eq!(proof.name.as_str(), record.bus_name);
+    assert_eq!(proof.sha256, record.assets[0].sha256);
+    assert_eq!(
+        proof.library_sha256.as_deref(),
+        record.assets[0].library_sha256
+    );
 
     let guilds = fixture
         .client
