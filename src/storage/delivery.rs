@@ -38,11 +38,11 @@ use crate::delivery::{
 const LOG_PREFIX: &str = "[channel-delivery-store]";
 
 /// Collection of entries awaiting a terminal outcome.
-pub const PENDING_COLLECTION: &str = "channels_delivery_pending";
+pub const PENDING_COLLECTION: &str = tinychannels_bus::storage_needs::DELIVERY_PENDING_COLLECTION;
 /// Collection of permanently failed entries.
-pub const FAILED_COLLECTION: &str = "channels_delivery_failed";
+pub const FAILED_COLLECTION: &str = tinychannels_bus::storage_needs::DELIVERY_FAILED_COLLECTION;
 /// Collection of idempotent terminal results.
-pub const RESULTS_COLLECTION: &str = "channels_delivery_results";
+pub const RESULTS_COLLECTION: &str = tinychannels_bus::storage_needs::DELIVERY_RESULTS_COLLECTION;
 
 /// Compare-and-swap attempts before an update reports contention.
 const CAS_ATTEMPTS: usize = 4;

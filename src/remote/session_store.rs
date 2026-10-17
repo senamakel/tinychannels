@@ -30,11 +30,11 @@ const LEGACY_TELEGRAM_STORE_FILE: &str = "state/telegram_remote_sessions.json";
 const LOG_PREFIX: &str = "[channel-remote]";
 
 /// Collection of chat → thread bindings.
-pub const BINDINGS_COLLECTION: &str = "channel_remote_bindings";
+pub const BINDINGS_COLLECTION: &str = tinychannels_bus::storage_needs::REMOTE_BINDINGS_COLLECTION;
 /// Collection of chats with a turn in flight.
-pub const BUSY_COLLECTION: &str = "channel_remote_busy";
+pub const BUSY_COLLECTION: &str = tinychannels_bus::storage_needs::REMOTE_BUSY_COLLECTION;
 /// Collection holding the one-time legacy import marker.
-pub const META_COLLECTION: &str = "channel_remote_meta";
+pub const META_COLLECTION: &str = tinychannels_bus::storage_needs::REMOTE_META_COLLECTION;
 const LEGACY_MARKER_ID: &str = "legacy-import";
 
 /// A chat's binding to a host conversation thread.

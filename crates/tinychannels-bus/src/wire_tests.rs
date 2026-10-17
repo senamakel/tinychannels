@@ -67,9 +67,41 @@ fn http_proxy_policy_round_trips_without_changing_its_wire_fields() {
 
 #[test]
 fn storage_needs_are_declared_by_the_bus_contract() {
-    // Keeping this reference in the contract crate makes the declaration
-    // available to hosts without linking the TinyChannels implementation.
-    let _needs = super::STORAGE_NEEDS;
+    // Keeping this inventory in the contract crate makes it available to
+    // hosts without linking the TinyChannels implementation.
+    let needs = &*super::STORAGE_NEEDS;
+    let names: Vec<_> = needs
+        .collections
+        .iter()
+        .map(|collection| collection.name.as_str())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "channels_delivery_pending",
+            "channels_delivery_failed",
+            "channels_delivery_results",
+            "channel_remote_bindings",
+            "channel_remote_busy",
+            "channel_remote_meta",
+            "whatsapp_device",
+            "whatsapp_identity",
+            "whatsapp_session",
+            "whatsapp_prekey",
+            "whatsapp_signed_prekey",
+            "whatsapp_sender_key",
+            "whatsapp_sync_key",
+            "whatsapp_lid_mapping",
+        ]
+    );
+    assert!(needs.collections.iter().all(|collection| {
+        collection.indexes.is_empty()
+            && collection.ttl_field.is_none()
+            && collection.search.is_none()
+    }));
+    assert!(needs.blob_prefixes.is_empty());
+    assert!(needs.stream_prefixes.is_empty());
+    assert!(needs.secret_prefixes.is_empty());
 }
 
 #[test]
