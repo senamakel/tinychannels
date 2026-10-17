@@ -68,9 +68,21 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
         self.assertEqual(BOUNDARY.violations(fixture(), tree_output()), [])
 
     def test_tinybus_dependency_is_rejected(self):
-        metadata = fixture(extra_packages=[{"id": "tinybus", "name": "tinybus", "version": "0.1.0"}])
+        metadata = fixture()
+        metadata["packages"].append(
+            {"id": "tinybus", "name": "tinybus", "version": "0.1.0"}
+        )
+        metadata["resolve"]["nodes"][0]["deps"].append(
+            {"pkg": "tinybus", "dep_kinds": [{"kind": None}]}
+        )
+        metadata["resolve"]["nodes"].append(
+            {"id": "tinybus", "features": [], "deps": []}
+        )
         self.assertTrue(
-            any("tinybus" in error for error in BOUNDARY.violations(metadata, tree_output()))
+            any(
+                "tinybus" in error
+                for error in BOUNDARY.violations(metadata, tree_output(("tinybus v0.1.0",)))
+            )
         )
 
     def test_storage_bus_client_feature_is_rejected(self):
