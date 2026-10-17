@@ -69,7 +69,7 @@ fn http_proxy_policy_round_trips_without_changing_its_wire_fields() {
 fn storage_needs_are_declared_by_the_bus_contract() {
     // Keeping this reference in the contract crate makes the declaration
     // available to hosts without linking the TinyChannels implementation.
-    let _needs = tinychannels_bus::STORAGE_NEEDS;
+    let _needs = super::STORAGE_NEEDS;
 }
 
 #[test]
