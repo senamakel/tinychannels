@@ -1,7 +1,6 @@
 //! Typed host calls to confidential TinyChannels module operations.
 
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use tinybus::module::{ModuleCallFailure, ModuleCallError, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
