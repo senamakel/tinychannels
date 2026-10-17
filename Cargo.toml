@@ -2,12 +2,14 @@
 members = [
     "crates/tinychannels-bus",
     "crates/tinychannels-module",
+    "crates/tinychannels-client",
     "crates/tinychannels-runtime",
 ]
 default-members = [
     ".",
     "crates/tinychannels-bus",
     "crates/tinychannels-module",
+    "crates/tinychannels-client",
     "crates/tinychannels-runtime",
 ]
 # The bus is a submodule with its own workspace; it is a path dependency of the
