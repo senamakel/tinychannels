@@ -10,6 +10,8 @@ case "${RUNNER_OS:-$(uname -s)}" in
 esac
 FEATURE_TEST_BASH="$feature_test_bash" python3 scripts/test-feature-lanes.py
 FEATURE_TEST_BASH="$feature_test_bash" python3 scripts/test-reviewed-epic-release.py
+python3 scripts/test-bus-purity.py
+python3 scripts/check-bus-purity.py
 python3 scripts/test-feature-shell.py
 cargo test --locked --workspace
 cargo test --locked --workspace --all-features

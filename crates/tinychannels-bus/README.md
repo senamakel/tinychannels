@@ -1,11 +1,19 @@
 # tinychannels-bus
 
 Serialized channel vocabulary, configuration/schema declarations, interface
-names, relay frames and structured errors. Normal dependencies are Serde,
-JSON/schema/error derivation, and Base64 used only by the existing
-`PassthroughForward.body` custom serializer (`bodyB64`). This crate has no
-provider callbacks, scheduler, crypto, entropy, stateful locks, transport,
-session derivation or delivery algorithms.
+names, relay frames and structured errors. It also declares the async provider
+trait and host-facing call shapes without implementing a provider or executing
+host callbacks. `context` contains shared DTOs and pure per-sender history
+helpers over an in-memory `Arc<Mutex<...>>`; `storage_needs::STORAGE_NEEDS` is
+static declaration data built with `LazyLock`.
+
+The observed default/all-feature normal and build closure has 26 packages:
+Serde/JSON/schema/error derivation, Base64 for the existing
+`PassthroughForward.body` custom serializer (`bodyB64`), `anyhow`, `async-trait`,
+Tokio's `sync` channel type, and `tinystoragedrivers-bus` 1.5 with default
+features disabled for storage declaration types. It contains no TinyBus,
+storage client/runtime or backend driver, HTTP/socket transport, database,
+task executor, scheduler, crypto/entropy implementation, or concrete provider.
 
 DTOs are defined once here. `tinychannels-runtime` and `tinychannels` re-export
 these same Rust types. Hosts should name wire values through this crate and
@@ -13,9 +21,13 @@ execute behavior through the compiled module. The root library compatibility
 facade is for existing implementation consumers, not a host dependency shortcut.
 
 `python3 scripts/check-bus-purity.py --offline` audits independent default and
-all-feature normal/build dependency closures and rejects runtime source seams.
-The approved 21-package closure includes Base64 solely for serialization;
-crypto and UUID generation remain implementation dependencies.
+all-feature normal/build closures. It checks the exact package set, canonical
+TSD 1.5 source with no client feature, and Tokio's sync-only feature set. Its
+source guard allows async trait signatures, Tokio sync carriers, in-memory
+history locking, and static metadata while rejecting concrete I/O, task,
+database, and provider execution. The CI feature-test lane runs this gate and
+its Python negative controls. Crypto and UUID generation remain implementation
+dependencies.
 
 The original module and host callback names, method arities, JSON field names,
 optional fields and persisted configuration values are unchanged. See the
