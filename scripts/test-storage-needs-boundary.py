@@ -109,6 +109,19 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
         errors = BOUNDARY.violations(metadata, tree_output())
         self.assertTrue(any("missing resolved normal/build node" in error for error in errors))
 
+    def test_missing_feature_evidence_fails_closed(self):
+        metadata = fixture()
+        tokio = next(node for node in metadata["resolve"]["nodes"] if node["id"] == "tokio")
+        del tokio["features"]
+        errors = BOUNDARY.violations(metadata, tree_output())
+        self.assertTrue(any("no feature evidence" in error for error in errors))
+
+    def test_missing_dependency_kind_evidence_fails_closed(self):
+        metadata = fixture()
+        metadata["resolve"]["nodes"][0]["deps"][0]["dep_kinds"] = []
+        errors = BOUNDARY.violations(metadata, tree_output())
+        self.assertTrue(any("no kind evidence" in error for error in errors))
+
     def test_tag_source_with_matching_commit_suffix_is_rejected(self):
         metadata = fixture()
         metadata["packages"][2]["source"] = (

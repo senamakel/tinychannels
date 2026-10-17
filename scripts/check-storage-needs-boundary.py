@@ -51,7 +51,11 @@ def reachable_normal_build(metadata):
 
     packages_by_id = {}
     for package in packages:
-        if not isinstance(package, dict) or not isinstance(package.get("id"), str):
+        if (
+            not isinstance(package, dict)
+            or not isinstance(package.get("id"), str)
+            or not isinstance(package.get("name"), str)
+        ):
             errors.append("Cargo metadata contains a malformed package record")
             continue
         if package["id"] in packages_by_id:
