@@ -87,7 +87,9 @@ impl ModuleAccess for Access {
                     self.host
                         .load_github_release_cached(&self.release, serde_json::json!({}))
                         .map(|_| ())
-                        .map_err(|_| "the cached test module could not be admitted".to_owned())
+                        .map_err(|error| {
+                            format!("the cached test module could not be admitted: {error}")
+                        })
                 })
                 .await
                 .map(|_| ())
