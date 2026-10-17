@@ -83,7 +83,8 @@ Do not report vulnerabilities through public issues. Use the process in
 Change the Cargo package versions through a reviewed PR. After it merges, tag that commit as vX.Y.Z and push the tag, or dispatch Release with an existing version tag. The shared release verifies the package version, builds and loads all 17 native and distro artifacts, and publishes their checksum manifest. Release does not push version bumps to main.
 
 For a release through OpenHuman epic #8056, dispatch
-`.github/workflows/epic-release.yml` from `epic/8056-modules-wiring` with the
-existing tag, `mode=reviewed`, and the positive canonical PR number whose merge
-commit the tag names. The legacy zero default is rejected. Ordinary tags and
-the existing Release dispatch continue through `.github/workflows/release.yml`.
+`.github/workflows/release.yml` from `epic/8056-modules-wiring` with
+`mode=reviewed`, the existing tag, and the positive canonical PR number whose
+merge commit the tag names. The legacy zero default is rejected. Ordinary tags
+and the existing Release dispatch continue through the same workflow's default
+`mode=tag` path.

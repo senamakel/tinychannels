@@ -42,7 +42,6 @@ def run_validator(**overrides):
         "REPOSITORY": CANONICAL,
         "REF": EPIC_REF,
         "RELEASE_MODE": "reviewed",
-        "RELEASE_TAG": "v0.1.35",
         "REVIEWED_PR": "8056",
     }
     values.update(overrides)
@@ -64,7 +63,7 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
     def test_valid_dispatch_emits_reviewed_release_outputs(self):
         result, output = run_validator()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(output, "tag=v0.1.35\nversion=0.1.35\nreviewed_pr=8056\n")
+        self.assertEqual(output, "reviewed_pr=8056\n")
 
     def test_wrong_event_repo_branch_and_mode_are_rejected(self):
         for name, value in (
@@ -97,15 +96,16 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         self.assertIn("      mode:\n", source)
         self.assertIn("options: [tag, reviewed]", source)
         self.assertIn(REVIEWED_RELEASE, source)
-        self.assertIn("fromJSON(needs.resolve.outputs.reviewed_pr || '0')", source)
+        self.assertIn("fromJSON(needs.validate.outputs.reviewed_pr || '0')", source)
         self.assertIn("default: '0'", source)
         self.assertIn("if: inputs.mode == 'reviewed'", source)
+        self.assertIn("if: github.event_name == 'push' || inputs.mode != 'reviewed'", source)
 
     def test_permissions_are_scoped_to_validation_and_release_needs(self):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("permissions: {}", source)
         self.assertIn(
-            "  resolve:\n    runs-on: ubuntu-latest\n    permissions: {}", source
+            "  validate:\n    runs-on: ubuntu-latest\n    permissions: {}", source
         )
         self.assertIn(
             "      contents: write\n      pull-requests: read\n"
@@ -128,6 +128,7 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         self.assertIn("  push:\n    tags: ['v*']", source)
         self.assertIn("if: github.event_name == 'push' || inputs.mode != 'reviewed'", source)
         self.assertIn("if: inputs.mode == 'reviewed'", source)
+        self.assertFalse((ROOT / ".github/workflows/epic-release.yml").exists())
 
     def test_tinybus_and_module_sdk_share_the_published_workspace_source(self):
         workspace = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
@@ -181,6 +182,8 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         )
         self.assertIn("module-reviewed-epic-release.yml", source)
         self.assertIn("module-release:", source)
+        self.assertIn("default: tag", source)
+        self.assertIn("needs: resolve", source)
 
 
 if __name__ == "__main__":
