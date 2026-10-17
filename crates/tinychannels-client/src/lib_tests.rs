@@ -115,7 +115,7 @@ tinybus_module::module_export_static! {
     setup = linked_fixture_setup,
     config = LinkedFixtureConfig,
     worker_threads = 1,
-    provides = [tinychannels_bus::BUS_NAME],
+    provides = ["ai.tinyhumans.TinyChannels"],
     methods = [],
     signals = [],
     requires = [],
@@ -271,6 +271,7 @@ async fn fixture(
         tinychannels_bus::OBJECT_PATH,
         tinychannels_bus::BUS_NAME,
     )?;
+    assert!(proxy.attestation().await?.is_some(), "fixture must be admitted as linked host code");
     let reports = Arc::new(Mutex::new(Vec::new()));
     let reporter = FailureReporter::new(Arc::new(RecordingFailures(Arc::clone(&reports))));
     let module = ModuleClient::new(FixtureAccess { reporter }).with_fixture(proxy);
