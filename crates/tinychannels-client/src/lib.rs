@@ -1,7 +1,6 @@
 //! Typed host calls to confidential TinyChannels module operations.
 
 use serde::de::DeserializeOwned;
-use serde_json::Value;
 use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
@@ -92,15 +91,13 @@ impl TinyChannelsClient {
         proxy: HttpProxyPolicy,
         timeout_ms: u64,
     ) -> Result<Vec<tinychannels_bus::ChannelHealthReport>, ModuleCallFailure> {
-        let response: Value = self
-            .module
+        self.module
             .call_attested_detailed(
                 "tinychannels",
                 methods::CHECK_CHANNEL_HEALTH,
                 (config, proxy, timeout_ms),
             )
-            .await?;
-        serde_json::from_value(response).map_err(|_| self.malformed_reply())
+            .await
     }
 
     async fn discord<T: DeserializeOwned>(
