@@ -2,12 +2,17 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$repo_root"
+if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+  pwsh -NoProfile -File scripts/test-client-e2e.ps1
+  exit
+fi
 TASK_TARGET_ROOT="$repo_root/target"
 host="$(rustc -vV | sed -n 's/^host: //p')"
 case "$host" in
   *-apple-darwin) library_name="libtinychannels_client_test_fixture.dylib" ;;
   *-linux-gnu) library_name="libtinychannels_client_test_fixture.so" ;;
-  *-windows-*) echo "test-client-e2e.sh requires a Unix runner" >&2; exit 1 ;;
+  *-windows-*) echo "test-client-e2e.sh requires RUNNER_OS=Windows on a Windows runner" >&2; exit 1 ;;
   *) echo "unsupported test host: $host" >&2; exit 2 ;;
 esac
 
