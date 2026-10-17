@@ -12,19 +12,20 @@ use tinychannels_bus::{
 const TOKEN: &str = "fixture-call-secret";
 
 fn config() -> ChannelsConfig {
-    let mut config = ChannelsConfig::default();
-    config.cli = false;
-    config.message_timeout_secs = 47;
-    config.active_channel = Some("discord".into());
-    config.discord = Some(DiscordConfig {
-        bot_token: "fixture-config-secret".into(),
-        guild_id: Some("config-guild".into()),
-        channel_id: Some("config-channel".into()),
-        allowed_users: vec!["member-1".into()],
-        listen_to_bots: true,
-        mention_only: true,
-    });
-    config
+    ChannelsConfig {
+        cli: false,
+        message_timeout_secs: 47,
+        active_channel: Some("discord".into()),
+        discord: Some(DiscordConfig {
+            bot_token: "fixture-config-secret".into(),
+            guild_id: Some("config-guild".into()),
+            channel_id: Some("config-channel".into()),
+            allowed_users: vec!["member-1".into()],
+            listen_to_bots: true,
+            mention_only: true,
+        }),
+        ..Default::default()
+    }
 }
 
 fn proxy(selector: &str) -> HttpProxyPolicy {
