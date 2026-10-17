@@ -40,26 +40,19 @@ use wacore::store::traits::DeviceStore;
 
 const LOG_PREFIX: &str = "[whatsapp-store]";
 
-pub(crate) const DEVICE: &str = "whatsapp_device";
-pub(crate) const IDENTITY: &str = "whatsapp_identity";
-pub(crate) const SESSION: &str = "whatsapp_session";
-pub(crate) const PREKEY: &str = "whatsapp_prekey";
-pub(crate) const SIGNED_PREKEY: &str = "whatsapp_signed_prekey";
-pub(crate) const SENDER_KEY: &str = "whatsapp_sender_key";
-pub(crate) const SYNC_KEY: &str = "whatsapp_sync_key";
-pub(crate) const LID_MAPPING: &str = "whatsapp_lid_mapping";
+pub(crate) const DEVICE: &str = tinychannels_bus::storage_needs::WHATSAPP_DEVICE_COLLECTION;
+pub(crate) const IDENTITY: &str = tinychannels_bus::storage_needs::WHATSAPP_IDENTITY_COLLECTION;
+pub(crate) const SESSION: &str = tinychannels_bus::storage_needs::WHATSAPP_SESSION_COLLECTION;
+pub(crate) const PREKEY: &str = tinychannels_bus::storage_needs::WHATSAPP_PREKEY_COLLECTION;
+pub(crate) const SIGNED_PREKEY: &str =
+    tinychannels_bus::storage_needs::WHATSAPP_SIGNED_PREKEY_COLLECTION;
+pub(crate) const SENDER_KEY: &str = tinychannels_bus::storage_needs::WHATSAPP_SENDER_KEY_COLLECTION;
+pub(crate) const SYNC_KEY: &str = tinychannels_bus::storage_needs::WHATSAPP_SYNC_KEY_COLLECTION;
+pub(crate) const LID_MAPPING: &str =
+    tinychannels_bus::storage_needs::WHATSAPP_LID_MAPPING_COLLECTION;
 
 /// Every collection the backend writes, for declaration and tests.
-pub const COLLECTIONS: [&str; 8] = [
-    DEVICE,
-    IDENTITY,
-    SESSION,
-    PREKEY,
-    SIGNED_PREKEY,
-    SENDER_KEY,
-    SYNC_KEY,
-    LID_MAPPING,
-];
+pub const COLLECTIONS: [&str; 8] = tinychannels_bus::storage_needs::WHATSAPP_COLLECTIONS;
 
 /// A WhatsApp Web session backend whose pairing state survives a restart.
 pub struct DocumentWhatsAppBackend {

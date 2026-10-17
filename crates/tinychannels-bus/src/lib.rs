@@ -24,6 +24,7 @@ pub mod module_runtime;
 pub mod module_supervision;
 pub mod names;
 pub mod relay;
+pub mod storage_needs;
 pub mod traits;
 pub mod version;
 pub use capabilities::{ChannelCapabilities, capabilities_for, provider_id};
@@ -59,3 +60,4 @@ pub use module_interaction::{
 pub use module_supervision::ChannelSupervisionPolicy;
 
 pub use module_runtime::{ChannelRuntimeDispatchPolicy, ChannelRuntimeReservation};
+pub use storage_needs::STORAGE_NEEDS;
