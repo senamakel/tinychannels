@@ -250,11 +250,15 @@ pub(crate) async fn fixture() -> Fixture {
     }
 }
 
-pub(crate) async fn unattested_client() -> (
-    TinyChannelsClient,
-    Arc<std::sync::atomic::AtomicUsize>,
-    Connection,
-) {
+pub(crate) struct UnattestedFixture {
+    pub(crate) client: TinyChannelsClient,
+    pub(crate) calls: Arc<std::sync::atomic::AtomicUsize>,
+    pub(crate) probe: Connection,
+    _service: Connection,
+    _broker_task: tokio::task::JoinHandle<tinybus::Result<()>>,
+}
+
+pub(crate) async fn unattested_fixture() -> UnattestedFixture {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct Unattested(Arc<AtomicUsize>);
@@ -292,7 +296,7 @@ pub(crate) async fn unattested_client() -> (
     let calls = Arc::new(AtomicUsize::new(0));
     let bus = MemoryBus::new();
     let broker = Broker::new();
-    let _broker_task = broker.spawn(bus.clone());
+    let broker_task = broker.spawn(bus.clone());
     let service = Connection::connect(bus.connect().await.expect("service transport"))
         .await
         .expect("service connection");
@@ -322,11 +326,13 @@ pub(crate) async fn unattested_client() -> (
         record: record(Pin::Correct),
         reporter: FailureReporter::new(Arc::new(Reports::default())),
     };
-    (
-        TinyChannelsClient::new(tinybus::module::ModuleClient::new(access)),
+    UnattestedFixture {
+        client: TinyChannelsClient::new(tinybus::module::ModuleClient::new(access)),
         calls,
-        client_connection,
-    )
+        probe: client_connection,
+        _service: service,
+        _broker_task: broker_task,
+    }
 }
 
 pub(crate) async fn assert_unattested_peer_live(probe: &Connection) -> tinybus::BusName {
