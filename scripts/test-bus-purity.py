@@ -100,6 +100,29 @@ static NEEDS: LazyLock<StorageNeeds<'static>> = LazyLock::new(build_metadata);
         )
         self.assertTrue(any("unsafe contract dependencies" in error for error in errors))
 
+    def test_dev_only_edges_are_excluded_from_the_host_dependency_closure(self):
+        metadata = metadata_fixture(
+            extra_packages=(
+                {"id": "pkg:wiremock", "name": "wiremock", "version": "0.6.0"},
+            )
+        )
+        root = next(
+            node
+            for node in metadata["resolve"]["nodes"]
+            if node["id"] == "pkg:tinychannels-bus"
+        )
+        root["deps"].append(
+            {
+                "pkg": "pkg:wiremock",
+                "name": "wiremock",
+                "dep_kinds": [{"kind": "dev"}],
+            }
+        )
+        metadata["resolve"]["nodes"].append(
+            {"id": "pkg:wiremock", "features": [], "deps": []}
+        )
+        self.assertEqual(BUS_PURITY.dependency_violations(metadata), [])
+
     def test_non_sync_tokio_feature_is_rejected(self):
         errors = BUS_PURITY.dependency_violations(
             metadata_fixture(tokio_features=("sync", "time"))
