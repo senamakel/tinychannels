@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
-WORKFLOW = ROOT / ".github/workflows/epic-release.yml"
+WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@d463b7d93a3d6ea618e46365dffcf34ecc898462"
@@ -94,16 +94,18 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
 
     def test_workflow_calls_reviewed_release_with_skip_safe_numeric_pr(self):
         source = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("      mode:\n", source)
+        self.assertIn("options: [tag, reviewed]", source)
         self.assertIn(REVIEWED_RELEASE, source)
-        self.assertIn("fromJSON(needs.validate.outputs.reviewed_pr || '0')", source)
+        self.assertIn("fromJSON(needs.resolve.outputs.reviewed_pr || '0')", source)
         self.assertIn("default: '0'", source)
-        self.assertIn("options: [reviewed]", source)
+        self.assertIn("if: inputs.mode == 'reviewed'", source)
 
     def test_permissions_are_scoped_to_validation_and_release_needs(self):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("permissions: {}", source)
         self.assertIn(
-            "  validate:\n    runs-on: ubuntu-latest\n    permissions: {}", source
+            "  resolve:\n    runs-on: ubuntu-latest\n    permissions: {}", source
         )
         self.assertIn(
             "      contents: write\n      pull-requests: read\n"
@@ -119,6 +121,13 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             test_features,
         )
         self.assertIn("feature-test-script: scripts/test-features.sh", ci)
+
+    def test_reviewed_release_is_in_the_registered_release_workflow(self):
+        source = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("on:\n  workflow_dispatch:", source)
+        self.assertIn("  push:\n    tags: ['v*']", source)
+        self.assertIn("if: github.event_name == 'push' || inputs.mode != 'reviewed'", source)
+        self.assertIn("if: inputs.mode == 'reviewed'", source)
 
     def test_tinybus_and_module_sdk_share_the_published_workspace_source(self):
         workspace = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
@@ -170,7 +179,8 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             "3e87ade76b622844985d0c665a3b075313e4545c",
             source,
         )
-        self.assertNotIn("module-reviewed-epic-release.yml", source)
+        self.assertIn("module-reviewed-epic-release.yml", source)
+        self.assertIn("module-release:", source)
 
 
 if __name__ == "__main__":
