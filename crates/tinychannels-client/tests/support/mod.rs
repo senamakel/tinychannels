@@ -3,7 +3,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Arc, Mutex, OnceLock},
 };
 
@@ -441,10 +441,6 @@ fn env(name: &str) -> &'static str {
             .unwrap_or_else(|_| panic!("{name} must identify the staged local fixture"))
             .into_boxed_str(),
     )
-}
-
-pub(crate) fn cache_path() -> PathBuf {
-    PathBuf::from(env("TINYCHANNELS_CLIENT_TEST_CACHE"))
 }
 
 pub(crate) fn assert_unavailable(error: ModuleCallFailure) {

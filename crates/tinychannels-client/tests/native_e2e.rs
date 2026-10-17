@@ -6,9 +6,7 @@ mod support;
 
 use tinybus::module::{ModuleCallError, ModuleCallFailure};
 use tinychannels_bus::{
-    ChannelHealthState, ChannelsConfig, HttpProxyPolicy,
-    config::DiscordConfig,
-    controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
+    ChannelHealthState, ChannelsConfig, HttpProxyPolicy, config::DiscordConfig,
 };
 
 const TOKEN: &str = "fixture-call-secret";
@@ -67,14 +65,10 @@ async fn all_public_wrappers_route_to_the_pinned_peer_and_decode_typed_results()
         .discord_list_guilds(config(), TOKEN.into(), proxy("channel.discord"))
         .await
         .expect("guild list from the pinned native fixture");
-    assert_eq!(
-        guilds,
-        [DiscordGuild {
-            id: "guild-1".into(),
-            name: "Fixture guild".into(),
-            icon: None,
-        }]
-    );
+    assert_eq!(guilds.len(), 1);
+    assert_eq!(guilds[0].id, "guild-1");
+    assert_eq!(guilds[0].name, "Fixture guild");
+    assert_eq!(guilds[0].icon, None);
 
     let channels = fixture
         .client
@@ -86,16 +80,12 @@ async fn all_public_wrappers_route_to_the_pinned_peer_and_decode_typed_results()
         )
         .await
         .expect("channel list from the pinned native fixture");
-    assert_eq!(
-        channels,
-        [DiscordTextChannel {
-            id: "channel-1".into(),
-            name: "general".into(),
-            channel_type: 0,
-            position: 11,
-            parent_id: Some("category-1".into()),
-        }]
-    );
+    assert_eq!(channels.len(), 1);
+    assert_eq!(channels[0].id, "channel-1");
+    assert_eq!(channels[0].name, "general");
+    assert_eq!(channels[0].channel_type, 0);
+    assert_eq!(channels[0].position, 11);
+    assert_eq!(channels[0].parent_id.as_deref(), Some("category-1"));
 
     let permissions = fixture
         .client
@@ -108,15 +98,10 @@ async fn all_public_wrappers_route_to_the_pinned_peer_and_decode_typed_results()
         )
         .await
         .expect("permission check from the pinned native fixture");
-    assert_eq!(
-        permissions,
-        BotPermissionCheck {
-            can_view_channel: true,
-            can_send_messages: false,
-            can_read_message_history: true,
-            missing_permissions: vec!["SEND_MESSAGES".into()],
-        }
-    );
+    assert!(permissions.can_view_channel);
+    assert!(!permissions.can_send_messages);
+    assert!(permissions.can_read_message_history);
+    assert_eq!(permissions.missing_permissions, ["SEND_MESSAGES"]);
 
     let health = fixture
         .client
