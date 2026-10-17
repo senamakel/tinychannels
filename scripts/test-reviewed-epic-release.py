@@ -98,6 +98,27 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         self.assertIn("default: '0'", source)
         self.assertIn("options: [reviewed]", source)
 
+    def test_permissions_are_scoped_to_validation_and_release_needs(self):
+        source = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("permissions: {}", source)
+        self.assertIn(
+            "  validate:\n    runs-on: ubuntu-latest\n    permissions: {}", source
+        )
+        self.assertIn(
+            "      contents: write\n      pull-requests: read\n"
+            "      checks: read\n      actions: read",
+            source,
+        )
+
+    def test_release_validator_runs_in_existing_feature_test_ci_lane(self):
+        test_features = (ROOT / "scripts/test-features.sh").read_text(encoding="utf-8")
+        ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn(
+            'FEATURE_TEST_BASH="$feature_test_bash" python3 scripts/test-reviewed-epic-release.py',
+            test_features,
+        )
+        self.assertIn("feature-test-script: scripts/test-features.sh", ci)
+
     def test_ordinary_tag_release_caller_remains_in_place(self):
         source = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
         self.assertIn(
