@@ -1,6 +1,7 @@
 //! Typed host calls to confidential TinyChannels module operations.
 
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
@@ -91,13 +92,15 @@ impl TinyChannelsClient {
         proxy: HttpProxyPolicy,
         timeout_ms: u64,
     ) -> Result<Vec<tinychannels_bus::ChannelHealthReport>, ModuleCallFailure> {
-        self.module
+        let response: Value = self
+            .module
             .call_attested_detailed(
                 "tinychannels",
                 methods::CHECK_CHANNEL_HEALTH,
                 (config, proxy, timeout_ms),
             )
-            .await
+            .await?;
+        serde_json::from_value(response).map_err(|_| self.malformed_reply())
     }
 
     async fn discord<T: DeserializeOwned>(
@@ -109,14 +112,16 @@ impl TinyChannelsClient {
             .module
             .call_attested_detailed("tinychannels", methods::CHANNEL_CONTROLLER, (request,))
             .await?;
-        Self::decode_discord(response, expected).ok_or_else(|| {
-            self.module.report_malformed_reply("tinychannels");
-            ModuleCallFailure {
-                kind: ModuleCallError::ModuleFault,
-                wire_name: "ai.tinyhumans.tinybus.Error.Failed".into(),
-                message: "malformed channel controller response".into(),
-            }
-        })
+        Self::decode_discord(response, expected).ok_or_else(|| self.malformed_reply())
+    }
+
+    fn malformed_reply(&self) -> ModuleCallFailure {
+        self.module.report_malformed_reply("tinychannels");
+        ModuleCallFailure {
+            kind: ModuleCallError::ModuleFault,
+            wire_name: "ai.tinyhumans.tinybus.Error.Failed".into(),
+            message: "malformed TinyChannels module response".into(),
+        }
     }
 
     fn decode_discord<T: DeserializeOwned>(
