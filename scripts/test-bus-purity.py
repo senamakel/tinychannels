@@ -76,7 +76,9 @@ trait Channel {
 }
 static NEEDS: LazyLock<StorageNeeds<'static>> = LazyLock::new(build_metadata);
 """
-        self.assertEqual(BUS_PURITY.source_violations(source), [])
+        self.assertEqual(
+            BUS_PURITY.source_violations(source, source_path="traits.rs"), []
+        )
 
     def test_runtime_tasks_sockets_databases_and_provider_executors_are_rejected(self):
         snippets = (
@@ -85,10 +87,17 @@ static NEEDS: LazyLock<StorageNeeds<'static>> = LazyLock::new(build_metadata);
             ("rusqlite::Connection::open(path)", "database or HTTP implementation"),
             ("impl Channel for DiscordProvider {}", "concrete provider executor"),
             ("std::fs::read(path)", "filesystem implementation"),
+            ("tokio::sync::Mutex::new(())", "Tokio runtime synchronization"),
         )
         for source, expected in snippets:
             with self.subTest(source=source):
                 self.assertIn(expected, BUS_PURITY.source_violations(source))
+
+    def test_async_implementation_outside_the_provider_interface_is_rejected(self):
+        errors = BUS_PURITY.source_violations(
+            "async fn open_socket() {}", source_path="transport.rs"
+        )
+        self.assertIn("async implementation outside the channel interface", errors)
 
     def test_default_contract_dependency_closure_is_exact(self):
         self.assertEqual(BUS_PURITY.dependency_violations(metadata_fixture()), [])
