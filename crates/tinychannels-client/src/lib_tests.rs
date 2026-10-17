@@ -137,8 +137,7 @@ tinybus_module::module_export_static! {
 #[async_trait::async_trait]
 impl Interface for RecordingModule {
     fn name(&self) -> InterfaceName {
-        InterfaceName::new(tinychannels_bus::BUS_NAME)
-            .unwrap_or_else(|_| std::process::abort())
+        InterfaceName::new(tinychannels_bus::BUS_NAME).unwrap_or_else(|_| std::process::abort())
     }
 
     fn members(&self) -> Vec<MemberName> {
@@ -245,7 +244,10 @@ async fn fixture(
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static NEXT_FIXTURE: AtomicUsize = AtomicUsize::new(1);
-    let fixture_id = format!("tinychannels-client-{}", NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed));
+    let fixture_id = format!(
+        "tinychannels-client-{}",
+        NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
+    );
     let calls = Arc::new(Mutex::new(Vec::new()));
     let responses = Arc::new(Mutex::new(responses));
     LINKED_FIXTURES
@@ -258,10 +260,7 @@ async fn fixture(
     let broker = Broker::new();
     broker.clone().spawn(bus.clone());
     let host = tinybus::module::ModuleHost::new(broker);
-    host.attach_linked_with_config(
-        linked_module()?,
-        json!({"fixture_id": fixture_id}),
-    )?;
+    host.attach_linked_with_config(linked_module()?, json!({"fixture_id": fixture_id}))?;
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             if host
@@ -282,7 +281,10 @@ async fn fixture(
         tinychannels_bus::OBJECT_PATH,
         tinychannels_bus::BUS_NAME,
     )?;
-    assert!(proxy.attestation().await?.is_some(), "fixture must be admitted as linked host code");
+    assert!(
+        proxy.attestation().await?.is_some(),
+        "fixture must be admitted as linked host code"
+    );
     let reports = Arc::new(Mutex::new(Vec::new()));
     let reporter = FailureReporter::new(Arc::new(RecordingFailures(Arc::clone(&reports))));
     let module = ModuleClient::new(FixtureAccess { reporter }).with_fixture(proxy);
@@ -296,7 +298,10 @@ async fn fixture(
 }
 
 fn expected(member: &str, args: impl serde::Serialize) -> (String, Value) {
-    (member.to_owned(), serde_json::to_value(args).expect("test wire args serialize"))
+    (
+        member.to_owned(),
+        serde_json::to_value(args).expect("test wire args serialize"),
+    )
 }
 
 #[tokio::test]
@@ -313,7 +318,11 @@ async fn typed_operations_preserve_contract_members_positional_args_and_decoded_
 
     let guilds = fixture
         .client
-        .discord_list_guilds(config.clone(), "fixture-discord-token".into(), proxy.clone())
+        .discord_list_guilds(
+            config.clone(),
+            "fixture-discord-token".into(),
+            proxy.clone(),
+        )
         .await?;
     assert_eq!(guilds[0].id, "guild-fixture");
     assert_eq!(guilds[0].icon, None);
@@ -395,8 +404,14 @@ async fn typed_operations_preserve_contract_members_positional_args_and_decoded_
         .check_health(config.clone(), proxy.clone(), 4312)
         .await?;
     assert_eq!(health[0].channel, "discord");
-    assert_eq!(health[0].state, tinychannels_bus::ChannelHealthState::Healthy);
-    assert_eq!(health[1].state, tinychannels_bus::ChannelHealthState::Timeout);
+    assert_eq!(
+        health[0].state,
+        tinychannels_bus::ChannelHealthState::Healthy
+    );
+    assert_eq!(
+        health[1].state,
+        tinychannels_bus::ChannelHealthState::Timeout
+    );
 
     let actual = fixture
         .calls
@@ -408,49 +423,66 @@ async fn typed_operations_preserve_contract_members_positional_args_and_decoded_
         [
             expected(
                 tinychannels_bus::methods::CHANNEL_CONTROLLER,
-                (tinychannels_bus::ChannelControllerRequest::DiscordListGuilds {
-                    config: config.clone(),
-                    bot_token: "fixture-discord-token".into(),
-                    proxy: proxy.clone(),
-                },),
+                (
+                    tinychannels_bus::ChannelControllerRequest::DiscordListGuilds {
+                        config: config.clone(),
+                        bot_token: "fixture-discord-token".into(),
+                        proxy: proxy.clone(),
+                    },
+                ),
             ),
             expected(
                 tinychannels_bus::methods::CHANNEL_CONTROLLER,
-                (tinychannels_bus::ChannelControllerRequest::DiscordListChannels {
-                    config: config.clone(),
-                    guild_id: "guild-fixture".into(),
-                    bot_token: "fixture-discord-token".into(),
-                    proxy: proxy.clone(),
-                },),
+                (
+                    tinychannels_bus::ChannelControllerRequest::DiscordListChannels {
+                        config: config.clone(),
+                        guild_id: "guild-fixture".into(),
+                        bot_token: "fixture-discord-token".into(),
+                        proxy: proxy.clone(),
+                    },
+                ),
             ),
             expected(
                 tinychannels_bus::methods::CHANNEL_CONTROLLER,
-                (tinychannels_bus::ChannelControllerRequest::DiscordCheckPermissions {
-                    config: config.clone(),
-                    guild_id: "guild-fixture".into(),
-                    channel_id: "channel-fixture".into(),
-                    bot_token: "fixture-discord-token".into(),
-                    proxy: proxy.clone(),
-                },),
+                (
+                    tinychannels_bus::ChannelControllerRequest::DiscordCheckPermissions {
+                        config: config.clone(),
+                        guild_id: "guild-fixture".into(),
+                        channel_id: "channel-fixture".into(),
+                        bot_token: "fixture-discord-token".into(),
+                        proxy: proxy.clone(),
+                    },
+                ),
             ),
             expected(tinychannels_bus::methods::CHANNEL_CONTROLLER, (request,)),
             expected(
                 tinychannels_bus::methods::PREPARE_OUTBOUND_INTENT,
-                ("discord", tinychannels_bus::module_runtime::ChannelMessagePreparation::Legacy(message)),
+                (
+                    "discord",
+                    tinychannels_bus::module_runtime::ChannelMessagePreparation::Legacy(message)
+                ),
             ),
-            expected(tinychannels_bus::methods::PREPARE_CHANNEL_IDENTITY, (identity,)),
-            expected(tinychannels_bus::methods::PREPARE_CHANNEL_INBOUND, (inbound,)),
+            expected(
+                tinychannels_bus::methods::PREPARE_CHANNEL_IDENTITY,
+                (identity,)
+            ),
+            expected(
+                tinychannels_bus::methods::PREPARE_CHANNEL_INBOUND,
+                (inbound,)
+            ),
             expected(
                 tinychannels_bus::methods::CHECK_CHANNEL_HEALTH,
                 (config, proxy, 4312_u64),
             ),
         ]
     );
-    assert!(fixture
-        .reports
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .is_empty());
+    assert!(
+        fixture
+            .reports
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_empty()
+    );
     Ok(())
 }
 
@@ -482,7 +514,10 @@ async fn malformed_discord_projections_are_reported_as_closed_sanitized_faults()
             .reports
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        assert_eq!(reports.as_slice(), [(MODULE_ID.into(), "0.1.36".into(), "module_fault".into())]);
+        assert_eq!(
+            reports.as_slice(),
+            [(MODULE_ID.into(), "0.1.36".into(), "module_fault".into())]
+        );
     }
     Ok(())
 }
@@ -510,10 +545,11 @@ async fn confidential_discord_calls_do_not_fall_back_to_an_unattested_member()
         tinychannels_bus::OBJECT_PATH,
         tinychannels_bus::BUS_NAME,
     )?;
-    let reporter = FailureReporter::new(Arc::new(RecordingFailures(Arc::new(Mutex::new(Vec::new())))));
-    let client = TinyChannelsClient::new(
-        ModuleClient::new(FixtureAccess { reporter }).with_fixture(proxy),
-    );
+    let reporter = FailureReporter::new(Arc::new(RecordingFailures(Arc::new(Mutex::new(
+        Vec::new(),
+    )))));
+    let client =
+        TinyChannelsClient::new(ModuleClient::new(FixtureAccess { reporter }).with_fixture(proxy));
     let error = client
         .discord_list_guilds(
             tinychannels_bus::ChannelsConfig::default(),
@@ -523,9 +559,11 @@ async fn confidential_discord_calls_do_not_fall_back_to_an_unattested_member()
         .await
         .expect_err("confidential request must require module attestation");
     assert_eq!(error, ModuleCallError::TransportFailed);
-    assert!(calls
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .is_empty());
+    assert!(
+        calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_empty()
+    );
     Ok(())
 }
