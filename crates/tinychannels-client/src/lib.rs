@@ -1,4 +1,142 @@
-//! Typed host calls to the TinyChannels `TinyBus` module.
+//! Typed host calls to confidential TinyChannels module operations.
+
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+use tinybus::module::{ModuleCallFailure, ModuleCallError, ModuleClient};
+use tinychannels_bus::{
+    ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
+    methods,
+};
+
+/// Typed host client for the TinyChannels module.
+///
+/// The host supplies the module registry and lifecycle through `ModuleClient`.
+/// Calls that contain credentials or proxy policy use TinyBus's strict
+/// attested confidential route and never retry as ordinary calls.
+#[derive(Clone)]
+pub struct TinyChannelsClient {
+    module: ModuleClient,
+}
+
+impl TinyChannelsClient {
+    /// Create a client over the host's TinyBus module access.
+    #[must_use]
+    pub fn new(module: ModuleClient) -> Self {
+        Self { module }
+    }
+
+    /// List Discord guilds visible to the configured bot.
+    ///
+    /// `bot_token` and `proxy` are sent only after the module proves the
+    /// registry-pinned release archive and extracted library on the same
+    /// unique bus peer. Remote failure details are untrusted and may contain
+    /// sensitive text; the returned error's `Debug` and `Display` are redacted.
+    pub async fn discord_list_guilds(
+        &self,
+        config: ChannelsConfig,
+        bot_token: String,
+        proxy: HttpProxyPolicy,
+    ) -> Result<Vec<tinychannels_bus::DiscordGuild>, ModuleCallFailure> {
+        let request = ChannelControllerRequest::DiscordListGuilds {
+            config,
+            bot_token,
+            proxy,
+        };
+        self.discord(request, DiscordReply::Guilds).await
+    }
+
+    /// List Discord channels visible in a guild.
+    pub async fn discord_list_channels(
+        &self,
+        config: ChannelsConfig,
+        guild_id: String,
+        bot_token: String,
+        proxy: HttpProxyPolicy,
+    ) -> Result<Vec<tinychannels_bus::DiscordTextChannel>, ModuleCallFailure> {
+        let request = ChannelControllerRequest::DiscordListChannels {
+            config,
+            guild_id,
+            bot_token,
+            proxy,
+        };
+        self.discord(request, DiscordReply::Channels).await
+    }
+
+    /// Check the configured Discord bot's permissions in a channel.
+    pub async fn discord_check_permissions(
+        &self,
+        config: ChannelsConfig,
+        guild_id: String,
+        channel_id: String,
+        bot_token: String,
+        proxy: HttpProxyPolicy,
+    ) -> Result<tinychannels_bus::BotPermissionCheck, ModuleCallFailure> {
+        let request = ChannelControllerRequest::DiscordCheckPermissions {
+            config,
+            guild_id,
+            channel_id,
+            bot_token,
+            proxy,
+        };
+        self.discord(request, DiscordReply::Permissions).await
+    }
+
+    /// Check provider health using the timeout budget chosen by the host.
+    ///
+    /// The call is confidential because provider configuration and proxy
+    /// policy can contain sensitive operational details.
+    pub async fn check_health(
+        &self,
+        config: ChannelsConfig,
+        proxy: HttpProxyPolicy,
+        timeout_ms: u64,
+    ) -> Result<Vec<tinychannels_bus::ChannelHealthReport>, ModuleCallFailure> {
+        self.module
+            .call_attested_detailed(
+                "tinychannels",
+                methods::CHECK_CHANNEL_HEALTH,
+                (config, proxy, timeout_ms),
+            )
+            .await
+    }
+
+    async fn discord<T: DeserializeOwned>(
+        &self,
+        request: ChannelControllerRequest,
+        expected: DiscordReply,
+    ) -> Result<T, ModuleCallFailure> {
+        let response: ChannelControllerResult = self
+            .module
+            .call_attested_detailed("tinychannels", methods::CHANNEL_CONTROLLER, (request,))
+            .await?;
+        let raw = match (expected, response) {
+            (DiscordReply::Guilds, ChannelControllerResult::DiscordGuilds(result)) => result.raw,
+            (DiscordReply::Channels, ChannelControllerResult::DiscordChannels(result)) => {
+                result.raw
+            }
+            (DiscordReply::Permissions, ChannelControllerResult::DiscordPermissions(result)) => {
+                result.raw
+            }
+            _ => None,
+        };
+        raw.and_then(|value| serde_json::from_value(value).ok())
+            .ok_or_else(|| {
+                self.module.report_malformed_reply("tinychannels");
+                ModuleCallFailure {
+                    kind: ModuleCallError::ModuleFault,
+                    wire_name: "ai.tinyhumans.tinybus.Error.Failed".into(),
+                    message: "malformed channel controller response".into(),
+                }
+            })
+    }
+}
+
+#[derive(Clone, Copy)]
+enum DiscordReply {
+    Guilds,
+    Channels,
+    Permissions,
+}
 
 #[cfg(test)]
 #[path = "lib_tests.rs"]
