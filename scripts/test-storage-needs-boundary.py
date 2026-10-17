@@ -18,7 +18,7 @@ def fixture(extra_packages=(), tokio_features=("sync",), storage_features=()):
         {
             "id": "storage",
             "name": "tinystoragedrivers-bus",
-            "version": "1.4.0",
+            "version": "1.5.0",
             "source": "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=" + BOUNDARY.PIN,
         },
         {"id": "tokio", "name": "tokio", "version": "1.0.0"},

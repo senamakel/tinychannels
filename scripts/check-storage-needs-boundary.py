@@ -8,7 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "proofs/storage-needs-consumer/Cargo.toml"
-PIN = "c525a17d5153fc95e67e3cd44bcde1d90be60a71"
+PIN = "c9ea6ff1615b77b55d7269403af5fd11bedc9ce8"
 
 FORBIDDEN_PACKAGES = {
     "axum",
@@ -64,7 +64,7 @@ def violations(metadata, tree_output):
         )
     else:
         package = storage_bus[0]
-        if package["version"] != "1.4.0":
+        if package["version"] != "1.5.0":
             errors.append(f"unexpected storage bus version: {package['version']}")
         if PIN not in package.get("source", ""):
             errors.append("storage bus does not resolve to the expected canonical revision")
