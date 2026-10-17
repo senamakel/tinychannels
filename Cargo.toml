@@ -28,6 +28,9 @@ tinybus = { path = "vendor/tinybus/crates/tinybus" }
 # Releases update this sole workspace version before packaging every crate.
 version = "0.1.34"
 
+[workspace.dependencies]
+tinystoragedrivers = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "c525a17d5153fc95e67e3cd44bcde1d90be60a71", default-features = false }
+
 [package]
 rust-version = "1.94"
 name = "tinychannels"
