@@ -12,6 +12,7 @@ WORKFLOW = ROOT / ".github/workflows/epic-release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@d463b7d93a3d6ea618e46365dffcf34ecc898462"
+TINYBUS_REV = "ed1ee4f5ee561c0320fa715eef114e0f1b888e41"
 
 
 def validator_run_block():
@@ -118,6 +119,49 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             test_features,
         )
         self.assertIn("feature-test-script: scripts/test-features.sh", ci)
+
+    def test_tinybus_and_module_sdk_share_the_published_workspace_source(self):
+        workspace = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+        module = (ROOT / "crates/tinychannels-module/Cargo.toml").read_text(
+            encoding="utf-8"
+        )
+        tinybus_workspace = (ROOT / "vendor/tinybus/Cargo.toml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            f'tinybus = {{ version = "0.1.7", git = '
+            f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
+            'default-features = false }',
+            workspace,
+        )
+        self.assertIn(
+            f'tinybus-module = {{ version = "0.1.7", git = '
+            f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
+            'default-features = false }',
+            workspace,
+        )
+        self.assertIn(
+            'tinybus = { path = "vendor/tinybus/crates/tinybus" }\n'
+            'tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }',
+            workspace,
+        )
+        self.assertIn(
+            'tinybus = { workspace = true, features = ["macros", "modules"] }',
+            module,
+        )
+        self.assertIn("tinybus-module = { workspace = true }", module)
+        self.assertIn(
+            'tinybus = { workspace = true, features = ["test-support"] }',
+            module,
+        )
+        self.assertIn('version = "0.1.7"', tinybus_workspace)
+        current = subprocess.run(
+            ["git", "-C", str(ROOT / "vendor/tinybus"), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assertEqual(current, TINYBUS_REV)
 
     def test_ordinary_tag_release_caller_remains_in_place(self):
         source = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
