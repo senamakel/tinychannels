@@ -32,8 +32,8 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 version = "0.1.35"
 
 [workspace.dependencies]
-tinybus = { version = "0.1.7", git = "https://github.com/tinyhumansai/tinybus", rev = "ed1ee4f5ee561c0320fa715eef114e0f1b888e41", default-features = false }
-tinybus-module = { version = "0.1.7", git = "https://github.com/tinyhumansai/tinybus", rev = "ed1ee4f5ee561c0320fa715eef114e0f1b888e41", default-features = false }
+tinybus = { version = "0.2.2", git = "https://github.com/tinyhumansai/tinybus", rev = "b6cc32b309065d9f27cabe9c50eba137c423e2f6", default-features = false }
+tinybus-module = { version = "0.2.2", git = "https://github.com/tinyhumansai/tinybus", rev = "b6cc32b309065d9f27cabe9c50eba137c423e2f6", default-features = false }
 tinystoragedrivers-bus = { version = "1.5.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "c9ea6ff1615b77b55d7269403af5fd11bedc9ce8", default-features = false }
 
 [package]
