@@ -16,6 +16,5 @@ serde_json = "1"
 
 [dev-dependencies]
 async-trait = "0.1"
-tinybus = { workspace = true, features = ["macros", "modules"] }
-tinybus-module = { workspace = true, features = ["static-link"] }
+tinybus = { workspace = true, features = ["macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }

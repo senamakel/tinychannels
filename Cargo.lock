@@ -2827,7 +2827,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tinybus",
- "tinybus-module",
  "tinychannels-bus",
  "tokio",
 ]

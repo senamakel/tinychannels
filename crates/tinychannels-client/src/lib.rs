@@ -5,7 +5,7 @@ use serde_json::Value;
 use tinybus::module::{ModuleCallFailure, ModuleCallError, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
-    methods,
+    controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel}, methods,
 };
 
 /// Typed host client for the TinyChannels module.
@@ -36,7 +36,7 @@ impl TinyChannelsClient {
         config: ChannelsConfig,
         bot_token: String,
         proxy: HttpProxyPolicy,
-    ) -> Result<Vec<tinychannels_bus::DiscordGuild>, ModuleCallFailure> {
+    ) -> Result<Vec<DiscordGuild>, ModuleCallFailure> {
         let request = ChannelControllerRequest::DiscordListGuilds {
             config,
             bot_token,
@@ -52,7 +52,7 @@ impl TinyChannelsClient {
         guild_id: String,
         bot_token: String,
         proxy: HttpProxyPolicy,
-    ) -> Result<Vec<tinychannels_bus::DiscordTextChannel>, ModuleCallFailure> {
+    ) -> Result<Vec<DiscordTextChannel>, ModuleCallFailure> {
         let request = ChannelControllerRequest::DiscordListChannels {
             config,
             guild_id,
@@ -70,7 +70,7 @@ impl TinyChannelsClient {
         channel_id: String,
         bot_token: String,
         proxy: HttpProxyPolicy,
-    ) -> Result<tinychannels_bus::BotPermissionCheck, ModuleCallFailure> {
+    ) -> Result<BotPermissionCheck, ModuleCallFailure> {
         let request = ChannelControllerRequest::DiscordCheckPermissions {
             config,
             guild_id,
@@ -109,6 +109,20 @@ impl TinyChannelsClient {
             .module
             .call_attested_detailed("tinychannels", methods::CHANNEL_CONTROLLER, (request,))
             .await?;
+        Self::decode_discord(response, expected).ok_or_else(|| {
+            self.module.report_malformed_reply("tinychannels");
+            ModuleCallFailure {
+                kind: ModuleCallError::ModuleFault,
+                wire_name: "ai.tinyhumans.tinybus.Error.Failed".into(),
+                message: "malformed channel controller response".into(),
+            }
+        })
+    }
+
+    fn decode_discord<T: DeserializeOwned>(
+        response: ChannelControllerResult,
+        expected: DiscordReply,
+    ) -> Option<T> {
         let raw = match (expected, response) {
             (DiscordReply::Guilds, ChannelControllerResult::DiscordGuilds(result)) => result.raw,
             (DiscordReply::Channels, ChannelControllerResult::DiscordChannels(result)) => {
@@ -120,14 +134,6 @@ impl TinyChannelsClient {
             _ => None,
         };
         raw.and_then(|value| serde_json::from_value(value).ok())
-            .ok_or_else(|| {
-                self.module.report_malformed_reply("tinychannels");
-                ModuleCallFailure {
-                    kind: ModuleCallError::ModuleFault,
-                    wire_name: "ai.tinyhumans.tinybus.Error.Failed".into(),
-                    message: "malformed channel controller response".into(),
-                }
-            })
     }
 }
 
