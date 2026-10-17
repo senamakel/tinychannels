@@ -180,21 +180,101 @@ fn discord_replies_decode_only_the_matching_raw_projection() {
     .is_none());
 }
 
+#[test]
+fn discord_requests_keep_the_confidential_controller_wire_shape() {
+    let config = ChannelsConfig::default();
+    let proxy = HttpProxyPolicy::default();
+    let token = "private-token";
+
+    let requests = [
+        (
+            ChannelControllerRequest::DiscordListGuilds {
+                config: config.clone(),
+                bot_token: token.into(),
+                proxy: proxy.clone(),
+            },
+            json!({
+                "operation":"discord_list_guilds",
+                "request":{"config":config,"bot_token":token,"proxy":proxy}
+            }),
+        ),
+        (
+            ChannelControllerRequest::DiscordListChannels {
+                config: ChannelsConfig::default(),
+                guild_id: "guild-1".into(),
+                bot_token: token.into(),
+                proxy: HttpProxyPolicy::default(),
+            },
+            json!({
+                "operation":"discord_list_channels",
+                "request":{"config":ChannelsConfig::default(),"guild_id":"guild-1","bot_token":token,"proxy":HttpProxyPolicy::default()}
+            }),
+        ),
+        (
+            ChannelControllerRequest::DiscordCheckPermissions {
+                config: ChannelsConfig::default(),
+                guild_id: "guild-1".into(),
+                channel_id: "channel-1".into(),
+                bot_token: token.into(),
+                proxy: HttpProxyPolicy::default(),
+            },
+            json!({
+                "operation":"discord_check_permissions",
+                "request":{"config":ChannelsConfig::default(),"guild_id":"guild-1","channel_id":"channel-1","bot_token":token,"proxy":HttpProxyPolicy::default()}
+            }),
+        ),
+    ];
+
+    for (request, expected) in requests {
+        assert_eq!(serde_json::to_value((request,)).unwrap(), json!([expected]));
+    }
+}
+
 #[tokio::test]
 async fn discord_credentials_never_fall_back_when_peer_proof_is_missing() {
     let (client, calls) = unattested_client().await;
-    let result = client
+    let guilds = client
         .discord_list_guilds(
             ChannelsConfig::default(),
             "fixture-private-token".into(),
             HttpProxyPolicy::default(),
         )
         .await;
+    let channels = client
+        .discord_list_channels(
+            ChannelsConfig::default(),
+            "fixture-guild".into(),
+            "fixture-private-token".into(),
+            HttpProxyPolicy::default(),
+        )
+        .await;
+    let permissions = client
+        .discord_check_permissions(
+            ChannelsConfig::default(),
+            "fixture-guild".into(),
+            "fixture-channel".into(),
+            "fixture-private-token".into(),
+            HttpProxyPolicy::default(),
+        )
+        .await;
+    let health = client
+        .check_health(
+            ChannelsConfig::default(),
+            HttpProxyPolicy::default(),
+            1_000,
+        )
+        .await;
 
-    let error = result.expect_err("unattested module must be rejected");
-    assert_eq!(error.kind, ModuleCallError::Unavailable);
-    assert!(!format!("{error:?}").contains("fixture-private-token"));
-    assert!(!error.to_string().contains("fixture-private-token"));
+    for error in [
+        guilds.expect_err("unattested guild call must be rejected"),
+        channels.expect_err("unattested channel call must be rejected"),
+        permissions.expect_err("unattested permission call must be rejected"),
+        health.expect_err("unattested health call must be rejected"),
+    ] {
+        assert_eq!(error.kind, ModuleCallError::Unavailable);
+        assert!(!format!("{error:?}").contains("fixture-private-token"));
+        assert!(!error.to_string().contains("fixture-private-token"));
+    }
     assert!(calls.lock().unwrap().is_empty());
 }
 
