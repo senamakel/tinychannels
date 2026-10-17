@@ -66,6 +66,13 @@ fn http_proxy_policy_round_trips_without_changing_its_wire_fields() {
 }
 
 #[test]
+fn storage_needs_are_declared_by_the_bus_contract() {
+    // Keeping this reference in the contract crate makes the declaration
+    // available to hosts without linking the TinyChannels implementation.
+    let _needs = tinychannels_bus::STORAGE_NEEDS;
+}
+
+#[test]
 fn channel_controller_operations_have_closed_typed_wire_tags() {
     let request = ChannelControllerRequest::TestChannel {
         config: ChannelsConfig::default(),
