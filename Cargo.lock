@@ -2798,7 +2798,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinystoragedrivers-bus 1.4.0",
+ "tinystoragedrivers-bus 1.5.0",
  "tokio",
  "toml",
 ]
@@ -2865,8 +2865,8 @@ dependencies = [
 
 [[package]]
 name = "tinystoragedrivers-bus"
-version = "1.4.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=c525a17d5153fc95e67e3cd44bcde1d90be60a71#c525a17d5153fc95e67e3cd44bcde1d90be60a71"
+version = "1.5.0"
+source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=c9ea6ff1615b77b55d7269403af5fd11bedc9ce8#c9ea6ff1615b77b55d7269403af5fd11bedc9ce8"
 dependencies = [
  "serde",
  "serde_json",
