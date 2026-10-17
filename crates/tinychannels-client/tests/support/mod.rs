@@ -276,8 +276,8 @@ pub(crate) async fn unattested_fixture() -> UnattestedFixture {
                 .collect()
         }
 
-        fn requires_confidential(&self, _member: &MemberName) -> bool {
-            true
+        fn requires_confidential(&self, member: &MemberName) -> bool {
+            matches!(member.as_str(), "ChannelController" | "CheckChannelHealth")
         }
 
         async fn call(
