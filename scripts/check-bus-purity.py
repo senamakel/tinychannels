@@ -51,20 +51,6 @@ ALLOWED_PACKAGES = frozenset(
         "zmij",
     }
 )
-REQUIRED_PACKAGES = frozenset(
-    {
-        "anyhow",
-        "async-trait",
-        "base64",
-        "schemars",
-        "serde",
-        "serde_json",
-        "thiserror",
-        "tinychannels-bus",
-        "tinystoragedrivers-bus",
-        "tokio",
-    }
-)
 NORMAL_BUILD_KINDS = {None, "normal", "build"}
 TOKIO_FEATURES = frozenset({"sync"})
 
@@ -215,12 +201,17 @@ def dependency_violations(metadata):
     packages_by_id, nodes_by_id, reachable, errors = reachable_normal_build(metadata)
     packages = [packages_by_id[package_id] for package_id in reachable]
     names = {package["name"] for package in packages}
-    missing = sorted(REQUIRED_PACKAGES - names)
+    missing = sorted(ALLOWED_PACKAGES - names)
     unsafe = sorted(names - ALLOWED_PACKAGES)
     if missing:
-        errors.append(f"normal/build graph is missing required packages: {missing}")
+        errors.append(f"normal/build graph is incomplete; missing packages: {missing}")
     if unsafe:
         errors.append(f"unsafe contract dependencies: {unsafe}")
+    repeated_names = sorted(
+        name for name in names if sum(package["name"] == name for package in packages) > 1
+    )
+    if repeated_names:
+        errors.append(f"normal/build graph has duplicate package names: {repeated_names}")
 
     tsd_packages = [
         package for package in packages if package["name"] == "tinystoragedrivers-bus"
