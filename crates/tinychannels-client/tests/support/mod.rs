@@ -20,7 +20,7 @@ use tinychannels_client::TinyChannelsClient;
 use tokio::sync::OnceCell;
 
 const MODULE_ID: &str = "tinychannels";
-const RELEASE_URL: &str = "https://example.invalid/tinychannels/releases/tag/v0.1.36";
+const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.36";
 
 static RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 static WRONG_ARCHIVE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
