@@ -1,0 +1,421 @@
+//! Cached native module fixtures for the public client integration tests.
+
+#![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, OnceLock},
+};
+
+use tinybus::{
+    Connection, Error, Interface, InterfaceName, MemberName, ObjectPath, Proxy,
+    broker::Broker,
+    module::{
+        AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, ModuleAccess,
+        ModuleCallError, ModuleHost, ProxyFailure, ReleaseAsset, ReleaseRecord,
+    },
+    service::Interface as _,
+    transport::memory::MemoryBus,
+};
+use tinychannels_client::TinyChannelsClient;
+use tokio::sync::OnceCell;
+
+const MODULE_ID: &str = "tinychannels";
+const RELEASE_URL: &str = "https://example.invalid/tinychannels/releases/tag/v0.1.36";
+
+static RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
+static WRONG_ARCHIVE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
+static WRONG_LIBRARY_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
+
+#[derive(Default)]
+pub(crate) struct Reports(Mutex<Vec<(String, String, String)>>);
+
+impl FailureSink for Reports {
+    fn capture(&self, report: &FailureReport<'_>) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push((
+                report.module.to_owned(),
+                report.version.to_owned(),
+                report.reason.code().to_owned(),
+            ));
+    }
+}
+
+impl Reports {
+    pub(crate) fn clear(&self) {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
+    }
+
+    pub(crate) fn entries(&self) -> Vec<(String, String, String)> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+}
+
+pub(crate) struct Access {
+    host: Arc<ModuleHost>,
+    connection: Connection,
+    loaded: Arc<OnceCell<()>>,
+    record: &'static ReleaseRecord,
+    release: CachedRelease<'static>,
+    reporter: FailureReporter,
+}
+
+impl ModuleAccess for Access {
+    fn find(&self, id: &str) -> Option<&'static ReleaseRecord> {
+        (id == self.record.id).then_some(self.record)
+    }
+
+    fn enabled(&self) -> bool {
+        true
+    }
+
+    fn reporter(&self) -> &FailureReporter {
+        &self.reporter
+    }
+
+    fn ensure_loaded<'a>(&'a self, _id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            self.loaded
+                .get_or_try_init(|| async {
+                    self.host
+                        .load_github_release_cached(&self.release, serde_json::json!({}))
+                        .map(|_| ())
+                        .map_err(|_| "the cached test module could not be admitted".to_owned())
+                })
+                .await
+                .map(|_| ())
+        })
+    }
+
+    fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            self.ensure_loaded(id).await?;
+            self.host
+                .ensure_ready(self.record.bus_name)
+                .await
+                .map_err(|_| "the cached test module did not become ready".to_owned())
+        })
+    }
+
+    fn proxy<'a>(
+        &'a self,
+        bus_name: &'a str,
+        object_path: &'a str,
+    ) -> AccessFuture<'a, Result<Proxy, ProxyFailure>> {
+        Box::pin(async move {
+            self.connection
+                .proxy(bus_name, object_path, bus_name)
+                .map_err(|_| ProxyFailure::Contract)
+        })
+    }
+}
+
+struct WrongPinAccess {
+    access: Arc<Access>,
+    record: &'static ReleaseRecord,
+}
+
+impl ModuleAccess for WrongPinAccess {
+    fn find(&self, id: &str) -> Option<&'static ReleaseRecord> {
+        (id == self.record.id).then_some(self.record)
+    }
+
+    fn enabled(&self) -> bool {
+        self.access.enabled()
+    }
+
+    fn reporter(&self) -> &FailureReporter {
+        self.access.reporter()
+    }
+
+    fn ensure_loaded<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        self.access.ensure_loaded(id)
+    }
+
+    fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        self.access.prepare_attested(id)
+    }
+
+    fn proxy<'a>(
+        &'a self,
+        bus_name: &'a str,
+        object_path: &'a str,
+    ) -> AccessFuture<'a, Result<Proxy, ProxyFailure>> {
+        self.access.proxy(bus_name, object_path)
+    }
+}
+
+pub(crate) struct Fixture {
+    pub(crate) client: TinyChannelsClient,
+    pub(crate) wrong_archive_client: TinyChannelsClient,
+    pub(crate) wrong_library_client: TinyChannelsClient,
+    pub(crate) probe: Connection,
+    pub(crate) reports: Arc<Reports>,
+    _host: Arc<ModuleHost>,
+    _broker_task: tokio::task::JoinHandle<tinybus::Result<()>>,
+}
+
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        self._broker_task.abort();
+    }
+}
+
+pub(crate) async fn fixture() -> Fixture {
+    let bus = MemoryBus::new();
+    let broker = Broker::new();
+    let broker_task = broker.clone().spawn(bus.clone());
+    let host = Arc::new(ModuleHost::new(broker));
+    let probe = Connection::connect(bus.connect().await.expect("probe transport"))
+        .await
+        .expect("probe connection");
+    let record = record(Pin::Correct);
+    let release = cached_release();
+    let reports = Arc::new(Reports::default());
+    let access = Arc::new(Access {
+        host: Arc::clone(&host),
+        connection: probe.clone(),
+        loaded: Arc::new(OnceCell::new()),
+        record,
+        release,
+        reporter: FailureReporter::new(reports.clone()),
+    });
+    access
+        .ensure_loaded(MODULE_ID)
+        .await
+        .expect("cached pinned module should load without network access");
+    host.ensure_ready(record.bus_name)
+        .await
+        .expect("cached pinned module should become ready");
+
+    let wrong_archive_client =
+        TinyChannelsClient::new(tinybus::module::ModuleClient::new(WrongPinAccess {
+            access: Arc::clone(&access),
+            record: record(Pin::WrongArchive),
+        }));
+    let wrong_library_client =
+        TinyChannelsClient::new(tinybus::module::ModuleClient::new(WrongPinAccess {
+            access: Arc::clone(&access),
+            record: record(Pin::WrongLibrary),
+        }));
+    Fixture {
+        client: TinyChannelsClient::new(tinybus::module::ModuleClient::new(access)),
+        wrong_archive_client,
+        wrong_library_client,
+        probe,
+        reports,
+        _host: host,
+        _broker_task: broker_task,
+    }
+}
+
+pub(crate) async fn unattested_client() -> (TinyChannelsClient, Arc<std::sync::atomic::AtomicUsize>)
+{
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Unattested(Arc<AtomicUsize>);
+
+    #[async_trait::async_trait]
+    impl Interface for Unattested {
+        fn name(&self) -> InterfaceName {
+            InterfaceName::new(tinychannels_bus::BUS_NAME).expect("valid module name")
+        }
+
+        fn members(&self) -> Vec<MemberName> {
+            ["ChannelController", "CheckChannelHealth"]
+                .into_iter()
+                .map(|method| MemberName::new(method).expect("valid method"))
+                .collect()
+        }
+
+        fn requires_confidential(&self, _member: &MemberName) -> bool {
+            true
+        }
+
+        async fn call(
+            &self,
+            _member: &MemberName,
+            _args: serde_json::Value,
+        ) -> tinybus::Result<serde_json::Value> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(serde_json::json!({"result":"discord_guilds","value":{"raw":[]}}))
+        }
+    }
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let bus = MemoryBus::new();
+    let broker = Broker::new();
+    let _broker_task = broker.spawn(bus.clone());
+    let service = Connection::connect(bus.connect().await.expect("service transport"))
+        .await
+        .expect("service connection");
+    service
+        .serve_at(
+            ObjectPath::new(tinychannels_bus::OBJECT_PATH).expect("valid object path"),
+            Unattested(Arc::clone(&calls)),
+        )
+        .await
+        .expect("serve unattested peer");
+    service
+        .request_name(tinychannels_bus::BUS_NAME)
+        .await
+        .expect("own untrusted well-known name");
+    let client_connection = Connection::connect(bus.connect().await.expect("client transport"))
+        .await
+        .expect("client connection");
+    let owner = client_connection
+        .name_owner(tinychannels_bus::BUS_NAME)
+        .await
+        .expect("query peer owner")
+        .expect("peer owns the module name");
+    assert!(owner.is_unique());
+
+    let access = UnattestedAccess {
+        connection: client_connection,
+        record: record(Pin::Correct),
+        reporter: FailureReporter::new(Arc::new(Reports::default())),
+    };
+    (
+        TinyChannelsClient::new(tinybus::module::ModuleClient::new(access)),
+        calls,
+    )
+}
+
+struct UnattestedAccess {
+    connection: Connection,
+    record: &'static ReleaseRecord,
+    reporter: FailureReporter,
+}
+
+impl ModuleAccess for UnattestedAccess {
+    fn find(&self, id: &str) -> Option<&'static ReleaseRecord> {
+        (id == self.record.id).then_some(self.record)
+    }
+
+    fn enabled(&self) -> bool {
+        true
+    }
+
+    fn reporter(&self) -> &FailureReporter {
+        &self.reporter
+    }
+
+    fn ensure_loaded<'a>(&'a self, _id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        Box::pin(async { Ok(()) })
+    }
+
+    fn prepare_attested<'a>(&'a self, _id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        Box::pin(async { Ok(()) })
+    }
+
+    fn proxy<'a>(
+        &'a self,
+        bus_name: &'a str,
+        object_path: &'a str,
+    ) -> AccessFuture<'a, Result<Proxy, ProxyFailure>> {
+        Box::pin(async move {
+            self.connection
+                .proxy(bus_name, object_path, bus_name)
+                .map_err(|_| ProxyFailure::Contract)
+        })
+    }
+}
+
+pub(crate) async fn calls(probe: &Connection) -> usize {
+    let proxy = probe
+        .proxy(
+            tinychannels_bus::BUS_NAME,
+            tinychannels_bus::OBJECT_PATH,
+            tinychannels_bus::BUS_NAME,
+        )
+        .expect("fixture probe proxy");
+    proxy
+        .call("FixtureCallCount", ())
+        .await
+        .expect("read fixture call count")
+}
+
+pub(crate) fn record(pin: Pin) -> &'static ReleaseRecord {
+    let slot = match pin {
+        Pin::Correct => &RECORD,
+        Pin::WrongArchive => &WRONG_ARCHIVE_RECORD,
+        Pin::WrongLibrary => &WRONG_LIBRARY_RECORD,
+    };
+    slot.get_or_init(|| {
+        let host_key = Box::leak(
+            tinybus::module::platform::host_candidates()
+                .into_iter()
+                .next()
+                .expect("test platform has a TinyBus module key")
+                .into_boxed_str(),
+        );
+        let archive = env("TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME");
+        let archive_sha = match pin {
+            Pin::WrongArchive => Box::leak("0".repeat(64).into_boxed_str()),
+            _ => env("TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256"),
+        };
+        let library_sha = match pin {
+            Pin::WrongLibrary => Box::leak("f".repeat(64).into_boxed_str()),
+            _ => env("TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256"),
+        };
+        let assets = Box::leak(
+            vec![ReleaseAsset {
+                host_key,
+                archive,
+                sha256: archive_sha,
+                library_sha256: Some(library_sha),
+            }]
+            .into_boxed_slice(),
+        );
+        ReleaseRecord {
+            id: MODULE_ID,
+            bus_name: tinychannels_bus::BUS_NAME,
+            object_path: tinychannels_bus::OBJECT_PATH,
+            version: "0.1.36",
+            release_url: RELEASE_URL,
+            assets,
+        }
+    })
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum Pin {
+    Correct,
+    WrongArchive,
+    WrongLibrary,
+}
+
+fn cached_release() -> CachedRelease<'static> {
+    CachedRelease {
+        release_url: RELEASE_URL,
+        asset_name: env("TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME"),
+        expected_sha256: Some(env("TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256")),
+        expected_library_sha256: Some(env("TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256")),
+        cache_dir: Path::new(env("TINYCHANNELS_CLIENT_TEST_CACHE")),
+        allow_download: false,
+    }
+}
+
+fn env(name: &str) -> &'static str {
+    Box::leak(
+        std::env::var(name)
+            .unwrap_or_else(|_| panic!("{name} must identify the staged local fixture"))
+            .into_boxed_str(),
+    )
+}
+
+pub(crate) fn cache_path() -> PathBuf {
+    PathBuf::from(env("TINYCHANNELS_CLIENT_TEST_CACHE"))
+}
+
+pub(crate) fn assert_unavailable(error: ModuleCallFailure) {
+    assert_eq!(error.kind, ModuleCallError::Unavailable);
+}

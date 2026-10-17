@@ -14,7 +14,16 @@ tinychannels-bus = { path = "../tinychannels-bus" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[features]
+default = []
+native-e2e = []
+
 [dev-dependencies]
 async-trait = "0.1"
-tinybus = { workspace = true, features = ["macros"] }
+tinybus = { workspace = true, features = ["modules"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+
+[[test]]
+name = "native_e2e"
+path = "tests/native_e2e.rs"
+required-features = ["native-e2e"]
