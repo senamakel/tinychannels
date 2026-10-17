@@ -336,11 +336,13 @@ pub(crate) async fn assert_unattested_peer_live(probe: &Connection) -> tinybus::
         .expect("query unattested peer owner")
         .expect("unattested peer remains connected");
     assert!(owner.is_unique());
-    assert!(probe
-        .attestation(owner.clone())
-        .await
-        .expect("public peer proof lookup")
-        .is_none());
+    assert!(
+        probe
+            .attestation(owner.clone())
+            .await
+            .expect("public peer proof lookup")
+            .is_none()
+    );
     let readiness = probe
         .proxy(
             tinychannels_bus::BUS_NAME,

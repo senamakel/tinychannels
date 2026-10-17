@@ -235,13 +235,82 @@ async fn wrong_release_pins_and_unattested_peers_are_refused_before_business_cal
             .expect_err("a mismatched half of the paired pin must be refused");
         support::assert_unavailable(error);
         assert_eq!(support::calls(&fixture.probe).await, before);
+
+        let error = client
+            .discord_list_channels(
+                config(),
+                "guild-1".into(),
+                TOKEN.into(),
+                proxy("channel.discord"),
+            )
+            .await
+            .expect_err("a mismatched pin must refuse channel listing");
+        support::assert_unavailable(error);
+        assert_eq!(support::calls(&fixture.probe).await, before);
+
+        let error = client
+            .discord_check_permissions(
+                config(),
+                "guild-1".into(),
+                "channel-1".into(),
+                TOKEN.into(),
+                proxy("channel.discord"),
+            )
+            .await
+            .expect_err("a mismatched pin must refuse permission checks");
+        support::assert_unavailable(error);
+        assert_eq!(support::calls(&fixture.probe).await, before);
+
+        let error = client
+            .check_health(config(), proxy("channel.discord"), 12_345)
+            .await
+            .expect_err("a mismatched pin must refuse health checks");
+        support::assert_unavailable(error);
+        assert_eq!(support::calls(&fixture.probe).await, before);
     }
 
-    let (unattested, calls) = support::unattested_client().await;
+    let (unattested, calls, probe) = support::unattested_client().await;
+    let owner = support::assert_unattested_peer_live(&probe).await;
     let error = unattested
         .discord_list_guilds(config(), TOKEN.into(), proxy("channel.discord"))
         .await
         .expect_err("unique but unattested peer must be refused");
     assert_eq!(error.kind, ModuleCallError::Unavailable);
     assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(support::assert_unattested_peer_live(&probe).await, owner);
+
+    let error = unattested
+        .discord_list_channels(
+            config(),
+            "guild-1".into(),
+            TOKEN.into(),
+            proxy("channel.discord"),
+        )
+        .await
+        .expect_err("unique but unattested peer must refuse channel listing");
+    assert_eq!(error.kind, ModuleCallError::Unavailable);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(support::assert_unattested_peer_live(&probe).await, owner);
+
+    let error = unattested
+        .discord_check_permissions(
+            config(),
+            "guild-1".into(),
+            "channel-1".into(),
+            TOKEN.into(),
+            proxy("channel.discord"),
+        )
+        .await
+        .expect_err("unique but unattested peer must refuse permission checks");
+    assert_eq!(error.kind, ModuleCallError::Unavailable);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(support::assert_unattested_peer_live(&probe).await, owner);
+
+    let error = unattested
+        .check_health(config(), proxy("channel.discord"), 12_345)
+        .await
+        .expect_err("unique but unattested peer must refuse health checks");
+    assert_eq!(error.kind, ModuleCallError::Unavailable);
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(support::assert_unattested_peer_live(&probe).await, owner);
 }
