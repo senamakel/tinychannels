@@ -21,6 +21,7 @@ archive="$stage/$archive_name"
 cargo build --manifest-path "$fixture_manifest" --locked --target-dir "$TASK_TARGET_ROOT"
 rm -rf "$stage"
 mkdir -p "$cache"
+chmod 700 "$stage" "$cache"
 install -m 755 "$fixture_library" "$cache/$library_name"
 
 if command -v sha256sum >/dev/null 2>&1; then
