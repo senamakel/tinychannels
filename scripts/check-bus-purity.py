@@ -65,6 +65,12 @@ FORBIDDEN_SOURCE = (
     (re.compile(r"\bstd::thread\b"), "thread execution"),
     (re.compile(r"\btokio::(?:spawn|task::|time::)"), "Tokio task/time execution"),
     (
+        re.compile(
+            r"\btokio::sync::(?:Mutex|RwLock|OnceCell|Notify|oneshot::|watch::|broadcast::)"
+        ),
+        "Tokio runtime synchronization",
+    ),
+    (
         re.compile(r"\b(?:TcpListener|TcpStream|UdpSocket|UnixListener|UnixStream)\b"),
         "socket type",
     ),
@@ -83,13 +89,17 @@ FORBIDDEN_SOURCE = (
 )
 
 
-def source_violations(source_text):
+def source_violations(source_text, source_path=None):
     """Return runtime/implementation constructs found in one Rust source."""
-    return [
+    errors = [
         label
         for pattern, label in FORBIDDEN_SOURCE
         if pattern.search(source_text)
     ]
+    if source_path is not None and Path(source_path).name != "traits.rs":
+        if re.search(r"\basync\s+fn\b", source_text):
+            errors.append("async implementation outside the channel interface")
+    return errors
 
 
 def source_tree_violations(source_root=BUS_SOURCE):
@@ -98,7 +108,9 @@ def source_tree_violations(source_root=BUS_SOURCE):
     for source in sorted(Path(source_root).rglob("*.rs")):
         if source.name.endswith("_tests.rs"):
             continue
-        for violation in source_violations(source.read_text(encoding="utf-8")):
+        for violation in source_violations(
+            source.read_text(encoding="utf-8"), source_path=source
+        ):
             errors.append(f"{source.relative_to(ROOT)}: {violation}")
     return errors
 
