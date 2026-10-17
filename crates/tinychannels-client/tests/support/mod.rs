@@ -250,8 +250,11 @@ pub(crate) async fn fixture() -> Fixture {
     }
 }
 
-pub(crate) async fn unattested_client() -> (TinyChannelsClient, Arc<std::sync::atomic::AtomicUsize>)
-{
+pub(crate) async fn unattested_client() -> (
+    TinyChannelsClient,
+    Arc<std::sync::atomic::AtomicUsize>,
+    Connection,
+) {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct Unattested(Arc<AtomicUsize>);
@@ -263,7 +266,7 @@ pub(crate) async fn unattested_client() -> (TinyChannelsClient, Arc<std::sync::a
         }
 
         fn members(&self) -> Vec<MemberName> {
-            ["ChannelController", "CheckChannelHealth"]
+            ["ChannelController", "CheckChannelHealth", "FixtureReady"]
                 .into_iter()
                 .map(|method| MemberName::new(method).expect("valid method"))
                 .collect()
@@ -275,9 +278,12 @@ pub(crate) async fn unattested_client() -> (TinyChannelsClient, Arc<std::sync::a
 
         async fn call(
             &self,
-            _member: &MemberName,
+            member: &MemberName,
             _args: serde_json::Value,
         ) -> tinybus::Result<serde_json::Value> {
+            if member.as_str() == "FixtureReady" {
+                return Ok(serde_json::json!(true));
+            }
             self.0.fetch_add(1, Ordering::SeqCst);
             Ok(serde_json::json!({"result":"discord_guilds","value":{"raw":[]}}))
         }
@@ -312,14 +318,41 @@ pub(crate) async fn unattested_client() -> (TinyChannelsClient, Arc<std::sync::a
     assert!(owner.is_unique());
 
     let access = UnattestedAccess {
-        connection: client_connection,
+        connection: client_connection.clone(),
         record: record(Pin::Correct),
         reporter: FailureReporter::new(Arc::new(Reports::default())),
     };
     (
         TinyChannelsClient::new(tinybus::module::ModuleClient::new(access)),
         calls,
+        client_connection,
     )
+}
+
+pub(crate) async fn assert_unattested_peer_live(probe: &Connection) -> tinybus::BusName {
+    let owner = probe
+        .name_owner(tinychannels_bus::BUS_NAME)
+        .await
+        .expect("query unattested peer owner")
+        .expect("unattested peer remains connected");
+    assert!(owner.is_unique());
+    assert!(probe
+        .attestation(owner.clone())
+        .await
+        .expect("public peer proof lookup")
+        .is_none());
+    let readiness = probe
+        .proxy(
+            tinychannels_bus::BUS_NAME,
+            tinychannels_bus::OBJECT_PATH,
+            tinychannels_bus::BUS_NAME,
+        )
+        .expect("unattested readiness proxy")
+        .call::<bool>("FixtureReady", ())
+        .await
+        .expect("content-free readiness probe");
+    assert!(readiness);
+    owner
 }
 
 struct UnattestedAccess {
