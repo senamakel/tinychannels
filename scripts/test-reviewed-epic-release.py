@@ -15,12 +15,12 @@ REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-
 TINYBUS_REV = "ed1ee4f5ee561c0320fa715eef114e0f1b888e41"
 
 
-def validator_run_block():
+def workflow_run_block(step_name):
     lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
     step = next(
         i
         for i, line in enumerate(lines)
-        if line.strip() == "- name: Validate reviewed epic dispatch inputs"
+        if line.strip() == step_name
     )
     run = next(i for i in range(step + 1, len(lines)) if lines[i].strip() == "run: |")
     block = []
@@ -32,7 +32,7 @@ def validator_run_block():
         else:
             break
     if not block:
-        raise AssertionError("workflow validation run block is empty")
+        raise AssertionError(f"workflow run block is empty for {step_name}")
     return "\n".join(block) + "\n"
 
 
@@ -49,9 +49,24 @@ def run_validator(**overrides):
     with tempfile.TemporaryDirectory(prefix="reviewed epic release ") as directory:
         output_file = Path(directory) / "github-output.txt"
         result = subprocess.run(
-            [bash, "-c", validator_run_block()],
+            [bash, "-c", workflow_run_block("- name: Validate reviewed epic dispatch inputs")],
             cwd=directory,
             env=dict(os.environ, **values, GITHUB_OUTPUT="github-output.txt"),
+            capture_output=True,
+            text=True,
+        )
+        output = output_file.read_text(encoding="utf-8") if output_file.exists() else ""
+        return result, output
+
+
+def run_tag_resolver(tag):
+    bash = os.environ.get("FEATURE_TEST_BASH", "bash")
+    with tempfile.TemporaryDirectory(prefix="ordinary release tag ") as directory:
+        output_file = Path(directory) / "github-output.txt"
+        result = subprocess.run(
+            [bash, "-c", workflow_run_block("- id: tag")],
+            cwd=directory,
+            env=dict(os.environ, TAG=tag, GITHUB_OUTPUT="github-output.txt"),
             capture_output=True,
             text=True,
         )
@@ -87,9 +102,13 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
     def test_tag_must_be_v_prefixed_semver(self):
         for value in ("0.1.35", "v0.1", "vrelease"):
             with self.subTest(tag=value):
-                result, output = run_validator(RELEASE_TAG=value)
+                result, output = run_tag_resolver(value)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(output, "")
+
+        result, output = run_tag_resolver("v0.1.35")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(output, "tag=v0.1.35\nversion=0.1.35\n")
 
     def test_workflow_calls_reviewed_release_with_skip_safe_numeric_pr(self):
         source = WORKFLOW.read_text(encoding="utf-8")
@@ -105,7 +124,9 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("permissions: {}", source)
         self.assertIn(
-            "  validate:\n    runs-on: ubuntu-latest\n    permissions: {}", source
+            "  validate:\n    if: inputs.mode == 'reviewed'\n"
+            "    runs-on: ubuntu-latest\n    permissions: {}",
+            source,
         )
         self.assertIn(
             "      contents: write\n      pull-requests: read\n"
