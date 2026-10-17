@@ -101,10 +101,9 @@ static NEEDS: LazyLock<StorageNeeds<'static>> = LazyLock::new(build_metadata);
         self.assertTrue(any("unsafe contract dependencies" in error for error in errors))
 
     def test_dev_only_edges_are_excluded_from_the_host_dependency_closure(self):
-        metadata = metadata_fixture(
-            extra_packages=(
-                {"id": "pkg:wiremock", "name": "wiremock", "version": "0.6.0"},
-            )
+        metadata = metadata_fixture()
+        metadata["packages"].append(
+            {"id": "pkg:wiremock", "name": "wiremock", "version": "0.6.0"}
         )
         root = next(
             node
