@@ -115,7 +115,7 @@ tinybus_module::module_export_static! {
     setup = linked_fixture_setup,
     config = LinkedFixtureConfig,
     worker_threads = 1,
-    provides = ["ai.tinyhumans.TinyChannels"],
+    provides = ["ai.tinyhumans.tinychannels.Channels"],
     methods = [],
     signals = [],
     requires = [],
