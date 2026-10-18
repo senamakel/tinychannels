@@ -16,8 +16,10 @@ python3 scripts/test-feature-shell.py
 python3 scripts/test-client-native-topology.py
 python3 scripts/test-client-e2e-standalone.py
 cargo test --locked --workspace
-scripts/test-client-e2e.sh --prepare-only
-source target/tinychannels-client-e2e.env
+if [[ "${FEATURE_TEST_SKIP_CLIENT_PREPARE:-0}" != "1" ]]; then
+  scripts/test-client-e2e.sh --prepare-only
+  source target/tinychannels-client-e2e.env
+fi
 cargo test --locked --workspace --all-features
 cargo test --locked -p tinychannels --no-default-features
 cargo test --locked -p tinychannels --no-default-features --features email-send
