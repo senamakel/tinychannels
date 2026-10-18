@@ -12,7 +12,8 @@ use tinybus::{
     broker::Broker,
     module::{
         AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, ModuleAccess,
-        ModuleCallError, ModuleCallFailure, ModuleHost, ProxyFailure, ReleaseAsset, ReleaseRecord,
+        ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost, ModuleRuntime, ProxyFailure,
+        ReleaseAsset, ReleaseRecord, RuntimeNames,
     },
     transport::memory::MemoryBus,
 };
@@ -20,7 +21,7 @@ use tinychannels_client::TinyChannelsClient;
 use tokio::sync::OnceCell;
 
 const MODULE_ID: &str = "tinychannels";
-const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.36";
+const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37";
 
 static RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 static WRONG_ARCHIVE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
@@ -250,6 +251,100 @@ pub(crate) async fn fixture() -> Fixture {
     }
 }
 
+/// A locally cached native module loaded on the same broker used by SDK leases.
+pub(crate) struct RuntimeFixture {
+    pub(crate) client: TinyChannelsClient,
+    pub(crate) control: ModuleClient,
+    pub(crate) runtime: &'static ModuleRuntime,
+    pub(crate) reports: Arc<Reports>,
+}
+
+struct RuntimeAccess {
+    runtime: &'static ModuleRuntime,
+    loaded: OnceCell<()>,
+    record: &'static ReleaseRecord,
+    release: CachedRelease<'static>,
+    reporter: FailureReporter,
+}
+
+impl ModuleAccess for RuntimeAccess {
+    fn find(&self, id: &str) -> Option<&'static ReleaseRecord> {
+        (id == self.record.id).then_some(self.record)
+    }
+
+    fn enabled(&self) -> bool {
+        true
+    }
+
+    fn reporter(&self) -> &FailureReporter {
+        &self.reporter
+    }
+
+    fn ensure_loaded<'a>(&'a self, _: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            self.loaded
+                .get_or_try_init(|| async {
+                    self.runtime
+                        .host()
+                        .load_github_release_cached(&self.release, serde_json::json!({}))
+                        .map(|_| ())
+                        .map_err(|error| {
+                            format!("the locally pinned native fixture could not load: {error}")
+                        })
+                })
+                .await
+                .map(|_| ())
+        })
+    }
+
+    fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            self.ensure_loaded(id).await?;
+            self.runtime
+                .host()
+                .ensure_ready(self.record.bus_name)
+                .await
+                .map_err(|_| "the locally pinned native fixture did not become ready".to_owned())
+        })
+    }
+
+    fn proxy<'a>(
+        &'a self,
+        bus_name: &'a str,
+        object_path: &'a str,
+    ) -> AccessFuture<'a, Result<Proxy, ProxyFailure>> {
+        Box::pin(async move {
+            self.runtime
+                .connection()
+                .proxy(bus_name, object_path, bus_name)
+                .map_err(|_| ProxyFailure::Contract)
+        })
+    }
+}
+
+pub(crate) async fn runtime_fixture() -> RuntimeFixture {
+    let runtime = Box::leak(Box::new(
+        ModuleRuntime::start(&RuntimeNames::default(), None)
+            .expect("start one runtime for module and host callbacks"),
+    ));
+    let reports = Arc::new(Reports::default());
+    let access = RuntimeAccess {
+        runtime,
+        loaded: OnceCell::new(),
+        record: record(Pin::Correct),
+        release: cached_release(),
+        reporter: FailureReporter::new(reports.clone()),
+    };
+    let control = ModuleClient::new(access);
+    let client = TinyChannelsClient::new(control.clone());
+    RuntimeFixture {
+        client,
+        control,
+        runtime,
+        reports,
+    }
+}
+
 pub(crate) struct UnattestedFixture {
     pub(crate) client: TinyChannelsClient,
     pub(crate) calls: Arc<std::sync::atomic::AtomicUsize>,
@@ -453,7 +548,7 @@ pub(crate) fn record(pin: Pin) -> &'static ReleaseRecord {
             id: MODULE_ID,
             bus_name: tinychannels_bus::BUS_NAME,
             object_path: tinychannels_bus::OBJECT_PATH,
-            version: "0.1.36",
+            version: "0.1.37",
             release_url: RELEASE_URL,
             assets,
         }

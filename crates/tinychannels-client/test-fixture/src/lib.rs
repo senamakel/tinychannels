@@ -6,13 +6,20 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use serde::Deserialize;
+use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use tinybus::{Connection, Error, Interface, InterfaceName, MemberName, ObjectPath, Result};
 use tinychannels_bus::{
-    ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
-    controllers::{DiscordChannelListResult, DiscordGuildListResult, DiscordPermissionCheckResult},
-    methods,
+    ChannelControllerRequest, ChannelControllerResult, ChannelInteractionRequest,
+    ChannelInteractionResult, ChannelOutboundIntent, ChannelRuntimeDispatchPolicy,
+    ChannelRuntimeReservation, ChannelSupervisionPolicy, ChannelsConfig, HttpProxyPolicy,
+    controllers::{
+        ChannelSendMessageResult, DiscordChannelListResult, DiscordGuildListResult,
+        DiscordPermissionCheckResult,
+    },
+    methods, module_control::{ChannelControlRequest, ChannelControlResult},
+    module_progressive::{ProgressiveCommand, ProgressiveResult},
+    module_relay::RelayReservation,
 };
 
 const BUS_NAME: &str = tinychannels_bus::BUS_NAME;
@@ -20,11 +27,17 @@ const OBJECT_PATH: &str = tinychannels_bus::OBJECT_PATH;
 const TOKEN: &str = "fixture-call-secret";
 const CONFIG_TOKEN: &str = "fixture-config-secret";
 const INVALID_INPUT: &str = "ai.tinyhumans.tinychannels.Error.InvalidInput";
+const RUNTIME_HANDLE: &str = "0123456789abcdef0123456789abcdef";
+const RUNTIME_OBJECT_PATH: &str =
+    "/ai/tinyhumans/tinychannels/Channels/runtime_0123456789abcdef0123456789abcdef";
+const RUNTIME_CALLBACK_PATH: &str =
+    "/ai/tinyhumans/tinychannels/ChannelsHost/runtime_0123456789abcdef0123456789abcdef";
 
 #[derive(Deserialize)]
 struct FixtureConfig {}
 
 struct FixtureService {
+    connection: Connection,
     calls: Arc<AtomicUsize>,
 }
 
@@ -35,11 +48,14 @@ impl Interface for FixtureService {
     }
 
     fn members(&self) -> Vec<MemberName> {
-        [
-            methods::CHANNEL_CONTROLLER,
-            methods::CHECK_CHANNEL_HEALTH,
+        tinychannels_bus::METHODS
+        .into_iter()
+        .chain([
             "FixtureCallCount",
-        ]
+            "FixtureReady",
+            "FixtureReleaseAlias",
+            "FixtureDisconnect",
+        ])
         .into_iter()
         .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
         .collect()
@@ -48,7 +64,20 @@ impl Interface for FixtureService {
     fn requires_confidential(&self, member: &MemberName) -> bool {
         matches!(
             member.as_str(),
-            methods::CHANNEL_CONTROLLER | methods::CHECK_CHANNEL_HEALTH
+            methods::CHANNEL_CONTROLLER
+                | methods::CHECK_CHANNEL_HEALTH
+                | methods::RESERVE_RUNTIME
+                | methods::START_RUNTIME
+                | methods::START_RUNTIME_WITH_DISPATCH
+                | methods::STOP_RUNTIME
+                | methods::DESCRIBE_CONFIGURED_CHANNELS
+                | methods::START_CHANNEL_SUPERVISED
+                | methods::START_OUTBOUND_CHANNEL
+                | methods::PREPARE_CHANNEL_CONTROL
+                | methods::EXECUTE_PROGRESSIVE
+                | methods::PREPARE_OUTBOUND_INTENT
+                | methods::CHANNEL_INTERACTION
+                | methods::START_RELAY
         )
     }
 
@@ -58,6 +87,27 @@ impl Interface for FixtureService {
         }
         self.calls.fetch_add(1, Ordering::SeqCst);
         match member.as_str() {
+            "FixtureReady" => Ok(json!(true)),
+            "FixtureReleaseAlias" => {
+                self.connection.release_name(BUS_NAME).await?;
+                Ok(Value::Null)
+            }
+            "FixtureDisconnect" => {
+                self.connection.close().await?;
+                Ok(Value::Null)
+            }
+            methods::RESERVE_RUNTIME => {
+                arguments(&args, 0)?;
+                self.reserve_runtime().await
+            }
+            methods::START_RUNTIME => self.start_runtime(args, false).await,
+            methods::START_RUNTIME_WITH_DISPATCH => self.start_runtime(args, true).await,
+            methods::STOP_RUNTIME => {
+                if first_string(&args)? != RUNTIME_HANDLE {
+                    return Err(Error::failed("runtime stop handle mismatch"));
+                }
+                Ok(Value::Null)
+            }
             methods::CHANNEL_CONTROLLER => self.channel_controller(args),
             methods::CHECK_CHANNEL_HEALTH => self.check_health(args),
             _ => Err(Error::failed("unknown test fixture method")),
@@ -66,6 +116,49 @@ impl Interface for FixtureService {
 }
 
 impl FixtureService {
+    async fn reserve_runtime(&self) -> Result<Value> {
+        let reservation = ChannelRuntimeReservation {
+            handle: RUNTIME_HANDLE.into(),
+            object_path: RUNTIME_OBJECT_PATH.into(),
+            host_object_path: RUNTIME_CALLBACK_PATH.into(),
+        };
+        self.connection
+            .serve_at(
+                ObjectPath::new(RUNTIME_OBJECT_PATH)?,
+                FixtureObject {
+                    calls: Arc::clone(&self.calls),
+                },
+            )
+            .await?;
+        serde_json::to_value(reservation).map_err(|_| Error::failed("fixture serialization failed"))
+    }
+
+    async fn start_runtime(&self, args: Value, with_dispatch: bool) -> Result<Value> {
+        let values = arguments(&args, if with_dispatch { 2 } else { 1 })?;
+        if values.first().and_then(Value::as_str) != Some(RUNTIME_HANDLE) {
+            return Err(Error::failed("runtime start handle mismatch"));
+        }
+        if with_dispatch {
+            let policy: ChannelRuntimeDispatchPolicy = decode(values, 1)?;
+            if policy.listener_count != 2 {
+                return Err(Error::failed("runtime dispatch policy mismatch"));
+            }
+        }
+        let callback = self
+            .connection
+            .proxy(
+                tinychannels_bus::HOST_BUS_NAME,
+                RUNTIME_CALLBACK_PATH,
+                tinychannels_bus::HOST_BUS_NAME,
+            )?
+            .call::<String>("FixtureCallback", ())
+            .await?;
+        if callback != "callback-live" {
+            return Err(Error::failed("runtime callback was not registered"));
+        }
+        Ok(Value::Null)
+    }
+
     fn channel_controller(&self, args: Value) -> Result<Value> {
         let request = args
             .get(0)
@@ -209,6 +302,182 @@ impl FixtureService {
     }
 }
 
+struct FixtureObject {
+    calls: Arc<AtomicUsize>,
+}
+
+#[async_trait]
+impl Interface for FixtureObject {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(BUS_NAME).expect("TinyChannels bus name is valid")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        tinychannels_bus::METHODS
+            .into_iter()
+            .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
+            .collect()
+    }
+
+    fn requires_confidential(&self, member: &MemberName) -> bool {
+        matches!(
+            member.as_str(),
+            methods::DESCRIBE_CONFIGURED_CHANNELS
+                | methods::START_CHANNEL_SUPERVISED
+                | methods::START_OUTBOUND_CHANNEL
+                | methods::PREPARE_CHANNEL_CONTROL
+                | methods::EXECUTE_PROGRESSIVE
+                | methods::PREPARE_OUTBOUND_INTENT
+                | methods::CHANNEL_INTERACTION
+                | methods::START_RELAY
+        )
+    }
+
+    async fn call(&self, member: &MemberName, args: Value) -> Result<Value> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        match member.as_str() {
+            methods::DESCRIBE_CONFIGURED_CHANNELS => {
+                let values = arguments(&args, 2)?;
+                let _: ChannelsConfig = decode(values, 0)?;
+                let _: HttpProxyPolicy = decode(values, 1)?;
+                Ok(json!([]))
+            }
+            methods::START_CHANNEL_SUPERVISED => {
+                let values = arguments(&args, 4)?;
+                let _: String = decode(values, 0)?;
+                let _: ChannelsConfig = decode(values, 1)?;
+                let _: HttpProxyPolicy = decode(values, 2)?;
+                let _: ChannelSupervisionPolicy = decode(values, 3)?;
+                Ok(Value::Null)
+            }
+            methods::START_OUTBOUND_CHANNEL => {
+                let values = arguments(&args, 3)?;
+                let _: String = decode(values, 0)?;
+                let _: ChannelsConfig = decode(values, 1)?;
+                let _: HttpProxyPolicy = decode(values, 2)?;
+                Ok(Value::Null)
+            }
+            methods::PREPARE_CHANNEL_CONTROL => {
+                let values = arguments(&args, 1)?;
+                let _: ChannelControlRequest = decode(values, 0)?;
+                serde_json::to_value(ChannelControlResult::RuntimeLimits {
+                    timeout_secs: 47,
+                    max_in_flight: 8,
+                })
+                .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::EXECUTE_PROGRESSIVE => {
+                let values = arguments(&args, 1)?;
+                let _: ProgressiveCommand = decode(values, 0)?;
+                serde_json::to_value(ProgressiveResult::Closed)
+                    .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::PREPARE_OUTBOUND_INTENT => {
+                let values = arguments(&args, 2)?;
+                let _: String = decode(values, 0)?;
+                let _: tinychannels_bus::module_runtime::ChannelMessagePreparation =
+                    decode(values, 1)?;
+                serde_json::to_value(tinychannels_bus::module_runtime::PreparedChannelIntent {
+                    intent: ChannelOutboundIntent::default(),
+                    legacy_message: Value::Null,
+                })
+                .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::CHANNEL_INTERACTION => {
+                let values = arguments(&args, 1)?;
+                let _: ChannelInteractionRequest = decode(values, 0)?;
+                serde_json::to_value(ChannelInteractionResult::Completed)
+                    .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::START_RELAY => {
+                let values = arguments(&args, 2)?;
+                let _: RelayReservation = decode(values, 0)?;
+                let _: tinychannels_bus::config::RelayRuntimeConfig = decode(values, 1)?;
+                serde_json::to_value(tinychannels_bus::relay::CapabilityDescriptor::default())
+                    .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::RESERVE_RELAY => {
+                arguments(&args, 0)?;
+                serde_json::to_value(RelayReservation("fixture-relay".into()))
+                    .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::STOP_RELAY => {
+                let values = arguments(&args, 1)?;
+                let _: RelayReservation = decode(values, 0)?;
+                Ok(Value::Null)
+            }
+            methods::CHANNEL_STATUS => {
+                let values = arguments(&args, 1)?;
+                let _: String = decode(values, 0)?;
+                Ok(json!("peer-a"))
+            }
+            methods::SEND_CHANNEL_INTENT => {
+                let values = arguments(&args, 2)?;
+                let _: String = decode(values, 0)?;
+                let _: ChannelOutboundIntent = decode(values, 1)?;
+                serde_json::to_value(ChannelSendMessageResult::default())
+                    .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::SEND_RELAY_INTENT => {
+                let values = arguments(&args, 2)?;
+                let _: RelayReservation = decode(values, 0)?;
+                let _: ChannelOutboundIntent = decode(values, 1)?;
+                serde_json::to_value(ChannelSendMessageResult::default())
+                    .map_err(|_| Error::failed("fixture serialization failed"))
+            }
+            methods::SHUTDOWN => {
+                arguments(&args, 0)?;
+                Ok(Value::Null)
+            }
+            _ => Err(Error::failed("unexpected TinyChannels object method")),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct FixtureCallback;
+
+#[async_trait]
+impl Interface for FixtureCallback {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(tinychannels_bus::HOST_BUS_NAME)
+            .expect("TinyChannels callback bus name is valid")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        vec![MemberName::new("FixtureCallback").expect("valid fixture callback")]
+    }
+
+    async fn call(&self, _: &MemberName, _: Value) -> Result<Value> {
+        Ok(json!("callback-live"))
+    }
+}
+
+fn arguments(value: &Value, count: usize) -> Result<&[Value]> {
+    let values = value
+        .as_array()
+        .ok_or_else(|| Error::failed("fixture arguments are not positional"))?;
+    if values.len() != count {
+        return Err(Error::failed("fixture argument count mismatch"));
+    }
+    Ok(values)
+}
+
+fn decode<T: DeserializeOwned>(values: &[Value], index: usize) -> Result<T> {
+    values
+        .get(index)
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .ok_or_else(|| Error::failed("fixture argument has the wrong type"))
+}
+
+fn first_string(args: &Value) -> Result<&str> {
+    args.as_array()
+        .and_then(|values| values.first())
+        .and_then(Value::as_str)
+        .ok_or_else(|| Error::failed("fixture runtime handle is missing"))
+}
+
 fn validate_request(
     config: &ChannelsConfig,
     bot_token: &str,
@@ -269,7 +538,13 @@ fn invalid_input() -> Error {
 async fn setup(connection: Connection, _config: FixtureConfig) -> Result<()> {
     let calls = Arc::new(AtomicUsize::new(0));
     connection
-        .serve_at(ObjectPath::new(OBJECT_PATH)?, FixtureService { calls })
+        .serve_at(
+            ObjectPath::new(OBJECT_PATH)?,
+            FixtureService {
+                connection: connection.clone(),
+                calls,
+            },
+        )
         .await?;
     connection.request_name(BUS_NAME).await
 }
@@ -279,7 +554,15 @@ tinybus_module::module_export! {
     config = FixtureConfig,
     worker_threads = 1,
     provides = ["ai.tinyhumans.tinychannels.Channels"],
-    methods = ["ChannelController", "CheckChannelHealth", "FixtureCallCount"],
+        methods = [
+            "ChannelController", "CheckChannelHealth", "FixtureCallCount",
+            "FixtureReady", "FixtureReleaseAlias", "FixtureDisconnect",
+            "ReserveRuntime", "StartRuntime", "StartRuntimeWithDispatch", "StopRuntime",
+            "DescribeConfiguredChannels", "StartChannelSupervised", "StartOutboundChannel",
+            "PrepareChannelControl", "ExecuteProgressive", "PrepareOutboundIntent",
+            "ChannelInteraction", "StartRelay", "ReserveRelay", "StopRelay", "ChannelStatus",
+            "SendChannelIntent", "SendRelayIntent", "Shutdown",
+        ],
     signals = [],
     requires = [],
     optional = [],

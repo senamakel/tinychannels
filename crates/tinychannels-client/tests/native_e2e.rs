@@ -2,14 +2,34 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
+
 mod support;
 
-use tinybus::module::{ModuleCallError, ModuleCallFailure};
+use tinybus::{
+    BusName, Error, Interface, InterfaceName, MemberName, ObjectPath,
+    module::{ModuleCallError, ModuleCallFailure, RetryPolicy},
+};
 use tinychannels_bus::{
-    ChannelHealthState, ChannelsConfig, HttpProxyPolicy, config::DiscordConfig,
+    ChannelControlRequest, ChannelControlResult, ChannelHealthState, ChannelInteraction,
+    ChannelInteractionRequest, ChannelInteractionResult, ChannelMessagePreparation,
+    ChannelOutboundIntent, ChannelRuntimeDispatchPolicy, ChannelSupervisionPolicy, ChannelsConfig,
+    HttpProxyPolicy, ProgressiveCommand, ProgressiveResult, RelayReservation,
+    config::DiscordConfig,
 };
 
 const TOKEN: &str = "fixture-call-secret";
+const RUNTIME_HANDLE: &str = "0123456789abcdef0123456789abcdef";
+const RUNTIME_OBJECT_PATH: &str =
+    "/ai/tinyhumans/tinychannels/Channels/runtime_0123456789abcdef0123456789abcdef";
+const RUNTIME_CALLBACK_PATH: &str =
+    "/ai/tinyhumans/tinychannels/ChannelsHost/runtime_0123456789abcdef0123456789abcdef";
 
 fn config() -> ChannelsConfig {
     ChannelsConfig {
@@ -341,4 +361,333 @@ async fn wrong_release_pins_and_unattested_peers_are_refused_before_business_cal
         support::assert_unattested_peer_live(&unattested.probe).await,
         owner
     );
+}
+
+#[derive(Clone)]
+struct FixtureCallback;
+
+#[async_trait::async_trait]
+impl Interface for FixtureCallback {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(tinychannels_bus::HOST_BUS_NAME)
+            .expect("TinyChannels host callback interface")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        vec![MemberName::new("FixtureCallback").expect("fixture callback method")]
+    }
+
+    async fn call(
+        &self,
+        _: &MemberName,
+        _: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        Ok(serde_json::json!("callback-live"))
+    }
+}
+
+struct UnattestedReplacementRoot(Arc<AtomicUsize>);
+
+#[async_trait::async_trait]
+impl Interface for UnattestedReplacementRoot {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(tinychannels_bus::BUS_NAME).expect("TinyChannels module interface")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        vec![MemberName::new("FixtureReady").expect("readiness method")]
+    }
+
+    async fn call(
+        &self,
+        member: &MemberName,
+        _: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        if member.as_str() == "FixtureReady" {
+            Ok(serde_json::json!(true))
+        } else {
+            Err(Error::failed("unexpected replacement root call"))
+        }
+    }
+}
+
+struct UnattestedReplacementObject(Arc<AtomicUsize>);
+
+#[async_trait::async_trait]
+impl Interface for UnattestedReplacementObject {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(tinychannels_bus::BUS_NAME).expect("TinyChannels module interface")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        vec![MemberName::new(tinychannels_bus::methods::CHANNEL_STATUS)
+            .expect("channel status method")]
+    }
+
+    async fn call(
+        &self,
+        member: &MemberName,
+        _: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        if member.as_str() == tinychannels_bus::methods::CHANNEL_STATUS {
+            Ok(serde_json::json!("peer-b"))
+        } else {
+            Err(Error::failed("unexpected replacement object call"))
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_takes_alias() {
+    let fixture = support::runtime_fixture().await;
+    let driver = fixture
+        .client
+        .runtime_driver()
+        .await
+        .expect("strictly bind TinyChannels A before reservation");
+    let control = fixture
+        .control
+        .bind_attested("tinychannels")
+        .await
+        .expect("hold a test control reference to A before alias handover");
+    let ready: bool = control
+        .call("FixtureReady", ())
+        .await
+        .expect("A is live before reservation");
+    assert!(ready);
+    control
+        .call::<()>("FixtureReleaseAlias", ())
+        .await
+        .expect("A releases its well-known name");
+
+    // `serve_host_object` is an ordinary, unattested host service. It is used
+    // only to prove alias availability; it cannot receive confidential calls.
+    let replacement_calls = Arc::new(AtomicUsize::new(0));
+    let _replacement = fixture
+        .runtime
+        .serve_host_object(
+            BusName::new(tinychannels_bus::BUS_NAME).expect("module bus name"),
+            ObjectPath::new(tinychannels_bus::OBJECT_PATH).expect("module root path"),
+            UnattestedReplacementRoot(Arc::clone(&replacement_calls)),
+        )
+        .await
+        .expect("ordinary B can claim the released module alias");
+    fixture
+        .runtime
+        .connection()
+        .serve_at(
+            ObjectPath::new(RUNTIME_OBJECT_PATH).expect("fixture runtime object path"),
+            UnattestedReplacementObject(Arc::clone(&replacement_calls)),
+        )
+        .await
+        .expect("B has the same private path as a replacement canary");
+
+    let b_ready: bool = fixture
+        .runtime
+        .connection()
+        .proxy(
+            tinychannels_bus::BUS_NAME,
+            tinychannels_bus::OBJECT_PATH,
+            tinychannels_bus::BUS_NAME,
+        )
+        .expect("ordinary B root proxy")
+        .call("FixtureReady", ())
+        .await
+        .expect("ordinary readiness call proves B is available");
+    assert!(b_ready);
+    let b_object: String = fixture
+        .runtime
+        .connection()
+        .proxy(
+            tinychannels_bus::BUS_NAME,
+            RUNTIME_OBJECT_PATH,
+            tinychannels_bus::BUS_NAME,
+        )
+        .expect("ordinary B object proxy")
+        .call(tinychannels_bus::methods::CHANNEL_STATUS, ("discord",))
+        .await
+        .expect("ordinary status call proves the colliding B path is live");
+    assert_eq!(b_object, "peer-b");
+    let b_calls_before_lease = replacement_calls.load(Ordering::SeqCst);
+
+    let lease = fixture
+        .runtime
+        .lease(
+            driver,
+            |_, _| Ok(FixtureCallback),
+            RetryPolicy::new(Duration::from_secs(2), vec![]).expect("valid stop policy"),
+            |_| {},
+        )
+        .await
+        .expect("reserve, export callback and start on the already-bound A");
+    assert!(matches!(
+        lease
+            .object()
+            .channel_status("discord".into())
+            .await
+            .expect("typed object call stays on A after alias handover"),
+        "peer-a"
+    );
+    assert_eq!(
+        replacement_calls.load(Ordering::SeqCst),
+        b_calls_before_lease,
+        "B's live colliding object received no call from the lease"
+    );
+
+    let providers = lease
+        .object()
+        .describe_configured_channels(ChannelsConfig::default(), HttpProxyPolicy::default())
+        .await
+        .expect("confidential provider description");
+    assert!(providers.is_empty());
+    lease
+        .object()
+        .start_channel_supervised(
+            "discord".into(),
+            ChannelsConfig::default(),
+            HttpProxyPolicy::default(),
+            ChannelSupervisionPolicy::default(),
+        )
+        .await
+        .expect("confidential supervised start contract");
+    lease
+        .object()
+        .start_outbound_channel(
+            "discord".into(),
+            ChannelsConfig::default(),
+            HttpProxyPolicy::default(),
+        )
+        .await
+        .expect("confidential outbound start contract");
+    assert_eq!(
+        lease
+            .object()
+            .prepare_channel_control(ChannelControlRequest::RuntimeLimits {
+                timeout_secs: 47,
+                listener_count: 2,
+            })
+            .await
+            .expect("confidential channel control response"),
+        ChannelControlResult::RuntimeLimits {
+            timeout_secs: 47,
+            max_in_flight: 8,
+        }
+    );
+    assert_eq!(
+        lease
+            .object()
+            .execute_progressive(ProgressiveCommand::Close {
+                handle: "progressive-fixture".into(),
+            })
+            .await
+            .expect("confidential progressive result"),
+        ProgressiveResult::Closed
+    );
+    let prepared = lease
+        .object()
+        .prepare_outbound_intent(
+            "discord".into(),
+            ChannelMessagePreparation::Legacy(serde_json::json!({"text":"fixture"})),
+        )
+        .await
+        .expect("confidential prepared intent");
+    assert!(prepared.legacy_message.is_null());
+    assert_eq!(
+        lease
+            .object()
+            .channel_interaction(ChannelInteractionRequest {
+                channel: "discord".into(),
+                interaction: ChannelInteraction::Describe,
+            })
+            .await
+            .expect("confidential channel interaction"),
+        ChannelInteractionResult::Completed
+    ));
+    let relay = lease
+        .object()
+        .reserve_relay()
+        .await
+        .expect("ordinary relay reservation");
+    assert_eq!(relay, RelayReservation("fixture-relay".into()));
+    assert_eq!(
+        lease
+            .object()
+            .start_relay(relay.clone(), tinychannels_bus::config::RelayRuntimeConfig::default())
+            .await
+            .expect("confidential relay start descriptor")
+            .platform,
+        ""
+    );
+    lease
+        .object()
+        .stop_relay(relay.clone())
+        .await
+        .expect("ordinary relay stop");
+    lease
+        .object()
+        .send_channel_intent("discord".into(), ChannelOutboundIntent::default())
+        .await
+        .expect("ordinary channel intent");
+    lease
+        .object()
+        .send_relay_intent(relay, ChannelOutboundIntent::default())
+        .await
+        .expect("ordinary relay intent");
+    lease.object().shutdown().await.expect("ordinary shutdown");
+
+    assert!(lease.close().await.is_ok(), "decoded STOP unit reply is ACK");
+    let callback = fixture
+        .runtime
+        .connection()
+        .proxy(
+            tinychannels_bus::HOST_BUS_NAME,
+            RUNTIME_CALLBACK_PATH,
+            tinychannels_bus::HOST_BUS_NAME,
+        )
+        .expect("callback probe proxy");
+    assert!(
+        callback.call::<String>("FixtureCallback", ()).await.is_err(),
+        "only STOP ACK withdraws the callback registration"
+    );
+
+    // A's native connection closes on this fixture-only control call. Its
+    // already-held root and object routes must fail while ordinary B remains
+    // available. The failure path must not fall through to B.
+    let _ = control.call::<()>("FixtureDisconnect", ()).await;
+    assert!(control.call::<bool>("FixtureReady", ()).await.is_err());
+    assert!(lease.object().channel_status("discord".into()).await.is_err());
+    let after_disconnect: bool = fixture
+        .control
+        .call("tinychannels", "FixtureReady", ())
+        .await
+        .expect("ordinary B remains available after A disconnects");
+    assert!(after_disconnect);
+    assert_eq!(
+        replacement_calls.load(Ordering::SeqCst),
+        b_calls_before_lease + 1,
+        "the post-disconnect ordinary check reached B, while A's bound object did not"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn dispatch_policy_uses_only_the_explicit_runtime_start_method() {
+    let fixture = support::runtime_fixture().await;
+    let driver = fixture
+        .client
+        .runtime_driver_with_dispatch(ChannelRuntimeDispatchPolicy { listener_count: 2 })
+        .await
+        .expect("bind with an explicit host-selected dispatch policy");
+    let lease = fixture
+        .runtime
+        .lease(
+            driver,
+            |_, _| Ok(FixtureCallback),
+            RetryPolicy::new(Duration::from_secs(2), vec![]).expect("valid stop policy"),
+            |_| {},
+        )
+        .await
+        .expect("StartRuntimeWithDispatch exact policy reply");
+    assert!(lease.close().await.is_ok());
 }
