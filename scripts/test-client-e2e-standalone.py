@@ -81,6 +81,7 @@ elif args[0] != 'test':
     env.update(
         {
             "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
+            "RUNNER_OS": "",
             "TINYCHANNELS_FAKE_REPO": str(repo),
             "TINYCHANNELS_FAKE_TARGET": str(repo / "target"),
             "TINYCHANNELS_FAKE_CARGO_LOG": str(cargo_log),
@@ -109,6 +110,10 @@ elif args[0] != 'test':
             fail(f"{label} client E2E script depends on files outside its standalone repository")
     if re.search(r"\$cancelAware|&\s*bash\s+\$cancelAware", powershell_script):
         fail("PowerShell client E2E script still wraps Cargo through an external helper")
+    if len(re.findall(r"(?m)^cargo\s+(?:build|test)\b", bash_script)) != 5:
+        fail("Bash client E2E script must invoke its five Cargo commands directly")
+    if len(re.findall(r"(?m)^&\s+cargo\s+(?:build|test)\b", powershell_script)) != 5:
+        fail("PowerShell client E2E script must invoke its five Cargo commands directly")
 
     calls = [json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()]
     if len(calls) != 5 or [call["args"][0] for call in calls] != [

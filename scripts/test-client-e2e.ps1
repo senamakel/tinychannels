@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
-$cancelAware = (Resolve-Path (Join-Path $root '../../scripts/ci-cancel-aware.sh')).Path
 $target = Join-Path $root 'target'
 New-Item -ItemType Directory -Force $target | Out-Null
 $target = (Resolve-Path -LiteralPath $target).Path
@@ -23,9 +22,9 @@ function Set-PrivateDirectory([string]$Path) {
 }
 
 $fixtureManifest = Join-Path $root 'crates/tinychannels-client/test-fixture/Cargo.toml'
-& bash $cancelAware cargo build --manifest-path $fixtureManifest --locked --target-dir $target
+& cargo build --manifest-path $fixtureManifest --locked --target-dir $target
 if ($LASTEXITCODE -ne 0) { throw 'Failed to build tinychannels-client test fixture' }
-& bash $cancelAware cargo build --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target -p tinychannels-module
+& cargo build --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target -p tinychannels-module
 if ($LASTEXITCODE -ne 0) { throw 'Failed to build the actual TinyChannels module' }
 
 $stage = Join-Path $target 'tinychannels-client-e2e'
@@ -72,12 +71,12 @@ $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME = $nativeArchiveName
 $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256 = $nativeArchiveHash
 $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256 = $nativeLibraryHash
 $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL = 'https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37'
-& bash $cancelAware cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
+& cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
     -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
 if ($LASTEXITCODE -ne 0) { throw 'TinyChannels typed client native E2E failed' }
-& bash $cancelAware cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
+& cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
     -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
 if ($LASTEXITCODE -ne 0) { throw 'TinyChannels runtime driver native E2E failed' }
-& bash $cancelAware cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
+& cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
     -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1
 if ($LASTEXITCODE -ne 0) { throw 'Actual TinyChannels module runtime E2E failed' }
