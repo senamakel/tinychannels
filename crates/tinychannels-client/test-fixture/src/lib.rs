@@ -614,6 +614,22 @@ impl Interface for FixtureObject {
             _ => Err(Error::failed("unexpected TinyChannels object method")),
         }
     }
+
+    async fn call_with_context(
+        &self,
+        member: &MemberName,
+        args: Value,
+        context: &CallContext,
+    ) -> Result<Value> {
+        if audited_delivery_member(member.as_str()) {
+            self.runtime_controls
+                .delivery_flags
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push((member.as_str().to_owned(), context.is_confidential()));
+        }
+        self.call(member, args).await
+    }
 }
 
 #[derive(Clone)]
@@ -665,6 +681,10 @@ fn runtime_paths(handle: &str) -> (String, String) {
         format!("{OBJECT_PATH}/runtime_{handle}"),
         format!("{}/runtime_{handle}", tinychannels_bus::HOST_OBJECT_PATH),
     )
+}
+
+fn audited_delivery_member(member: &str) -> bool {
+    tinychannels_bus::METHODS.contains(&member)
 }
 
 fn validate_request(
@@ -751,6 +771,7 @@ tinybus_module::module_export! {
             "FixtureFailStart", "FixtureFailStop", "FixtureStopCallCount",
             "FixtureMalformedReservation", "FixtureMalformedStatus",
             "FixturePauseReserve", "FixtureWaitReserve", "FixtureReleaseReserve",
+            "FixtureTakeDeliveryFlags",
             "ReserveRuntime", "StartRuntime", "StartRuntimeWithDispatch", "StopRuntime",
             "DescribeConfiguredChannels", "StartChannelSupervised", "StartOutboundChannel",
             "PrepareChannelControl", "ExecuteProgressive", "PrepareOutboundIntent",
