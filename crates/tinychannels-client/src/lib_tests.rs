@@ -1,4 +1,5 @@
 use super::*;
+use crate::client::DiscordReply;
 
 use std::sync::{Arc, Mutex};
 

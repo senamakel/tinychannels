@@ -10,6 +10,13 @@ use tinychannels_bus::{
 use crate::{ChannelRuntimeDispatchPolicy, ChannelRuntimeDriver, ChannelRuntimeError};
 use crate::runtime::RuntimeStart;
 
+#[derive(Clone, Copy)]
+pub(super) enum DiscordReply {
+    Guilds,
+    Channels,
+    Permissions,
+}
+
 /// Typed host client for the TinyChannels module.
 ///
 /// The host supplies the module registry and lifecycle through `ModuleClient`.
@@ -158,7 +165,7 @@ impl TinyChannelsClient {
         }
     }
 
-    fn decode_discord<T: DeserializeOwned>(
+    pub(super) fn decode_discord<T: DeserializeOwned>(
         response: ChannelControllerResult,
         expected: DiscordReply,
     ) -> Option<T> {
