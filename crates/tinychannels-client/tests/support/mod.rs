@@ -360,15 +360,14 @@ impl RuntimeFixture {
             .forget();
     }
 
-    pub(crate) async fn wait_for_readiness_attempt(&self, previous: usize) {
+    pub(crate) async fn readiness_attempt_started(&self, previous: usize) -> bool {
         for _ in 0..10_000 {
             if self.readiness_attempts() > previous {
-                assert_eq!(self.bind_stage(), "readiness_in_progress");
-                return;
+                return self.bind_stage() == "readiness_in_progress";
             }
             tokio::task::yield_now().await;
         }
-        panic!("module client never entered host readiness preparation");
+        false
     }
 }
 
