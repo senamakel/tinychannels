@@ -60,7 +60,7 @@ class ClientNativeTopologyTests(unittest.TestCase):
         shell_runner = (ROOT / "scripts/test-client-e2e.sh").read_text(encoding="utf-8")
         powershell_runner = (ROOT / "scripts/test-client-e2e.ps1").read_text(encoding="utf-8")
         self.assertIn("--prepare-only", shell_runner)
-        self.assertIn("function run_counted_test", shell_runner)
+        self.assertIn("run_counted_test() {", shell_runner)
         self.assertIn("function Invoke-CountedNativeTest", powershell_runner)
         for target, count in EXPECTED_COUNTS.items():
             self.assertEqual(shell_runner.count(f"run_counted_test {count} {target}"), 1)
