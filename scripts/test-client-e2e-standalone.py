@@ -62,7 +62,7 @@ with Path(os.environ['TINYCHANNELS_FAKE_PWSH_LOG']).open('a', encoding='utf-8') 
     stream.write(json.dumps(sys.argv[1:]) + '\\n')
 """,
     )
-    write(fake_bin / "pwsh", f"#!/bin/sh\\nexec python3 '{pwsh_stub}' \"$@\"\\n")
+    write(fake_bin / "pwsh", f"#!/bin/sh\nexec python3 '{pwsh_stub}' \"$@\"\n")
     cargo_stub = fake_bin / "cargo_stub.py"
     write(
         cargo_stub,
@@ -175,6 +175,7 @@ else:
     for output in expected_outputs:
         if not output.is_file():
             fail(f"expected local staged module archive: {output}")
+    expected_cargo_call_count = len(calls)
 
     windows_delegations = (
         ("MINGW64_NT-10.0", True),
@@ -183,6 +184,7 @@ else:
     )
     for platform, prepare_only in windows_delegations:
         windows_env = dict(env, TINYCHANNELS_FAKE_UNAME=platform)
+        windows_env.pop("RUNNER_OS", None)
         command = [bash_executable, str(repo / "scripts" / "test-client-e2e.sh")]
         if prepare_only:
             command.append("--prepare-only")
@@ -208,7 +210,7 @@ else:
         after_calls = [
             json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()
         ]
-        if len(after_calls) != len(calls) + 6:
+        if len(after_calls) != expected_cargo_call_count:
             fail(f"RUNNER_OS-unset {platform} delegation unexpectedly invoked fake Cargo")
     environment_file = repo / "target" / "tinychannels-client-e2e.env"
     if not environment_file.is_file():
