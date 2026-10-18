@@ -22,6 +22,7 @@ use tinychannels_bus::{
     module_control::{ChannelControlRequest, ChannelControlResult},
     module_progressive::{ProgressiveCommand, ProgressiveResult},
     module_relay::RelayReservation,
+    module_runtime::ChannelMessagePreparation,
 };
 use tinychannels_client::{ChannelRuntimeClient, ChannelRuntimeErrorKind};
 
@@ -137,7 +138,6 @@ async fn callback_probe(
             path,
             tinychannels_bus::HOST_BUS_NAME,
         )
-        .map_err(|_| ModuleCallError::IncompatibleContract)?
         .call("FixtureCallback", ())
         .await
 }
