@@ -81,6 +81,9 @@ class ClientNativeTopologyTests(unittest.TestCase):
         powershell_runner = (ROOT / "scripts/test-client-e2e.ps1").read_text(encoding="utf-8")
         self.assertIn("System32/tar.exe", powershell_runner)
         self.assertNotRegex(powershell_runner, r"(?m)^&\s+tar\.exe\b")
+        self.assertIn('($environment -join "`n") + "`n"', powershell_runner)
+        self.assertIn("[System.IO.File]::WriteAllText", powershell_runner)
+        self.assertNotIn("[System.IO.File]::WriteAllLines", powershell_runner)
 
     def test_feature_and_coverage_runs_prepare_fixture_before_all_feature_tests(self):
         feature_runner = (ROOT / "scripts/test-features.sh").read_text(encoding="utf-8")

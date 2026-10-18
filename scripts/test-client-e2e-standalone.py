@@ -26,6 +26,7 @@ def write(path: Path, content: str) -> None:
 
 
 def main() -> None:
+    bash_executable = os.environ.get("FEATURE_TEST_BASH", "bash")
     if WORK.exists():
         shutil.rmtree(WORK)
     repo = WORK / "tinychannels"
@@ -94,7 +95,7 @@ else:
         }
     )
     result = subprocess.run(
-        ["bash", str(repo / "scripts" / "test-client-e2e.sh")],
+        [bash_executable, str(repo / "scripts" / "test-client-e2e.sh")],
         cwd=repo,
         env=env,
         check=False,
@@ -168,8 +169,58 @@ else:
         if f"export {key}=" not in environment:
             fail(f"client fixture environment omits {key}")
 
+    source_env = """set -e
+source "$1"
+printf '%s\\0' \\
+  "$TINYCHANNELS_CLIENT_TEST_CACHE" \\
+  "$TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME" \\
+  "$TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256" \\
+  "$TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256" \\
+  "$TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE" \\
+  "$TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME" \\
+  "$TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256" \\
+  "$TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256" \\
+  "$TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL"
+"""
+    sourced_env = subprocess.run(
+        [bash_executable, "-c", source_env, "client-env-test", "target/tinychannels-client-e2e.env"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    if sourced_env.returncode:
+        fail(f"Bash could not source the generated client fixture environment: {sourced_env.stderr!r}")
+    values = sourced_env.stdout.decode("utf-8").split("\0")[:-1]
+    if len(values) != 9 or any("\r" in value for value in values):
+        fail(f"sourced client fixture environment has missing or CR-suffixed values: {values!r}")
+    normalized_cache = values[0].replace("\\", "/")
+    normalized_native_cache = values[4].replace("\\", "/")
+    if not normalized_cache.endswith("/target/tinychannels-client-e2e/cache"):
+        fail(f"Bash sourced an incorrect fixture cache path: {values[0]!r}")
+    if values[1] != "tinychannels-module-client-test.tar.gz" or values[5] != "tinychannels-module-native-test.tar.gz":
+        fail("Bash sourced an unexpected local fixture archive name")
+    if not normalized_native_cache.endswith("/target/tinychannels-module-client-native-e2e/cache"):
+        fail(f"Bash sourced an incorrect production module cache path: {values[4]!r}")
+    if values[8] != "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37":
+        fail("Bash sourced an unexpected local module release URL")
+    if any(not re.fullmatch(r"[0-9a-f]{64}", values[index]) for index in (2, 3, 6, 7)):
+        fail("Bash sourced an invalid archive or library digest")
+
+    crlf_value = r"D:\a\repo\target\fixture-cache"
+    crlf_env = repo / "target" / "windows-crlf-control.env"
+    crlf_env.write_bytes(f"export CLIENT_TEST_VALUE='{crlf_value}'\r\n".encode("utf-8"))
+    crlf_result = subprocess.run(
+        [bash_executable, "-c", 'source "$1"; printf "%s" "$CLIENT_TEST_VALUE"',
+         "client-env-crlf-control", "target/windows-crlf-control.env"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    if crlf_result.returncode or crlf_result.stdout.decode("utf-8") != crlf_value + "\r":
+        fail("Bash CRLF control no longer reproduces the carriage return that corrupts env values")
+
     prepare_result = subprocess.run(
-        ["bash", str(repo / "scripts" / "test-client-e2e.sh"), "--prepare-only"],
+        [bash_executable, str(repo / "scripts" / "test-client-e2e.sh"), "--prepare-only"],
         cwd=repo,
         env=env,
         check=False,
@@ -184,7 +235,7 @@ else:
 
     empty_env = dict(env, TINYCHANNELS_FAKE_ZERO_TEST_TARGET="native_e2e")
     empty_result = subprocess.run(
-        ["bash", str(repo / "scripts" / "test-client-e2e.sh")],
+        [bash_executable, str(repo / "scripts" / "test-client-e2e.sh")],
         cwd=repo,
         env=empty_env,
         check=False,
