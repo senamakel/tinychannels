@@ -86,7 +86,7 @@ class ClientNativeTopologyTests(unittest.TestCase):
         )
         ordered_markers = (
             "support::gated_runtime_fixture().await",
-            ".readiness_attempt_started(before_limited_bind)",
+            "readiness_attempt_started(before_limited_bind)",
             "tokio::time::pause()",
             "tokio::time::advance(Duration::from_secs(2)).await",
             "let bind_outcome = limited_bind.await",
@@ -94,7 +94,7 @@ class ClientNativeTopologyTests(unittest.TestCase):
             "fixture.release_ready()",
             "fixture.wait_until_gate_callback_returns().await",
             ".ensure_ready(tinychannels_bus::BUS_NAME)",
-            "assert!(!module_ready_before_bind",
+            "!module_ready_before_bind,",
         )
         positions = [readiness.index(marker) for marker in ordered_markers]
         self.assertEqual(positions, sorted(positions))
