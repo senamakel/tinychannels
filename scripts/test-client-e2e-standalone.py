@@ -219,12 +219,21 @@ printf '%s\\0' \\
         check=False,
         capture_output=True,
     )
-    trailing_cr = crlf_line_result.stdout[len(crlf_value.encode("utf-8")) :]
-    if crlf_line_result.returncode or trailing_cr not in (b"", b"\r"):
+    crlf_prefix = crlf_value.encode("utf-8")
+    if crlf_line_result.returncode or not crlf_line_result.stdout.startswith(crlf_prefix):
+        fail(f"Bash CRLF line-ending control changed the value prefix: {crlf_line_result.stdout!r}")
+    trailing_cr = crlf_line_result.stdout[len(crlf_prefix) :]
+    if trailing_cr not in (b"", b"\r"):
         fail(f"Bash CRLF line-ending control had unexpected trailing bytes: {trailing_cr!r}")
 
     embedded_cr_env = repo / "target" / "embedded-cr-control.env"
-    embedded_cr_env.write_bytes(f"export CLIENT_TEST_VALUE='{crlf_value}\r'\n".encode("utf-8"))
+    embedded_cr_env.write_text(
+        f"CLIENT_TEST_BASE='{crlf_value}'\n"
+        "printf -v CLIENT_TEST_VALUE '%s\\r' \"$CLIENT_TEST_BASE\"\n"
+        "export CLIENT_TEST_VALUE\n",
+        encoding="utf-8",
+        newline="\n",
+    )
     embedded_cr_result = subprocess.run(
         [bash_executable, "-c", 'source "$1"; printf "%s" "$CLIENT_TEST_VALUE"',
          "client-env-embedded-cr-control", "target/embedded-cr-control.env"],
