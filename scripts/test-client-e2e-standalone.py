@@ -45,6 +45,24 @@ def main() -> None:
         fake_bin / "rustc",
         "#!/bin/sh\nprintf '%s\\n' 'host: aarch64-apple-darwin'\n",
     )
+    write(
+        fake_bin / "uname",
+        "#!/bin/sh\nprintf '%s\\n' \"${TINYCHANNELS_FAKE_UNAME:-Darwin}\"\n",
+    )
+    pwsh_stub = fake_bin / "pwsh_stub.py"
+    write(
+        pwsh_stub,
+        """#!/usr/bin/env python3
+import json
+import os
+import sys
+from pathlib import Path
+
+with Path(os.environ['TINYCHANNELS_FAKE_PWSH_LOG']).open('a', encoding='utf-8') as stream:
+    stream.write(json.dumps(sys.argv[1:]) + '\\n')
+""",
+    )
+    write(fake_bin / "pwsh", f"#!/bin/sh\\nexec python3 '{pwsh_stub}' \"$@\"\\n")
     cargo_stub = fake_bin / "cargo_stub.py"
     write(
         cargo_stub,
@@ -84,6 +102,7 @@ else:
     write(fake_bin / "cargo", f"#!/bin/sh\nexec python3 '{cargo_stub}' \"$@\"\n")
 
     cargo_log = WORK / "cargo.jsonl"
+    pwsh_log = WORK / "pwsh.jsonl"
     env = os.environ.copy()
     env.update(
         {
@@ -92,6 +111,8 @@ else:
             "TINYCHANNELS_FAKE_REPO": str(repo),
             "TINYCHANNELS_FAKE_TARGET": str(repo / "target"),
             "TINYCHANNELS_FAKE_CARGO_LOG": str(cargo_log),
+            "TINYCHANNELS_FAKE_PWSH_LOG": str(pwsh_log),
+            "TINYCHANNELS_FAKE_UNAME": "Darwin",
         }
     )
     result = subprocess.run(
@@ -107,6 +128,8 @@ else:
             "standalone Bash E2E script failed with fake Cargo "
             f"(exit {result.returncode}):\n{result.stdout}{result.stderr}"
         )
+    if pwsh_log.exists():
+        fail("Unix fake-Cargo smoke unexpectedly delegated to PowerShell")
 
     bash_script = (ROOT / "scripts" / "test-client-e2e.sh").read_text(encoding="utf-8")
     powershell_script = (ROOT / "scripts" / "test-client-e2e.ps1").read_text(
@@ -152,6 +175,41 @@ else:
     for output in expected_outputs:
         if not output.is_file():
             fail(f"expected local staged module archive: {output}")
+
+    windows_delegations = (
+        ("MINGW64_NT-10.0", True),
+        ("MSYS_NT-10.0", True),
+        ("CYGWIN_NT-10.0", False),
+    )
+    for platform, prepare_only in windows_delegations:
+        windows_env = dict(env, TINYCHANNELS_FAKE_UNAME=platform)
+        command = [bash_executable, str(repo / "scripts" / "test-client-e2e.sh")]
+        if prepare_only:
+            command.append("--prepare-only")
+        delegated = subprocess.run(
+            command,
+            cwd=repo,
+            env=windows_env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if delegated.returncode:
+            fail(
+                f"RUNNER_OS-unset {platform} delegation failed "
+                f"(exit {delegated.returncode}): {delegated.stdout}{delegated.stderr}"
+            )
+        calls = [json.loads(line) for line in pwsh_log.read_text(encoding="utf-8").splitlines()]
+        expected_args = ["-NoProfile", "-File", "scripts/test-client-e2e.ps1"]
+        if prepare_only:
+            expected_args.append("-PrepareOnly")
+        if calls[-1:] != [expected_args]:
+            fail(f"RUNNER_OS-unset {platform} delegated unexpected PowerShell args: {calls!r}")
+        after_calls = [
+            json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()
+        ]
+        if len(after_calls) != len(calls) + 6:
+            fail(f"RUNNER_OS-unset {platform} delegation unexpectedly invoked fake Cargo")
     environment_file = repo / "target" / "tinychannels-client-e2e.env"
     if not environment_file.is_file():
         fail("client fixture preparation did not write its reusable environment file")
