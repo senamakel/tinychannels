@@ -119,14 +119,6 @@ fn runtime_object_path(handle: u64) -> String {
     )
 }
 
-fn runtime_callback_path(handle: u64) -> String {
-    format!(
-        "{}/runtime_{}",
-        tinychannels_bus::HOST_OBJECT_PATH,
-        runtime_handle(handle)
-    )
-}
-
 async fn callback_probe(
     runtime: &'static tinybus::module::ModuleRuntime,
     path: &str,

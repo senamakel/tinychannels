@@ -30,9 +30,6 @@ const OBJECT_PATH: &str = tinychannels_bus::OBJECT_PATH;
 const TOKEN: &str = "fixture-call-secret";
 const CONFIG_TOKEN: &str = "fixture-config-secret";
 const INVALID_INPUT: &str = "ai.tinyhumans.tinychannels.Error.InvalidInput";
-const FIRST_RUNTIME_HANDLE: &str = "00000000000000000000000000000001";
-const FIRST_RUNTIME_OBJECT_PATH: &str =
-    "/ai/tinyhumans/tinychannels/Channels/runtime_00000000000000000000000000000001";
 
 #[derive(Deserialize)]
 struct FixtureConfig {}
@@ -629,25 +626,6 @@ impl Interface for FixtureObject {
                 .push((member.as_str().to_owned(), context.is_confidential()));
         }
         self.call(member, args).await
-    }
-}
-
-#[derive(Clone)]
-struct FixtureCallback;
-
-#[async_trait]
-impl Interface for FixtureCallback {
-    fn name(&self) -> InterfaceName {
-        InterfaceName::new(tinychannels_bus::HOST_BUS_NAME)
-            .expect("TinyChannels callback bus name is valid")
-    }
-
-    fn members(&self) -> Vec<MemberName> {
-        vec![MemberName::new("FixtureCallback").expect("valid fixture callback")]
-    }
-
-    async fn call(&self, _: &MemberName, _: Value) -> Result<Value> {
-        Ok(json!("callback-live"))
     }
 }
 
