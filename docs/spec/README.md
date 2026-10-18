@@ -27,6 +27,8 @@ state remain outside this crate until they can be split behind transport traits.
 
 ## Research and Porting Specs
 
+- [TinyChannels client](tinychannels-client.md) — host construction, attested
+  runtime leases, and the native test proof boundaries.
 - [Storage needs](storage-needs.md) — the bus contract's declared collection
   inventory for delivery, remote sessions, and WhatsApp Web persistence.
 - [OpenClaw and Hermes channel porting](openclaw-hermes-channel-porting.md) —
