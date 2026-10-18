@@ -16,7 +16,10 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
     // callback gate, but TinyBus cannot publish READY until setup returns.
     let fixture = support::gated_runtime_fixture().await;
 
-    assert!(!fixture.module_ready(), "host must not report gated A as READY");
+    assert!(
+        !fixture.module_ready(),
+        "host must not report gated A as READY"
+    );
     let probe = fixture
         .runtime
         .connection()
@@ -58,7 +61,10 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
         error.kind(),
         ChannelRuntimeErrorKind::Module(ModuleCallError::Unavailable)
     );
-    assert!(!fixture.module_ready(), "timed-out bind leaves fixture unready");
+    assert!(
+        !fixture.module_ready(),
+        "timed-out bind leaves fixture unready"
+    );
 
     // A default client has no extra caller deadline. It waits on the same cold
     // setup barrier, then binds successfully after the fixture publishes READY.
@@ -75,7 +81,10 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
         .await
         .expect("default-deadline bind task completes")
         .expect("cold attested bind succeeds after setup publishes READY");
-    assert!(fixture.module_ready(), "host observes READY for the fixture bus");
+    assert!(
+        fixture.module_ready(),
+        "host observes READY for the fixture bus"
+    );
     assert_eq!(
         probe
             .call::<usize>("FixtureCallCount", ())

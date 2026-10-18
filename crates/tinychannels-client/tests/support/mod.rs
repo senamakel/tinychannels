@@ -19,9 +19,9 @@ use tinybus::{
     Connection, Interface, InterfaceName, MemberName, ObjectPath, Proxy,
     broker::Broker,
     module::{
-        AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, ModuleAccess,
-        HostObjectGuard, ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost,
-        ModuleRuntime, ModuleState, ProxyFailure, ReleaseAsset, ReleaseRecord, RuntimeNames,
+        AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, HostObjectGuard,
+        ModuleAccess, ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost, ModuleRuntime,
+        ModuleState, ProxyFailure, ReleaseAsset, ReleaseRecord, RuntimeNames,
     },
     transport::memory::MemoryBus,
 };
@@ -30,7 +30,8 @@ use tokio::sync::OnceCell;
 
 const MODULE_ID: &str = "tinychannels";
 const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37";
-const READINESS_GATE_PATH: &str = "/ai/tinyhumans/tinychannels/ChannelsHost/test_fixture_ready_gate";
+const READINESS_GATE_PATH: &str =
+    "/ai/tinyhumans/tinychannels/ChannelsHost/test_fixture_ready_gate";
 
 static RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 static NATIVE_MODULE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
@@ -562,14 +563,12 @@ async fn runtime_fixture_with_readiness(
             .ensure_loaded(MODULE_ID)
             .await
             .expect("cold native fixture loads before the bounded operations client is created");
-        access
-            .prepare_attested(MODULE_ID)
-            .await
-            .expect("native fixture reaches host readiness before the bounded operations client is created");
+        access.prepare_attested(MODULE_ID).await.expect(
+            "native fixture reaches host readiness before the bounded operations client is created",
+        );
     }
-    let startup_client = TinyChannelsClient::new(ModuleClient::new(SharedRuntimeAccess(
-        Arc::clone(&access),
-    )));
+    let startup_client =
+        TinyChannelsClient::new(ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access))));
     let control =
         ModuleClient::new(SharedRuntimeAccess(access)).with_timeout(Duration::from_secs(2));
     let client = TinyChannelsClient::new(control.clone());
