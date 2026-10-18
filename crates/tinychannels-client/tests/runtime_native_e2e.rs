@@ -210,9 +210,32 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         "the SDK reports the malformed reservation once"
     );
     control
+        .call::<()>("FixturePauseReserve", ())
+        .await
+        .expect("pause the next reservation reply from A");
+    let serial_callback_path = Arc::new(Mutex::new(None::<String>));
+    let serial_callback_capture = Arc::clone(&serial_callback_path);
+    let serial_activation = fixture.runtime.lease(
+        serial_driver,
+        move |reservation, _| {
+            *serial_callback_capture
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                Some(reservation.host_object_path.clone());
+            Ok(FixtureCallback)
+        },
+        RetryPolicy::new(Duration::from_secs(2), vec![]).expect("valid stop policy"),
+        |_| {},
+    );
+    let serial_activation = tokio::spawn(serial_activation);
+    control
+        .call::<()>("FixtureWaitReserve", ())
+        .await
+        .expect("A is paused inside confidential ReserveRuntime");
+    control
         .call::<()>("FixtureReleaseAlias", ())
         .await
-        .expect("A releases its well-known name after all drivers are bound");
+        .expect("A releases its well-known name while Reserve is paused");
 
     // B is intentionally an ordinary, unattested host object. It is only an
     // availability/collision control and cannot receive confidential calls.
@@ -283,24 +306,13 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         assert_eq!(b_status, "peer-b");
     }
     let b_calls_before_leases = replacement_calls.load(Ordering::SeqCst);
-
-    let serial_callback_path = Arc::new(Mutex::new(None::<String>));
-    let serial_callback_capture = Arc::clone(&serial_callback_path);
-    let serial_lease = fixture
-        .runtime
-        .lease(
-            serial_driver,
-            move |reservation, _| {
-                *serial_callback_capture
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                    Some(reservation.host_object_path.clone());
-                Ok(FixtureCallback)
-            },
-            RetryPolicy::new(Duration::from_secs(2), vec![]).expect("valid stop policy"),
-            |_| {},
-        )
+    control
+        .call::<()>("FixtureReleaseReserve", ())
         .await
+        .expect("release the paused A reservation after B takes the alias");
+    let serial_lease = serial_activation
+        .await
+        .expect("activation task")
         .expect("legacy reserve/start/callback transaction stays on A");
     fixture.reports.clear();
     control
