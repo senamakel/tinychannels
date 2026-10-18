@@ -361,7 +361,10 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
         runtime,
         loaded: OnceCell::new(),
         record: native_module_record(),
-        release: cached_release_with_prefix("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST"),
+        release: cached_release_with_prefix(
+            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
+            env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "RELEASE_URL"),
+        ),
         reporter: FailureReporter::new(reports.clone()),
     });
     RuntimeFixture {
@@ -590,12 +593,12 @@ pub(crate) enum Pin {
 }
 
 fn cached_release() -> CachedRelease<'static> {
-    cached_release_with_prefix("TINYCHANNELS_CLIENT_TEST")
+    cached_release_with_prefix("TINYCHANNELS_CLIENT_TEST", RELEASE_URL)
 }
 
-fn cached_release_with_prefix(prefix: &str) -> CachedRelease<'static> {
+fn cached_release_with_prefix(prefix: &str, release_url: &'static str) -> CachedRelease<'static> {
     CachedRelease {
-        release_url: env_prefixed(prefix, "RELEASE_URL"),
+        release_url,
         asset_name: env_prefixed(prefix, "ARCHIVE_NAME"),
         expected_sha256: Some(env_prefixed(prefix, "ARCHIVE_SHA256")),
         expected_library_sha256: Some(env_prefixed(prefix, "LIBRARY_SHA256")),
