@@ -3,8 +3,18 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$repo_root"
+prepare_only=0
+if [[ "$#" -gt 1 || ( "$#" -eq 1 && "$1" != "--prepare-only" ) ]]; then
+  echo "usage: scripts/test-client-e2e.sh [--prepare-only]" >&2
+  exit 64
+fi
+if [[ "$#" -eq 1 ]]; then prepare_only=1; fi
 if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
-  pwsh -NoProfile -File scripts/test-client-e2e.ps1
+  if [[ "$prepare_only" -eq 1 ]]; then
+    pwsh -NoProfile -File scripts/test-client-e2e.ps1 -PrepareOnly
+  else
+    pwsh -NoProfile -File scripts/test-client-e2e.ps1
+  fi
   exit
 fi
 TASK_TARGET_ROOT="$repo_root/target"
@@ -77,9 +87,51 @@ export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256="$native_archive_ha
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256="$native_library_sha256"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37"
 
-cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+write_environment_file() {
+  local env_file="$TASK_TARGET_ROOT/tinychannels-client-e2e.env"
+  {
+    printf 'export TINYCHANNELS_CLIENT_TEST_CACHE=%q\n' "$cache"
+    printf 'export TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME=%q\n' "$archive_name"
+    printf 'export TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256=%q\n' "$archive_hash"
+    printf 'export TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256=%q\n' "$library_sha256"
+    printf 'export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE=%q\n' "$native_cache"
+    printf 'export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME=%q\n' "$native_archive_name"
+    printf 'export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256=%q\n' "$native_archive_hash"
+    printf 'export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256=%q\n' "$native_library_sha256"
+    printf 'export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL=%q\n' \
+      "$TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL"
+  } > "$env_file"
+}
+write_environment_file
+
+if [[ "$prepare_only" -eq 1 ]]; then
+  echo "Prepared local client and production-module fixtures; environment: $TASK_TARGET_ROOT/tinychannels-client-e2e.env"
+  exit 0
+fi
+
+test_logs="$TASK_TARGET_ROOT/tinychannels-client-e2e-logs"
+rm -rf "$test_logs"
+mkdir -p "$test_logs"
+run_counted_test() {
+  local expected_count="$1"
+  local test_name="$2"
+  shift 2
+  local log_path="$test_logs/$test_name.log"
+  if ! "$@" 2>&1 | tee "$log_path"; then
+    echo "native client E2E target $test_name failed; see $log_path" >&2
+    return 1
+  fi
+  local actual_count
+  actual_count="$(sed -nE 's/^test result: ok\. ([0-9]+) passed;.*/\1/p' "$log_path" | tail -n 1)"
+  if [[ "$actual_count" != "$expected_count" ]]; then
+    echo "native client E2E target $test_name ran ${actual_count:-no reported tests}; expected $expected_count" >&2
+    return 1
+  fi
+}
+
+run_counted_test 4 native_e2e cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
-cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+run_counted_test 1 runtime_native_e2e cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
-cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+run_counted_test 1 native_module_runtime_e2e cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1

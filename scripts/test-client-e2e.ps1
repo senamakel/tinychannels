@@ -1,3 +1,4 @@
+param([switch]$PrepareOnly)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
@@ -19,6 +20,28 @@ function Set-PrivateDirectory([string]$Path) {
     if ($LASTEXITCODE -ne 0) { throw "could not restrict test fixture directory permissions: $Path" }
     icacls $Path /setowner $identity.Name | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "could not set test fixture directory owner: $Path" }
+}
+
+function ConvertTo-BashLiteral([string]$Value) {
+    return "'" + $Value.Replace("'", "'\''") + "'"
+}
+
+function Invoke-CountedNativeTest {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][int]$ExpectedCount,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $logPath = Join-Path $nativeTestLogs "$Name.log"
+    & cargo @Arguments 2>&1 | Tee-Object -FilePath $logPath
+    if ($LASTEXITCODE -ne 0) { throw "TinyChannels native E2E target failed: $Name" }
+    $summaries = @(Select-String -Path $logPath -Pattern '^test result: ok\. (\d+) passed;')
+    if ($summaries.Count -eq 0) { throw "TinyChannels native E2E target reported no test result: $Name" }
+    $actualCount = [int]$summaries[-1].Matches[0].Groups[1].Value
+    if ($actualCount -ne $ExpectedCount) {
+        throw "TinyChannels native E2E target $Name ran $actualCount tests; expected $ExpectedCount"
+    }
 }
 
 $fixtureManifest = Join-Path $root 'crates/tinychannels-client/test-fixture/Cargo.toml'
@@ -50,14 +73,16 @@ Copy-Item -LiteralPath (Join-Path $target "debug/$nativeLibraryName") -Destinati
 $libraryHash = (Get-FileHash -LiteralPath $library -Algorithm SHA256).Hash.ToLowerInvariant()
 '"{0}" = "{1}"' -f $libraryName, $libraryHash |
     Set-Content -Path (Join-Path $cache 'modules.toml') -Encoding utf8NoBOM
-& tar.exe -czf $archive -C $cache $libraryName modules.toml
+$nativeTar = Join-Path $env:SystemRoot 'System32/tar.exe'
+if (-not (Test-Path -LiteralPath $nativeTar -PathType Leaf)) { throw "Windows tar.exe is missing: $nativeTar" }
+& $nativeTar -czf $archive -C $cache $libraryName modules.toml
 if ($LASTEXITCODE -ne 0) { throw 'Could not archive the local TinyChannels test fixture' }
 Copy-Item -LiteralPath $archive -Destination (Join-Path $cache $archiveName)
 $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
 $nativeLibraryHash = (Get-FileHash -LiteralPath $nativeLibrary -Algorithm SHA256).Hash.ToLowerInvariant()
 '"{0}" = "{1}"' -f $nativeLibraryName, $nativeLibraryHash |
     Set-Content -Path (Join-Path $nativeCache 'modules.toml') -Encoding utf8NoBOM
-& tar.exe -czf $nativeArchive -C $nativeCache $nativeLibraryName modules.toml
+& $nativeTar -czf $nativeArchive -C $nativeCache $nativeLibraryName modules.toml
 if ($LASTEXITCODE -ne 0) { throw 'Could not archive the actual TinyChannels module' }
 Copy-Item -LiteralPath $nativeArchive -Destination (Join-Path $nativeCache $nativeArchiveName)
 $nativeArchiveHash = (Get-FileHash -LiteralPath $nativeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -71,12 +96,27 @@ $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME = $nativeArchiveName
 $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256 = $nativeArchiveHash
 $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256 = $nativeLibraryHash
 $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL = 'https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37'
-& cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
-    -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
-if ($LASTEXITCODE -ne 0) { throw 'TinyChannels typed client native E2E failed' }
-& cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
-    -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
-if ($LASTEXITCODE -ne 0) { throw 'TinyChannels runtime driver native E2E failed' }
-& cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
-    -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1
-if ($LASTEXITCODE -ne 0) { throw 'Actual TinyChannels module runtime E2E failed' }
+$environmentPath = Join-Path $target 'tinychannels-client-e2e.env'
+$environment = @(
+    "export TINYCHANNELS_CLIENT_TEST_CACHE=$(ConvertTo-BashLiteral $cache)"
+    "export TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME=$(ConvertTo-BashLiteral $archiveName)"
+    "export TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256=$(ConvertTo-BashLiteral $archiveHash)"
+    "export TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256=$(ConvertTo-BashLiteral $libraryHash)"
+    "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE=$(ConvertTo-BashLiteral $nativeCache)"
+    "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME=$(ConvertTo-BashLiteral $nativeArchiveName)"
+    "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256=$(ConvertTo-BashLiteral $nativeArchiveHash)"
+    "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256=$(ConvertTo-BashLiteral $nativeLibraryHash)"
+    "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL=$(ConvertTo-BashLiteral $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL)"
+)
+[System.IO.File]::WriteAllLines($environmentPath, [string[]]$environment, [System.Text.UTF8Encoding]::new($false))
+if ($PrepareOnly) { return }
+
+$nativeTestLogs = Join-Path $target 'tinychannels-client-e2e-logs'
+Remove-Item -LiteralPath $nativeTestLogs -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force $nativeTestLogs | Out-Null
+$manifest = Join-Path $root 'Cargo.toml'
+$common = @('--manifest-path', $manifest, '--locked', '--target-dir', $target,
+    '-p', 'tinychannels-client', '--features', 'native-e2e')
+Invoke-CountedNativeTest -Name 'native_e2e' -ExpectedCount 4 -Arguments (@('test') + $common + @('--test', 'native_e2e', '--', '--test-threads=1'))
+Invoke-CountedNativeTest -Name 'runtime_native_e2e' -ExpectedCount 1 -Arguments (@('test') + $common + @('--test', 'runtime_native_e2e', '--', '--test-threads=1'))
+Invoke-CountedNativeTest -Name 'native_module_runtime_e2e' -ExpectedCount 1 -Arguments (@('test') + $common + @('--test', 'native_module_runtime_e2e', '--', '--test-threads=1'))
