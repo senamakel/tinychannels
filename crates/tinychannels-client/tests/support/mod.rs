@@ -20,8 +20,8 @@ use tinybus::{
     broker::Broker,
     module::{
         AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, ModuleAccess,
-        ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost, ModuleRuntime, ModuleState,
-        ProxyFailure, ReleaseAsset, ReleaseRecord, RuntimeNames,
+        HostObjectGuard, ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost,
+        ModuleRuntime, ModuleState, ProxyFailure, ReleaseAsset, ReleaseRecord, RuntimeNames,
     },
     transport::memory::MemoryBus,
 };
@@ -30,6 +30,7 @@ use tokio::sync::OnceCell;
 
 const MODULE_ID: &str = "tinychannels";
 const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37";
+const READINESS_GATE_PATH: &str = "/ai/tinyhumans/tinychannels/ChannelsHost/test_fixture_ready_gate";
 
 static RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 static NATIVE_MODULE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
@@ -268,6 +269,8 @@ pub(crate) struct RuntimeFixture {
     pub(crate) runtime: &'static ModuleRuntime,
     pub(crate) reports: Arc<Reports>,
     bind_stage: Arc<AtomicU8>,
+    readiness_gate: Option<Arc<ReadinessGate>>,
+    _readiness_gate_guard: Option<HostObjectGuard>,
 }
 
 #[derive(Clone, Copy)]
@@ -318,6 +321,58 @@ impl RuntimeFixture {
             module.manifest.bus_name.as_str() == tinychannels_bus::BUS_NAME
                 && matches!(module.state, ModuleState::Ready | ModuleState::Serving)
         })
+    }
+
+    pub(crate) async fn wait_until_setup_is_held_before_ready(&self) {
+        self.readiness_gate
+            .as_ref()
+            .expect("gated fixture has a readiness gate")
+            .entered
+            .acquire()
+            .await
+            .expect("readiness gate stays open")
+            .forget();
+    }
+
+    pub(crate) fn release_ready(&self) {
+        self.readiness_gate
+            .as_ref()
+            .expect("gated fixture has a readiness gate")
+            .release
+            .add_permits(1);
+    }
+}
+
+struct ReadinessGate {
+    entered: tokio::sync::Semaphore,
+    release: tokio::sync::Semaphore,
+}
+
+struct ReadinessGateHost(Arc<ReadinessGate>);
+
+#[async_trait::async_trait]
+impl Interface for ReadinessGateHost {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(tinychannels_bus::HOST_BUS_NAME).expect("TinyChannels host bus name")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        vec![MemberName::new("WaitBeforeReady").expect("fixture readiness gate method")]
+    }
+
+    async fn call(
+        &self,
+        _: &MemberName,
+        _: serde_json::Value,
+    ) -> tinybus::Result<serde_json::Value> {
+        self.0.entered.add_permits(1);
+        self.0
+            .release
+            .acquire()
+            .await
+            .map_err(|_| Error::failed("fixture readiness gate closed"))?
+            .forget();
+        Ok(serde_json::Value::Null)
     }
 }
 
