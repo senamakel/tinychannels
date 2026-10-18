@@ -35,7 +35,12 @@ async fn runtime_driver_builders_bind_strictly_before_any_runtime_call() {
         .module
         .call(MODULE_ID, "FixtureReady", ())
         .await
-        .expect("ordinary readiness control succeeds on the live peer");
+        .unwrap_or_else(|error| {
+            panic!(
+                "ordinary readiness control succeeds on the live peer: {error:?}; calls={:?}",
+                calls.lock().expect("call log")
+            )
+        });
     assert!(ready);
     let before = calls.lock().expect("call log").clone();
     assert_eq!(before, ["FixtureReady"]);
