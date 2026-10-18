@@ -142,19 +142,25 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
     let startup_client = fixture.startup_client.clone();
     let before_startup_bind = fixture.readiness_attempts();
     let startup_bind = tokio::spawn(async move { startup_client.runtime_driver().await });
-    fixture
-        .wait_for_readiness_attempt(before_startup_bind)
+    let readiness_started = fixture
+        .readiness_attempt_started(before_startup_bind)
         .await;
-    assert!(
-        !startup_bind.is_finished(),
-        "cold bind waits for host readiness while the fixture setup barrier is held"
-    );
+    let bind_pending_at_gate = !startup_bind.is_finished();
     fixture.release_ready();
-    let startup_driver = startup_bind
-        .await
+    let startup_result = startup_bind.await;
+    let module_ready_after_release = fixture.module_ready();
+    let startup_driver = startup_result
         .expect("default-deadline cold bind task completes")
         .expect("cold attested bind succeeds after setup publishes READY");
-    assert!(fixture.module_ready(), "host observes READY for fixture A");
+    assert!(
+        readiness_started,
+        "cold bind entered host readiness before the setup barrier was released"
+    );
+    assert!(
+        bind_pending_at_gate,
+        "cold bind waits for host readiness while the fixture setup barrier is held"
+    );
+    assert!(module_ready_after_release, "host observes READY for fixture A");
     drop(startup_driver);
     assert!(
         fixture.module_ready(),
