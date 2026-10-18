@@ -336,6 +336,7 @@ printf '%s\\0' \\
         fail("client E2E runner accepted a successful Cargo command that reported zero native tests")
 
     print("standalone client E2E scripts use checkout-local files; count guard rejected zero native tests")
+    print("RUNNER_OS-unset Git Bash simulation delegated MINGW/MSYS/CYGWIN to PowerShell")
 
 
 if __name__ == "__main__":
