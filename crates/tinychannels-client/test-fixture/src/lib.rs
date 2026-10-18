@@ -71,7 +71,6 @@ impl Interface for FixtureService {
                 "FixtureMalformedReservation",
                 "FixtureMalformedStatus",
             ])
-            .into_iter()
             .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
             .collect()
     }
@@ -205,6 +204,7 @@ impl FixtureService {
                 ObjectPath::new(&object_path)?,
                 FixtureObject {
                     calls: Arc::clone(&self.calls),
+                    runtime_controls: Arc::clone(&self.runtime_controls),
                 },
             )
             .await?;
@@ -664,6 +664,7 @@ tinybus_module::module_export! {
             "ChannelController", "CheckChannelHealth", "FixtureCallCount",
             "FixtureReady", "FixtureReleaseAlias", "FixtureDisconnect",
             "FixtureFailStart", "FixtureFailStop", "FixtureStopCallCount",
+            "FixtureMalformedReservation", "FixtureMalformedStatus",
             "ReserveRuntime", "StartRuntime", "StartRuntimeWithDispatch", "StopRuntime",
             "DescribeConfiguredChannels", "StartChannelSupervised", "StartOutboundChannel",
             "PrepareChannelControl", "ExecuteProgressive", "PrepareOutboundIntent",

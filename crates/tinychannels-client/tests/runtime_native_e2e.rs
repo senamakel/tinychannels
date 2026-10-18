@@ -22,7 +22,7 @@ use tinychannels_bus::{
     ChannelRuntimeDispatchPolicy, ChannelSupervisionPolicy, ChannelsConfig, HttpProxyPolicy,
     ProgressiveCommand, ProgressiveResult, RelayReservation,
 };
-use tinychannels_client::ChannelRuntimeClient;
+use tinychannels_client::{ChannelRuntimeClient, ChannelRuntimeErrorKind};
 
 const FIRST_RUNTIME_HANDLE: u64 = 1;
 const LAST_RUNTIME_HANDLE: u64 = 4;
@@ -187,6 +187,28 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
             .is_err(),
         "the native fixture refuses an ordinary lifecycle call"
     );
+    fixture.reports.clear();
+    control
+        .call::<()>("FixtureMalformedReservation", ())
+        .await
+        .expect("configure one malformed reservation reply");
+    let malformed_reservation = serial_driver
+        .reserve()
+        .await
+        .expect_err("malformed reservation fails closed");
+    assert_eq!(
+        malformed_reservation.kind(),
+        ChannelRuntimeErrorKind::Module(ModuleCallError::IncompatibleContract)
+    );
+    assert_eq!(
+        fixture.reports.entries(),
+        [(
+            "tinychannels".into(),
+            support::record(support::Pin::Correct).version.into(),
+            "incompatible_contract".into(),
+        )],
+        "the SDK reports the malformed reservation once"
+    );
     control
         .call::<()>("FixtureReleaseAlias", ())
         .await
@@ -280,6 +302,29 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         )
         .await
         .expect("legacy reserve/start/callback transaction stays on A");
+    fixture.reports.clear();
+    control
+        .call::<()>("FixtureMalformedStatus", ())
+        .await
+        .expect("configure one malformed object response");
+    let malformed_status = serial_lease
+        .object()
+        .channel_status("discord".into())
+        .await
+        .expect_err("malformed typed object response fails closed");
+    assert_eq!(
+        malformed_status.kind(),
+        ChannelRuntimeErrorKind::Module(ModuleCallError::IncompatibleContract)
+    );
+    assert_eq!(
+        fixture.reports.entries(),
+        [(
+            "tinychannels".into(),
+            support::record(support::Pin::Correct).version.into(),
+            "incompatible_contract".into(),
+        )],
+        "the SDK reports the malformed object reply once"
+    );
     let serial_path = serial_callback_path
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
