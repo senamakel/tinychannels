@@ -1,14 +1,16 @@
 //! Native test-only module for checking the public TinyChannels client routes.
 
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 
 use async_trait::async_trait;
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
-use tinybus::{Connection, Error, Interface, InterfaceName, MemberName, ObjectPath, Result};
+use tinybus::{
+    CallContext, Connection, Error, Interface, InterfaceName, MemberName, ObjectPath, Result,
+};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelInteractionRequest,
     ChannelInteractionResult, ChannelOutboundIntent, ChannelRuntimeDispatchPolicy,
@@ -49,6 +51,7 @@ struct RuntimeControls {
     pause_next_reserve: AtomicBool,
     reserve_entered: tokio::sync::Semaphore,
     reserve_release: tokio::sync::Semaphore,
+    delivery_flags: Mutex<Vec<(String, bool)>>,
     stop_calls: AtomicUsize,
     next_handle: AtomicU64,
 }
@@ -63,6 +66,7 @@ impl Default for RuntimeControls {
             pause_next_reserve: AtomicBool::new(false),
             reserve_entered: tokio::sync::Semaphore::new(0),
             reserve_release: tokio::sync::Semaphore::new(0),
+            delivery_flags: Mutex::new(Vec::new()),
             stop_calls: AtomicUsize::new(0),
             next_handle: AtomicU64::new(0),
         }
@@ -91,6 +95,7 @@ impl Interface for FixtureService {
                 "FixturePauseReserve",
                 "FixtureWaitReserve",
                 "FixtureReleaseReserve",
+                "FixtureTakeDeliveryFlags",
             ])
             .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
             .collect()
@@ -171,6 +176,17 @@ impl Interface for FixtureService {
                 self.runtime_controls.reserve_release.add_permits(1);
                 Ok(Value::Null)
             }
+            "FixtureTakeDeliveryFlags" => {
+                let flags = std::mem::take(
+                    &mut *self
+                        .runtime_controls
+                        .delivery_flags
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                );
+                serde_json::to_value(flags)
+                    .map_err(|_| Error::failed("delivery flags could not serialize"))
+            }
             "FixtureReleaseAlias" => {
                 self.connection.release_name(BUS_NAME).await?;
                 Ok(Value::Null)
@@ -210,6 +226,22 @@ impl Interface for FixtureService {
             methods::CHECK_CHANNEL_HEALTH => self.check_health(args),
             _ => Err(Error::failed("unknown test fixture method")),
         }
+    }
+
+    async fn call_with_context(
+        &self,
+        member: &MemberName,
+        args: Value,
+        context: &CallContext,
+    ) -> Result<Value> {
+        if audited_delivery_member(member.as_str()) {
+            self.runtime_controls
+                .delivery_flags
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push((member.as_str().to_owned(), context.is_confidential()));
+        }
+        self.call(member, args).await
     }
 }
 
