@@ -62,6 +62,8 @@ class ClientNativeTopologyTests(unittest.TestCase):
         self.assertIn("--prepare-only", shell_runner)
         self.assertIn("run_counted_test() {", shell_runner)
         self.assertIn("function Invoke-CountedNativeTest", powershell_runner)
+        self.assertIn("& cargo @Arguments", powershell_runner)
+        self.assertEqual(powershell_runner.count("-Arguments (@('test') + $common + @("), 3)
         for target, count in EXPECTED_COUNTS.items():
             self.assertEqual(shell_runner.count(f"run_counted_test {count} {target}"), 1)
             self.assertIn(f"--test {target}", shell_runner)
