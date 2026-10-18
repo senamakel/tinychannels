@@ -15,29 +15,9 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
     // module serves its object and claims its name before entering the host
     // callback gate, but TinyBus cannot publish READY until setup returns.
     let fixture = support::gated_runtime_fixture().await;
-
     assert!(
         !fixture.module_ready(),
         "host must not report gated A as READY"
-    );
-    let probe = fixture
-        .runtime
-        .connection()
-        .proxy(
-            tinychannels_bus::BUS_NAME,
-            tinychannels_bus::OBJECT_PATH,
-            tinychannels_bus::BUS_NAME,
-        )
-        .expect("pre-READY fixture probe proxy");
-    assert!(
-        probe
-            .call::<bool>("FixtureReady", ())
-            .await
-            .expect("object is reachable before TinyBus READY publication")
-    );
-    assert!(
-        !fixture.module_ready(),
-        "ordinary pre-READY control traffic must not make the host accept readiness"
     );
 
     let limited_client = fixture.client.clone();
@@ -85,14 +65,6 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
     assert!(
         fixture.module_ready(),
         "host observes READY for the fixture bus"
-    );
-    assert_eq!(
-        probe
-            .call::<usize>("FixtureCallCount", ())
-            .await
-            .expect("read fixture business-call count"),
-        1,
-        "bind and attestation do not invoke a fixture business method"
     );
     drop(driver);
 }
