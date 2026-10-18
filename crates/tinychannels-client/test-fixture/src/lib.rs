@@ -41,14 +41,32 @@ struct FixtureService {
     runtime_controls: Arc<RuntimeControls>,
 }
 
-#[derive(Default)]
 struct RuntimeControls {
     fail_start: AtomicBool,
     fail_stop: AtomicBool,
     malformed_reservation: AtomicBool,
     malformed_status: AtomicBool,
+    pause_next_reserve: AtomicBool,
+    reserve_entered: tokio::sync::Semaphore,
+    reserve_release: tokio::sync::Semaphore,
     stop_calls: AtomicUsize,
     next_handle: AtomicU64,
+}
+
+impl Default for RuntimeControls {
+    fn default() -> Self {
+        Self {
+            fail_start: AtomicBool::new(false),
+            fail_stop: AtomicBool::new(false),
+            malformed_reservation: AtomicBool::new(false),
+            malformed_status: AtomicBool::new(false),
+            pause_next_reserve: AtomicBool::new(false),
+            reserve_entered: tokio::sync::Semaphore::new(0),
+            reserve_release: tokio::sync::Semaphore::new(0),
+            stop_calls: AtomicUsize::new(0),
+            next_handle: AtomicU64::new(0),
+        }
+    }
 }
 
 #[async_trait]
@@ -70,6 +88,9 @@ impl Interface for FixtureService {
                 "FixtureStopCallCount",
                 "FixtureMalformedReservation",
                 "FixtureMalformedStatus",
+                "FixturePauseReserve",
+                "FixtureWaitReserve",
+                "FixtureReleaseReserve",
             ])
             .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
             .collect()
@@ -131,6 +152,25 @@ impl Interface for FixtureService {
                     .store(true, Ordering::SeqCst);
                 Ok(Value::Null)
             }
+            "FixturePauseReserve" => {
+                self.runtime_controls
+                    .pause_next_reserve
+                    .store(true, Ordering::SeqCst);
+                Ok(Value::Null)
+            }
+            "FixtureWaitReserve" => {
+                self.runtime_controls
+                    .reserve_entered
+                    .acquire()
+                    .await
+                    .map_err(|_| Error::failed("reservation gate closed"))?
+                    .forget();
+                Ok(Value::Null)
+            }
+            "FixtureReleaseReserve" => {
+                self.runtime_controls.reserve_release.add_permits(1);
+                Ok(Value::Null)
+            }
             "FixtureReleaseAlias" => {
                 self.connection.release_name(BUS_NAME).await?;
                 Ok(Value::Null)
@@ -175,6 +215,19 @@ impl Interface for FixtureService {
 
 impl FixtureService {
     async fn reserve_runtime(&self) -> Result<Value> {
+        if self
+            .runtime_controls
+            .pause_next_reserve
+            .swap(false, Ordering::SeqCst)
+        {
+            self.runtime_controls.reserve_entered.add_permits(1);
+            self.runtime_controls
+                .reserve_release
+                .acquire()
+                .await
+                .map_err(|_| Error::failed("reservation gate closed"))?
+                .forget();
+        }
         if self
             .runtime_controls
             .malformed_reservation
@@ -665,6 +718,7 @@ tinybus_module::module_export! {
             "FixtureReady", "FixtureReleaseAlias", "FixtureDisconnect",
             "FixtureFailStart", "FixtureFailStop", "FixtureStopCallCount",
             "FixtureMalformedReservation", "FixtureMalformedStatus",
+            "FixturePauseReserve", "FixtureWaitReserve", "FixtureReleaseReserve",
             "ReserveRuntime", "StartRuntime", "StartRuntimeWithDispatch", "StopRuntime",
             "DescribeConfiguredChannels", "StartChannelSupervised", "StartOutboundChannel",
             "PrepareChannelControl", "ExecuteProgressive", "PrepareOutboundIntent",
