@@ -720,6 +720,78 @@ async fn dispatch_policy_uses_only_the_explicit_runtime_start_method() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn actual_native_module_composes_provider_free_runtime_and_callback_registration() {
+    let fixture = support::native_module_runtime_fixture().await;
+    let driver = fixture
+        .client
+        .runtime_driver()
+        .await
+        .expect("strictly bind the locally built TinyChannels module artifact");
+    let callback_path = Arc::new(std::sync::Mutex::new(None::<String>));
+    let captured_callback_path = Arc::clone(&callback_path);
+    let lease = fixture
+        .runtime
+        .lease(
+            driver,
+            move |reservation: &ChannelRuntimeReservation, _| {
+                *captured_callback_path
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                    Some(reservation.host_object_path.clone());
+                Ok(FixtureCallback)
+            },
+            RetryPolicy::new(Duration::from_secs(2), vec![]).expect("valid stop policy"),
+            |_| {},
+        )
+        .await
+        .expect("real module reserves, binds a private object, exports callback and starts");
+
+    // No providers are configured; this exercises the real module's typed
+    // object contract without contacting an external provider or service.
+    let _configured = lease
+        .object()
+        .describe_configured_channels(ChannelsConfig::default(), HttpProxyPolicy::default())
+        .await
+        .expect("real module provider description");
+    let path = callback_path
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+        .expect("callback factory received the actual reservation path");
+    assert_eq!(
+        fixture
+            .runtime
+            .connection()
+            .proxy(
+                tinychannels_bus::HOST_BUS_NAME,
+                &path,
+                tinychannels_bus::HOST_BUS_NAME,
+            )
+            .expect("registered host callback proxy")
+            .call::<String>("FixtureCallback", ())
+            .await
+            .expect("callback is reachable at the actual returned path"),
+        "callback-live"
+    );
+    assert!(lease.close().await.is_ok(), "real STOP unit reply is ACK");
+    assert!(
+        fixture
+            .runtime
+            .connection()
+            .proxy(
+                tinychannels_bus::HOST_BUS_NAME,
+                &path,
+                tinychannels_bus::HOST_BUS_NAME,
+            )
+            .expect("callback proxy after STOP")
+            .call::<String>("FixtureCallback", ())
+            .await
+            .is_err(),
+        "real module STOP ACK releases the callback registration"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn opaque_start_and_stop_errors_remain_unacknowledged_and_keep_callback_live() {
     let fixture = support::runtime_fixture().await;
     let driver = fixture

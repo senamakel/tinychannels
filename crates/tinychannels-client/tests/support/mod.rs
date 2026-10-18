@@ -24,6 +24,7 @@ const MODULE_ID: &str = "tinychannels";
 const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37";
 
 static RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
+static NATIVE_MODULE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 static WRONG_ARCHIVE_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 static WRONG_LIBRARY_RECORD: OnceLock<ReleaseRecord> = OnceLock::new();
 
@@ -345,6 +346,28 @@ pub(crate) async fn runtime_fixture() -> RuntimeFixture {
     }
 }
 
+/// The actual TinyChannels module cdylib, staged locally with both exact hashes.
+pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
+    let runtime = Box::leak(Box::new(
+        ModuleRuntime::start(&RuntimeNames::default(), None)
+            .expect("start one runtime for native module and host callbacks"),
+    ));
+    let reports = Arc::new(Reports::default());
+    let control = ModuleClient::new(RuntimeAccess {
+        runtime,
+        loaded: OnceCell::new(),
+        record: native_module_record(),
+        release: cached_release_with_prefix("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST"),
+        reporter: FailureReporter::new(reports.clone()),
+    });
+    RuntimeFixture {
+        client: TinyChannelsClient::new(control.clone()),
+        control,
+        runtime,
+        reports,
+    }
+}
+
 pub(crate) struct UnattestedFixture {
     pub(crate) client: TinyChannelsClient,
     pub(crate) calls: Arc<std::sync::atomic::AtomicUsize>,
@@ -563,19 +586,76 @@ pub(crate) enum Pin {
 }
 
 fn cached_release() -> CachedRelease<'static> {
+    cached_release_with_prefix("TINYCHANNELS_CLIENT_TEST")
+}
+
+fn cached_release_with_prefix(prefix: &str) -> CachedRelease<'static> {
     CachedRelease {
-        release_url: RELEASE_URL,
-        asset_name: env("TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME"),
-        expected_sha256: Some(env("TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256")),
-        expected_library_sha256: Some(env("TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256")),
-        cache_dir: Path::new(env("TINYCHANNELS_CLIENT_TEST_CACHE")),
+        release_url: env_prefixed(prefix, "RELEASE_URL"),
+        asset_name: env_prefixed(prefix, "ARCHIVE_NAME"),
+        expected_sha256: Some(env_prefixed(prefix, "ARCHIVE_SHA256")),
+        expected_library_sha256: Some(env_prefixed(prefix, "LIBRARY_SHA256")),
+        cache_dir: Path::new(env_prefixed(prefix, "CACHE")),
         allow_download: false,
     }
+}
+
+fn native_module_record() -> &'static ReleaseRecord {
+    NATIVE_MODULE_RECORD.get_or_init(|| {
+        let host_key = Box::leak(
+            tinybus::module::platform::host_candidates()
+                .into_iter()
+                .next()
+                .expect("test platform has a TinyBus module key")
+                .into_boxed_str(),
+        );
+        let archive = env_prefixed(
+            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
+            "ARCHIVE_NAME",
+        );
+        let archive_sha = env_prefixed(
+            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
+            "ARCHIVE_SHA256",
+        );
+        let library_sha = env_prefixed(
+            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
+            "LIBRARY_SHA256",
+        );
+        let assets = Box::leak(
+            vec![ReleaseAsset {
+                host_key,
+                archive,
+                sha256: archive_sha,
+                library_sha256: Some(library_sha),
+            }]
+            .into_boxed_slice(),
+        );
+        ReleaseRecord {
+            id: MODULE_ID,
+            bus_name: tinychannels_bus::BUS_NAME,
+            object_path: tinychannels_bus::OBJECT_PATH,
+            version: "0.1.37",
+            release_url: env_prefixed(
+                "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
+                "RELEASE_URL",
+            ),
+            assets,
+        }
+    })
 }
 
 fn env(name: &str) -> &'static str {
     Box::leak(
         std::env::var(name)
+            .unwrap_or_else(|_| panic!("{name} must identify the staged local fixture"))
+            .into_boxed_str(),
+    )
+}
+
+fn env_prefixed(prefix: &str, suffix: &str) -> &'static str {
+    let name = format!("{prefix}_{suffix}");
+    Box::leak(
+        std::env::var(&name)
             .unwrap_or_else(|_| panic!("{name} must identify the staged local fixture"))
             .into_boxed_str(),
     )
