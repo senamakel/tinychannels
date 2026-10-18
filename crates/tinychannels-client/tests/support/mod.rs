@@ -16,7 +16,7 @@ use std::{
 };
 
 use tinybus::{
-    Connection, Interface, InterfaceName, MemberName, ObjectPath, Proxy,
+    Connection, Error, Interface, InterfaceName, MemberName, ObjectPath, Proxy,
     broker::Broker,
     module::{
         AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, HostObjectGuard,
@@ -569,8 +569,8 @@ async fn runtime_fixture_with_readiness(
     }
     let startup_client =
         TinyChannelsClient::new(ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access))));
-    let control =
-        ModuleClient::new(SharedRuntimeAccess(access)).with_timeout(Duration::from_secs(2));
+    let control = ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access)))
+        .with_timeout(Duration::from_secs(2));
     let client = TinyChannelsClient::new(control.clone());
     let fixture = RuntimeFixture {
         client,

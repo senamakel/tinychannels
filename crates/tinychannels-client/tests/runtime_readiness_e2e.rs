@@ -7,7 +7,7 @@ use std::time::Duration;
 mod support;
 
 use tinybus::module::ModuleCallError;
-use tinychannels_bus::ChannelRuntimeErrorKind;
+use tinychannels_client::ChannelRuntimeErrorKind;
 
 #[tokio::test(start_paused = true)]
 async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
@@ -56,7 +56,8 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
     let error = limited_bind
         .await
         .expect("bounded bind task completes")
-        .expect_err("withheld READY cannot be accepted");
+        .err()
+        .expect("withheld READY cannot be accepted");
     assert_eq!(
         error.kind(),
         ChannelRuntimeErrorKind::Module(ModuleCallError::Unavailable)
