@@ -349,15 +349,17 @@ impl RuntimeFixture {
             .add_permits(1);
     }
 
-    pub(crate) async fn wait_until_gate_callback_returns(&self) {
-        self.readiness_gate
-            .as_ref()
-            .expect("gated fixture has a readiness gate")
-            .returned
-            .acquire()
-            .await
-            .expect("readiness gate stays open")
-            .forget();
+    pub(crate) async fn wait_until_gate_callback_returns(&self) -> bool {
+        let Some(gate) = self.readiness_gate.as_ref() else {
+            return false;
+        };
+        match tokio::time::timeout(Duration::from_secs(5), gate.returned.acquire()).await {
+            Ok(Ok(permit)) => {
+                permit.forget();
+                true
+            }
+            Ok(Err(_)) | Err(_) => false,
+        }
     }
 
     pub(crate) async fn readiness_attempt_started(&self, previous: usize) -> bool {

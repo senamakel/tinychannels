@@ -98,6 +98,12 @@ class ClientNativeTopologyTests(unittest.TestCase):
         )
         positions = [readiness.index(marker) for marker in ordered_markers]
         self.assertEqual(positions, sorted(positions))
+        support = (ROOT / "crates/tinychannels-client/tests/support/mod.rs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("wait_until_gate_callback_returns(&self) -> bool", support)
+        self.assertIn("tokio::time::timeout(Duration::from_secs(5)", support)
+        self.assertIn("assert!(gate_callback_returned", readiness)
 
         runtime_test = (ROOT / "crates/tinychannels-client/tests/runtime_native_e2e.rs").read_text(
             encoding="utf-8"
