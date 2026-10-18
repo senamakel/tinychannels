@@ -2,34 +2,14 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::Duration,
-};
-
 mod support;
 
-use tinybus::{
-    BusName, Error, Interface, InterfaceName, MemberName, ObjectPath,
-    module::{ModuleCallError, ModuleCallFailure, RetryPolicy},
-};
+use tinybus::module::{ModuleCallError, ModuleCallFailure};
 use tinychannels_bus::{
-    ChannelControlRequest, ChannelControlResult, ChannelHealthState, ChannelInteraction,
-    ChannelInteractionRequest, ChannelInteractionResult, ChannelMessagePreparation,
-    ChannelOutboundIntent, ChannelRuntimeDispatchPolicy, ChannelSupervisionPolicy, ChannelsConfig,
-    HttpProxyPolicy, ProgressiveCommand, ProgressiveResult, RelayReservation,
-    config::DiscordConfig,
+    ChannelHealthState, ChannelsConfig, HttpProxyPolicy, config::DiscordConfig,
 };
 
 const TOKEN: &str = "fixture-call-secret";
-const RUNTIME_HANDLE: &str = "0123456789abcdef0123456789abcdef";
-const RUNTIME_OBJECT_PATH: &str =
-    "/ai/tinyhumans/tinychannels/Channels/runtime_0123456789abcdef0123456789abcdef";
-const RUNTIME_CALLBACK_PATH: &str =
-    "/ai/tinyhumans/tinychannels/ChannelsHost/runtime_0123456789abcdef0123456789abcdef";
 
 fn config() -> ChannelsConfig {
     ChannelsConfig {

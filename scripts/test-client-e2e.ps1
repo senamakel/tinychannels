@@ -74,3 +74,9 @@ $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL = 'https://github.com/ti
 cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
     -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
 if ($LASTEXITCODE -ne 0) { throw 'TinyChannels typed client native E2E failed' }
+cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
+    -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
+if ($LASTEXITCODE -ne 0) { throw 'TinyChannels runtime driver native E2E failed' }
+cargo test --manifest-path (Join-Path $root 'Cargo.toml') --locked --target-dir $target `
+    -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1
+if ($LASTEXITCODE -ne 0) { throw 'Actual TinyChannels module runtime E2E failed' }

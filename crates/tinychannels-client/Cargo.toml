@@ -27,3 +27,13 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"
 name = "native_e2e"
 path = "tests/native_e2e.rs"
 required-features = ["native-e2e"]
+
+[[test]]
+name = "runtime_native_e2e"
+path = "tests/runtime_native_e2e.rs"
+required-features = ["native-e2e"]
+
+[[test]]
+name = "native_module_runtime_e2e"
+path = "tests/native_module_runtime_e2e.rs"
+required-features = ["native-e2e"]

@@ -67,14 +67,19 @@ tar -C "$native_cache" -czf "$native_archive" "$native_library_name" modules.tom
 install -m 644 "$native_archive" "$native_cache/$native_archive_name"
 native_archive_hash="$(archive_sha256 "$native_archive")"
 
-TINYCHANNELS_CLIENT_TEST_CACHE="$cache" \
-TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME="$archive_name" \
-TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256="$archive_hash" \
-TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256="$library_sha256" \
-TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE="$native_cache" \
-TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME="$native_archive_name" \
-TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256="$native_archive_hash" \
-TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256="$native_library_sha256" \
-TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37" \
+export TINYCHANNELS_CLIENT_TEST_CACHE="$cache"
+export TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME="$archive_name"
+export TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256="$archive_hash"
+export TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256="$library_sha256"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE="$native_cache"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME="$native_archive_name"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256="$native_archive_hash"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256="$native_library_sha256"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37"
+
 cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
+cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+  -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
+cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+  -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1
