@@ -108,7 +108,8 @@ $environment = @(
     "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256=$(ConvertTo-BashLiteral $nativeLibraryHash)"
     "export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL=$(ConvertTo-BashLiteral $env:TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL)"
 )
-[System.IO.File]::WriteAllLines($environmentPath, [string[]]$environment, [System.Text.UTF8Encoding]::new($false))
+$environmentText = ($environment -join "`n") + "`n"
+[System.IO.File]::WriteAllText($environmentPath, $environmentText, [System.Text.UTF8Encoding]::new($false))
 if ($PrepareOnly) { return }
 
 $nativeTestLogs = Join-Path $target 'tinychannels-client-e2e-logs'

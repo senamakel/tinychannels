@@ -14,7 +14,7 @@ python3 scripts/test-bus-purity.py
 python3 scripts/check-bus-purity.py
 python3 scripts/test-feature-shell.py
 python3 scripts/test-client-native-topology.py
-python3 scripts/test-client-e2e-standalone.py
+FEATURE_TEST_BASH="$feature_test_bash" python3 scripts/test-client-e2e-standalone.py
 cargo test --locked --workspace
 if [[ "${FEATURE_TEST_SKIP_CLIENT_PREPARE:-0}" != "1" ]]; then
   scripts/test-client-e2e.sh --prepare-only
