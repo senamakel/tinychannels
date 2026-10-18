@@ -61,6 +61,7 @@ impl Interface for RecordingModule {
 
 struct TestAccess {
     record: &'static ReleaseRecord,
+    _service: Connection,
     connection: Connection,
     reporter: FailureReporter,
 }
@@ -157,6 +158,7 @@ async fn unattested_client() -> (TinyChannelsClient, Calls, Proxy) {
         .expect("ordinary fixture control proxy");
     let module = ModuleClient::new(TestAccess {
         record,
+        _service: service,
         connection: caller,
         reporter: FailureReporter::new(Arc::new(NoFailures)),
     });
