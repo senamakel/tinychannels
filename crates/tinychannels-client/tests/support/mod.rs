@@ -269,17 +269,47 @@ pub(crate) struct RuntimeFixture {
     bind_stage: Arc<AtomicU8>,
 }
 
+#[derive(Clone, Copy)]
+#[repr(u8)]
+enum BindStage {
+    PreparationNotStarted,
+    CachedLoadInProgress,
+    CachedLoadFailed,
+    CachedLoadComplete,
+    ReadinessInProgress,
+    ReadinessFailed,
+    ReadyBeforePeerResolution,
+}
+
+impl BindStage {
+    fn from_byte(stage: u8) -> Self {
+        match stage {
+            1 => Self::CachedLoadInProgress,
+            2 => Self::CachedLoadFailed,
+            3 => Self::CachedLoadComplete,
+            4 => Self::ReadinessInProgress,
+            5 => Self::ReadinessFailed,
+            6 => Self::ReadyBeforePeerResolution,
+            _ => Self::PreparationNotStarted,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::PreparationNotStarted => "preparation_not_started",
+            Self::CachedLoadInProgress => "cached_load_in_progress",
+            Self::CachedLoadFailed => "cached_load_failed",
+            Self::CachedLoadComplete => "cached_load_complete",
+            Self::ReadinessInProgress => "readiness_in_progress",
+            Self::ReadinessFailed => "readiness_failed",
+            Self::ReadyBeforePeerResolution => "ready_before_peer_resolution",
+        }
+    }
+}
+
 impl RuntimeFixture {
     pub(crate) fn bind_stage(&self) -> &'static str {
-        match self.bind_stage.load(Ordering::SeqCst) {
-            1 => "cached_load_in_progress",
-            2 => "cached_load_failed",
-            3 => "cached_load_complete",
-            4 => "readiness_in_progress",
-            5 => "readiness_failed",
-            7 => "ready_before_peer_resolution",
-            _ => "preparation_not_started",
-        }
+        BindStage::from_byte(self.bind_stage.load(Ordering::SeqCst)).label()
     }
 }
 
@@ -310,14 +340,16 @@ impl ModuleAccess for RuntimeAccess {
             let loaded = self
                 .loaded
                 .get_or_try_init(|| async {
-                    self.bind_stage.store(1, Ordering::SeqCst);
+                    self.bind_stage
+                        .store(BindStage::CachedLoadInProgress as u8, Ordering::SeqCst);
                     let result = self
                         .runtime
                         .host()
                         .load_github_release_cached(&self.release, serde_json::json!({}))
                         .map(|_| ());
                     if result.is_err() {
-                        self.bind_stage.store(2, Ordering::SeqCst);
+                        self.bind_stage
+                            .store(BindStage::CachedLoadFailed as u8, Ordering::SeqCst);
                     }
                     result.map_err(|error| {
                         format!("the locally pinned native fixture could not load: {error}")
@@ -326,7 +358,8 @@ impl ModuleAccess for RuntimeAccess {
                 .await
                 .map(|_| ());
             if loaded.is_ok() {
-                self.bind_stage.store(3, Ordering::SeqCst);
+                self.bind_stage
+                    .store(BindStage::CachedLoadComplete as u8, Ordering::SeqCst);
             }
             loaded
         })
@@ -335,14 +368,19 @@ impl ModuleAccess for RuntimeAccess {
     fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
             self.ensure_loaded(id).await?;
-            self.bind_stage.store(4, Ordering::SeqCst);
+            self.bind_stage
+                .store(BindStage::ReadinessInProgress as u8, Ordering::SeqCst);
             self.runtime
                 .host()
                 .ensure_ready(self.record.bus_name)
                 .await
-                .map(|()| self.bind_stage.store(7, Ordering::SeqCst))
+                .map(|()| {
+                    self.bind_stage
+                        .store(BindStage::ReadyBeforePeerResolution as u8, Ordering::SeqCst)
+                })
                 .map_err(|_| {
-                    self.bind_stage.store(5, Ordering::SeqCst);
+                    self.bind_stage
+                        .store(BindStage::ReadinessFailed as u8, Ordering::SeqCst);
                     "the locally pinned native fixture did not become ready".to_owned()
                 })
         })
