@@ -12,7 +12,7 @@ WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@6ed83b04aab2d8977ec62e966cb914531e534fa4"
-TINYBUS_REV = "cba2de0e573f99fe4c7e45ba14e2d6b5a2a7757f"
+TINYBUS_REV = "207a9a7df15e44fdba00a807d0f7eaf21904ba0e"
 
 
 def workflow_run_block(step_name):
@@ -160,13 +160,13 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            f'tinybus = {{ version = "0.3.2", git = '
+            f'tinybus = {{ version = "0.3.3", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
         self.assertIn(
-            f'tinybus-module = {{ version = "0.3.2", git = '
+            f'tinybus-module = {{ version = "0.3.3", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
@@ -185,7 +185,7 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             'tinybus = { workspace = true, features = ["test-support"] }',
             module,
         )
-        self.assertIn('version = "0.3.2"', tinybus_workspace)
+        self.assertIn('version = "0.3.3"', tinybus_workspace)
         current = subprocess.run(
             ["git", "-C", str(ROOT / "vendor/tinybus"), "rev-parse", "HEAD"],
             check=True,
