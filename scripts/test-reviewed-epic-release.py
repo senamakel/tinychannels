@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
-REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@d463b7d93a3d6ea618e46365dffcf34ecc898462"
+REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@6ed83b04aab2d8977ec62e966cb914531e534fa4"
 TINYBUS_REV = "cba2de0e573f99fe4c7e45ba14e2d6b5a2a7757f"
 
 
