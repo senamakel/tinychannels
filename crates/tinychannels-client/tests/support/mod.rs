@@ -8,7 +8,7 @@
 
 use std::{
     path::Path,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock, atomic::{AtomicU8, Ordering}},
     time::Duration,
 };
 
@@ -263,6 +263,22 @@ pub(crate) struct RuntimeFixture {
     pub(crate) control: ModuleClient,
     pub(crate) runtime: &'static ModuleRuntime,
     pub(crate) reports: Arc<Reports>,
+    bind_stage: Arc<AtomicU8>,
+}
+
+impl RuntimeFixture {
+    pub(crate) fn bind_stage(&self) -> &'static str {
+        match self.bind_stage.load(Ordering::SeqCst) {
+            1 => "cached_load_in_progress",
+            2 => "cached_load_failed",
+            3 => "cached_load_complete",
+            4 => "readiness_in_progress",
+            5 => "readiness_failed",
+            6 => "readiness_task_failed",
+            7 => "ready_before_peer_binding",
+            _ => "preparation_not_started",
+        }
+    }
 }
 
 struct RuntimeAccess {
@@ -271,6 +287,7 @@ struct RuntimeAccess {
     record: &'static ReleaseRecord,
     release: CachedRelease<'static>,
     reporter: FailureReporter,
+    bind_stage: Arc<AtomicU8>,
 }
 
 impl ModuleAccess for RuntimeAccess {
@@ -288,29 +305,42 @@ impl ModuleAccess for RuntimeAccess {
 
     fn ensure_loaded<'a>(&'a self, _: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
-            self.loaded
+            let loaded = self.loaded
                 .get_or_try_init(|| async {
-                    self.runtime
+                    self.bind_stage.store(1, Ordering::SeqCst);
+                    let result = self.runtime
                         .host()
                         .load_github_release_cached(&self.release, serde_json::json!({}))
-                        .map(|_| ())
-                        .map_err(|error| {
-                            format!("the locally pinned native fixture could not load: {error}")
-                        })
+                        .map(|_| ());
+                    if result.is_err() {
+                        self.bind_stage.store(2, Ordering::SeqCst);
+                    }
+                    result.map_err(|error| {
+                        format!("the locally pinned native fixture could not load: {error}")
+                    })
                 })
                 .await
-                .map(|_| ())
+                .map(|_| ());
+            if loaded.is_ok() {
+                self.bind_stage.store(3, Ordering::SeqCst);
+            }
+            loaded
         })
     }
 
     fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
             self.ensure_loaded(id).await?;
+            self.bind_stage.store(4, Ordering::SeqCst);
             self.runtime
                 .host()
                 .ensure_ready(self.record.bus_name)
                 .await
-                .map_err(|_| "the locally pinned native fixture did not become ready".to_owned())
+                .map(|()| self.bind_stage.store(7, Ordering::SeqCst))
+                .map_err(|_| {
+                    self.bind_stage.store(5, Ordering::SeqCst);
+                    "the locally pinned native fixture did not become ready".to_owned()
+                })
         })
     }
 
@@ -334,12 +364,14 @@ pub(crate) async fn runtime_fixture() -> RuntimeFixture {
             .expect("start one runtime for module and host callbacks"),
     ));
     let reports = Arc::new(Reports::default());
+    let bind_stage = Arc::new(AtomicU8::new(0));
     let access = RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
         record: record(Pin::Correct),
         release: cached_release(),
         reporter: FailureReporter::new(reports.clone()),
+        bind_stage: Arc::clone(&bind_stage),
     };
     let control = ModuleClient::new(access).with_timeout(Duration::from_secs(2));
     let client = TinyChannelsClient::new(control.clone());
@@ -348,6 +380,7 @@ pub(crate) async fn runtime_fixture() -> RuntimeFixture {
         control,
         runtime,
         reports,
+        bind_stage,
     }
 }
 
@@ -358,6 +391,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
             .expect("start one runtime for native module and host callbacks"),
     ));
     let reports = Arc::new(Reports::default());
+    let bind_stage = Arc::new(AtomicU8::new(0));
     let control = ModuleClient::new(RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
@@ -367,12 +401,14 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
             env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "RELEASE_URL"),
         ),
         reporter: FailureReporter::new(reports.clone()),
+        bind_stage: Arc::clone(&bind_stage),
     });
     RuntimeFixture {
         client: TinyChannelsClient::new(control.clone()),
         control,
         runtime,
         reports,
+        bind_stage,
     }
 }
 
