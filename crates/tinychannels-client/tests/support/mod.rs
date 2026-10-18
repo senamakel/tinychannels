@@ -8,7 +8,10 @@
 
 use std::{
     path::Path,
-    sync::{Arc, Mutex, OnceLock, atomic::{AtomicU8, Ordering}},
+    sync::{
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicU8, Ordering},
+    },
     time::Duration,
 };
 
@@ -274,8 +277,7 @@ impl RuntimeFixture {
             3 => "cached_load_complete",
             4 => "readiness_in_progress",
             5 => "readiness_failed",
-            6 => "readiness_task_failed",
-            7 => "ready_before_peer_binding",
+            7 => "ready_before_peer_resolution",
             _ => "preparation_not_started",
         }
     }
@@ -305,10 +307,12 @@ impl ModuleAccess for RuntimeAccess {
 
     fn ensure_loaded<'a>(&'a self, _: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
-            let loaded = self.loaded
+            let loaded = self
+                .loaded
                 .get_or_try_init(|| async {
                     self.bind_stage.store(1, Ordering::SeqCst);
-                    let result = self.runtime
+                    let result = self
+                        .runtime
                         .host()
                         .load_github_release_cached(&self.release, serde_json::json!({}))
                         .map(|_| ());

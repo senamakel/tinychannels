@@ -143,7 +143,12 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         .client
         .runtime_driver()
         .await
-        .expect("bind A before any runtime reservation");
+        .unwrap_or_else(|_| {
+            panic!(
+                "bind A before any runtime reservation; native fixture stage: {}",
+                fixture.bind_stage()
+            )
+        });
     let dispatch_driver = fixture
         .client
         .runtime_driver_with_dispatch(ChannelRuntimeDispatchPolicy { listener_count: 2 })
