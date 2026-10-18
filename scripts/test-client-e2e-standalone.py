@@ -150,6 +150,37 @@ else:
     for output in expected_outputs:
         if not output.is_file():
             fail(f"expected local staged module archive: {output}")
+    environment_file = repo / "target" / "tinychannels-client-e2e.env"
+    if not environment_file.is_file():
+        fail("client fixture preparation did not write its reusable environment file")
+    environment = environment_file.read_text(encoding="utf-8")
+    for key in (
+        "TINYCHANNELS_CLIENT_TEST_CACHE",
+        "TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME",
+        "TINYCHANNELS_CLIENT_TEST_ARCHIVE_SHA256",
+        "TINYCHANNELS_CLIENT_TEST_LIBRARY_SHA256",
+        "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE",
+        "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME",
+        "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256",
+        "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256",
+        "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL",
+    ):
+        if f"export {key}=" not in environment:
+            fail(f"client fixture environment omits {key}")
+
+    prepare_result = subprocess.run(
+        ["bash", str(repo / "scripts" / "test-client-e2e.sh"), "--prepare-only"],
+        cwd=repo,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if prepare_result.returncode:
+        fail(f"prepare-only client E2E mode failed: {prepare_result.stdout}{prepare_result.stderr}")
+    prepare_calls = [json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()]
+    if len(prepare_calls) != 7 or [call["args"][0] for call in prepare_calls[-2:]] != ["build", "build"]:
+        fail("prepare-only client E2E mode must build both local fixtures without running tests")
 
     empty_env = dict(env, TINYCHANNELS_FAKE_ZERO_TEST_TARGET="native_e2e")
     empty_result = subprocess.run(
