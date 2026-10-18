@@ -10,7 +10,7 @@ use std::{
     path::Path,
     sync::{
         Arc, Mutex, OnceLock,
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicU8, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -269,6 +269,7 @@ pub(crate) struct RuntimeFixture {
     pub(crate) runtime: &'static ModuleRuntime,
     pub(crate) reports: Arc<Reports>,
     bind_stage: Arc<AtomicU8>,
+    readiness_attempts: Arc<AtomicUsize>,
     access: Arc<RuntimeAccess>,
     readiness_gate: Option<Arc<ReadinessGate>>,
     _readiness_gate_guard: Option<HostObjectGuard>,
@@ -315,6 +316,10 @@ impl BindStage {
 impl RuntimeFixture {
     pub(crate) fn bind_stage(&self) -> &'static str {
         BindStage::from_byte(self.bind_stage.load(Ordering::SeqCst)).label()
+    }
+
+    pub(crate) fn readiness_attempts(&self) -> usize {
+        self.readiness_attempts.load(Ordering::SeqCst)
     }
 
     pub(crate) fn module_ready(&self) -> bool {
@@ -384,6 +389,7 @@ struct RuntimeAccess {
     release: CachedRelease<'static>,
     reporter: FailureReporter,
     bind_stage: Arc<AtomicU8>,
+    readiness_attempts: Arc<AtomicUsize>,
     hold_ready: bool,
 }
 
@@ -468,6 +474,7 @@ impl ModuleAccess for RuntimeAccess {
     fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
         Box::pin(async move {
             self.ensure_loaded(id).await?;
+            self.readiness_attempts.fetch_add(1, Ordering::SeqCst);
             self.bind_stage
                 .store(BindStage::ReadinessInProgress as u8, Ordering::SeqCst);
             self.runtime
@@ -518,6 +525,7 @@ async fn runtime_fixture_with_readiness(
     ));
     let reports = Arc::new(Reports::default());
     let bind_stage = Arc::new(AtomicU8::new(0));
+    let readiness_attempts = Arc::new(AtomicUsize::new(0));
     let readiness_gate = hold_ready.then(|| {
         Arc::new(ReadinessGate {
             entered: tokio::sync::Semaphore::new(0),
@@ -546,6 +554,7 @@ async fn runtime_fixture_with_readiness(
         release: cached_release(),
         reporter: FailureReporter::new(reports.clone()),
         bind_stage: Arc::clone(&bind_stage),
+        readiness_attempts: Arc::clone(&readiness_attempts),
         hold_ready,
     });
     if prepare_before_operation_client {
@@ -571,6 +580,7 @@ async fn runtime_fixture_with_readiness(
         runtime,
         reports,
         bind_stage,
+        readiness_attempts,
         access,
         readiness_gate,
         _readiness_gate_guard: readiness_gate_guard,
@@ -594,6 +604,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
     ));
     let reports = Arc::new(Reports::default());
     let bind_stage = Arc::new(AtomicU8::new(0));
+    let readiness_attempts = Arc::new(AtomicUsize::new(0));
     let access = Arc::new(RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
@@ -604,6 +615,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
         ),
         reporter: FailureReporter::new(reports.clone()),
         bind_stage: Arc::clone(&bind_stage),
+        readiness_attempts: Arc::clone(&readiness_attempts),
         hold_ready: false,
     });
     let control = ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access)));
@@ -614,6 +626,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
         runtime,
         reports,
         bind_stage,
+        readiness_attempts,
         access,
         readiness_gate: None,
         _readiness_gate_guard: None,

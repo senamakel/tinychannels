@@ -17,6 +17,9 @@ TARGETS = {
     "runtime_native_e2e": (
         "typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_handover",
     ),
+    "runtime_readiness_e2e": (
+        "cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld",
+    ),
     "native_module_runtime_e2e": (
         "actual_native_module_runs_provider_free_runtime_and_releases_callback_on_ack",
     ),
@@ -24,6 +27,7 @@ TARGETS = {
 EXPECTED_COUNTS = {
     "native_e2e": 4,
     "runtime_native_e2e": 1,
+    "runtime_readiness_e2e": 1,
     "native_module_runtime_e2e": 1,
 }
 
@@ -42,8 +46,8 @@ class ClientNativeTopologyTests(unittest.TestCase):
         for target in targets.values():
             self.assertEqual(target["required-features"], ["native-e2e"])
 
-    def test_all_six_native_cases_remain_unchanged_and_not_ignored(self):
-        self.assertEqual(sum(EXPECTED_COUNTS.values()), 6)
+    def test_all_native_cases_remain_unchanged_and_not_ignored(self):
+        self.assertEqual(sum(EXPECTED_COUNTS.values()), 7)
         for target, names in TARGETS.items():
             source = (ROOT / "crates/tinychannels-client/tests" / f"{target}.rs").read_text(
                 encoding="utf-8"
@@ -83,7 +87,7 @@ class ClientNativeTopologyTests(unittest.TestCase):
         self.assertIn("run_counted_test() {", shell_runner)
         self.assertIn("function Invoke-CountedNativeTest", powershell_runner)
         self.assertIn("& cargo @Arguments", powershell_runner)
-        self.assertEqual(powershell_runner.count("-Arguments (@('test') + $common + @("), 3)
+        self.assertEqual(powershell_runner.count("-Arguments (@('test') + $common + @("), 4)
         for target, count in EXPECTED_COUNTS.items():
             self.assertEqual(shell_runner.count(f"run_counted_test {count} {target}"), 1)
             self.assertIn(f"--test {target}", shell_runner)

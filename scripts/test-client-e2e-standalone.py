@@ -73,7 +73,7 @@ if args[0] == 'build':
     (output / library).write_bytes(b'fake native library: ' + library.encode())
 elif args[0] == 'test':
     test_name = args[args.index('--test') + 1]
-    expected = {'native_e2e': 4, 'runtime_native_e2e': 1, 'native_module_runtime_e2e': 1}[test_name]
+    expected = {'native_e2e': 4, 'runtime_native_e2e': 1, 'runtime_readiness_e2e': 1, 'native_module_runtime_e2e': 1}[test_name]
     if os.environ.get('TINYCHANNELS_FAKE_ZERO_TEST_TARGET') == test_name:
         expected = 0
     print(f'test result: ok. {expected} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out')
@@ -123,16 +123,17 @@ else:
         fail("PowerShell client E2E script must build both fixtures and run counted native tests")
 
     calls = [json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()]
-    if len(calls) != 5 or [call["args"][0] for call in calls] != [
+    if len(calls) != 6 or [call["args"][0] for call in calls] != [
         "build",
         "build",
+        "test",
         "test",
         "test",
         "test",
     ]:
         fail(f"expected two builds and three test commands, captured: {calls!r}")
 
-    expected_tests = ["native_e2e", "runtime_native_e2e", "native_module_runtime_e2e"]
+    expected_tests = ["native_e2e", "runtime_native_e2e", "runtime_readiness_e2e", "native_module_runtime_e2e"]
     for call, expected in zip(calls[2:], expected_tests, strict=True):
         args = call["args"]
         if "--test" not in args or args[args.index("--test") + 1] != expected:
@@ -259,7 +260,7 @@ printf '%s\\0' \\
     if prepare_result.returncode:
         fail(f"prepare-only client E2E mode failed: {prepare_result.stdout}{prepare_result.stderr}")
     prepare_calls = [json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()]
-    if len(prepare_calls) != 7 or [call["args"][0] for call in prepare_calls[-2:]] != ["build", "build"]:
+    if len(prepare_calls) != 8 or [call["args"][0] for call in prepare_calls[-2:]] != ["build", "build"]:
         fail("prepare-only client E2E mode must build both local fixtures without running tests")
 
     empty_env = dict(env, TINYCHANNELS_FAKE_ZERO_TEST_TARGET="native_e2e")

@@ -120,4 +120,5 @@ $common = @('--manifest-path', $manifest, '--locked', '--target-dir', $target,
     '-p', 'tinychannels-client', '--features', 'native-e2e')
 Invoke-CountedNativeTest -Name 'native_e2e' -ExpectedCount 4 -Arguments (@('test') + $common + @('--test', 'native_e2e', '--', '--test-threads=1'))
 Invoke-CountedNativeTest -Name 'runtime_native_e2e' -ExpectedCount 1 -Arguments (@('test') + $common + @('--test', 'runtime_native_e2e', '--', '--test-threads=1'))
+Invoke-CountedNativeTest -Name 'runtime_readiness_e2e' -ExpectedCount 1 -Arguments (@('test') + $common + @('--test', 'runtime_readiness_e2e', '--', '--test-threads=1'))
 Invoke-CountedNativeTest -Name 'native_module_runtime_e2e' -ExpectedCount 1 -Arguments (@('test') + $common + @('--test', 'native_module_runtime_e2e', '--', '--test-threads=1'))

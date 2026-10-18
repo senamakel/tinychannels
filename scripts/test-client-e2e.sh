@@ -133,5 +133,7 @@ run_counted_test 4 native_e2e cargo test --manifest-path "$repo_root/Cargo.toml"
   -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
 run_counted_test 1 runtime_native_e2e cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
+run_counted_test 1 runtime_readiness_e2e cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+  -p tinychannels-client --features native-e2e --test runtime_readiness_e2e -- --test-threads=1
 run_counted_test 1 native_module_runtime_e2e cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1
