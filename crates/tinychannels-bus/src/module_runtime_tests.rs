@@ -82,7 +82,10 @@ fn runtime_reservation_validation_rejects_each_bad_identity_component_sanitely()
         let error = invalid
             .validate()
             .expect_err("invalid reservation identity must be rejected");
-        assert_eq!(error, crate::TinyChannelsError::new("invalid channel runtime reservation"));
+        assert_eq!(
+            error,
+            crate::TinyChannelsError::new("invalid channel runtime reservation")
+        );
         let reason = error.to_string();
         assert!(!reason.contains(&invalid.handle));
         assert!(!reason.contains("object-path-supplied-marker"));

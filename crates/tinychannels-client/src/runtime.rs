@@ -4,13 +4,17 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use tinybus::{
     BusName, ObjectPath,
-    module::{BoundModuleClient, ModuleCallError, ModuleObjectClient, RuntimeLeaseDriver, StartOutcome, StopOutcome},
+    module::{
+        BoundModuleClient, ModuleCallError, ModuleObjectClient, RuntimeLeaseDriver, StartOutcome,
+        StopOutcome,
+    },
 };
 use tinychannels_bus::{
     ChannelInteractionRequest, ChannelInteractionResult, ChannelOutboundIntent,
     ChannelRuntimeDispatchPolicy, ChannelRuntimeReservation, ChannelSupervisionPolicy,
-    ChannelsConfig, HttpProxyPolicy, methods,
+    ChannelsConfig, HttpProxyPolicy,
     controllers::ChannelSendMessageResult,
+    methods,
     module_control::{ChannelControlRequest, ChannelControlResult},
     module_progressive::{ProgressiveCommand, ProgressiveResult},
     module_relay::RelayReservation,
@@ -344,4 +348,3 @@ impl ChannelRuntimeClient {
             .await
     }
 }
-

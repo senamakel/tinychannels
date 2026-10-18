@@ -77,7 +77,10 @@ impl ChannelRuntimeError {
         }
     }
 
-    pub(crate) fn contract(operation: ChannelRuntimeOperation, kind: ChannelRuntimeErrorKind) -> Self {
+    pub(crate) fn contract(
+        operation: ChannelRuntimeOperation,
+        kind: ChannelRuntimeErrorKind,
+    ) -> Self {
         Self { operation, kind }
     }
 
@@ -123,4 +126,3 @@ impl std::error::Error for ChannelRuntimeError {
         }
     }
 }
-
