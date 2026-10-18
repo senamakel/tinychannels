@@ -7,19 +7,19 @@ use serde::de::DeserializeOwned;
 use tinybus::{
     BusName, ObjectPath,
     module::{
-        BoundModuleClient, ModuleCallError, ModuleCallFailure, ModuleClient,
-        ModuleObjectClient, RuntimeLeaseDriver, StartOutcome, StopOutcome,
+        BoundModuleClient, ModuleCallError, ModuleCallFailure, ModuleClient, ModuleObjectClient,
+        RuntimeLeaseDriver, StartOutcome, StopOutcome,
     },
 };
 use tinychannels_bus::{
-    ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
-    ChannelInteractionRequest, ChannelInteractionResult, ChannelOutboundIntent,
-    ChannelRuntimeDispatchPolicy, ChannelRuntimeReservation, ChannelSupervisionPolicy,
+    ChannelControllerRequest, ChannelControllerResult, ChannelInteractionRequest,
+    ChannelInteractionResult, ChannelOutboundIntent, ChannelRuntimeDispatchPolicy,
+    ChannelRuntimeReservation, ChannelSupervisionPolicy, ChannelsConfig, HttpProxyPolicy,
     controllers::{BotPermissionCheck, ChannelSendMessageResult, DiscordGuild, DiscordTextChannel},
+    methods,
     module_control::{ChannelControlRequest, ChannelControlResult},
     module_progressive::{ProgressiveCommand, ProgressiveResult},
     module_relay::RelayReservation,
-    methods,
 };
 
 /// Typed host client for the TinyChannels module.
@@ -56,7 +56,8 @@ impl TinyChannelsClient {
         &self,
         policy: ChannelRuntimeDispatchPolicy,
     ) -> Result<ChannelRuntimeDriver, ChannelRuntimeError> {
-        self.bind_runtime_driver(RuntimeStart::Dispatch(policy)).await
+        self.bind_runtime_driver(RuntimeStart::Dispatch(policy))
+            .await
     }
 
     async fn bind_runtime_driver(
@@ -366,10 +367,7 @@ impl RuntimeLeaseDriver for ChannelRuntimeDriver {
         Ok((name, path))
     }
 
-    async fn object(
-        &self,
-        reservation: &Self::Reservation,
-    ) -> Result<Self::Object, Self::Error> {
+    async fn object(&self, reservation: &Self::Reservation) -> Result<Self::Object, Self::Error> {
         let object = self
             .bound
             .object_client(&reservation.object_path)
@@ -381,10 +379,7 @@ impl RuntimeLeaseDriver for ChannelRuntimeDriver {
         let result = match self.start {
             RuntimeStart::Serial => {
                 self.bound
-                    .call_confidential::<()>(
-                        methods::START_RUNTIME,
-                        (reservation.handle.clone(),),
-                    )
+                    .call_confidential::<()>(methods::START_RUNTIME, (reservation.handle.clone(),))
                     .await
             }
             RuntimeStart::Dispatch(policy) => {
@@ -408,10 +403,7 @@ impl RuntimeLeaseDriver for ChannelRuntimeDriver {
     async fn stop(&self, reservation: &Self::Reservation) -> StopOutcome<Self::Error> {
         match self
             .bound
-            .call_confidential::<()>(
-                methods::STOP_RUNTIME,
-                (reservation.handle.clone(),),
-            )
+            .call_confidential::<()>(methods::STOP_RUNTIME, (reservation.handle.clone(),))
             .await
         {
             Ok(()) => StopOutcome::Acknowledged,
@@ -638,12 +630,8 @@ impl ChannelRuntimeClient {
 
     /// Shut down provider and relay services owned by this runtime object.
     pub async fn shutdown(&self) -> Result<(), ChannelRuntimeError> {
-        self.ordinary(
-            ChannelRuntimeOperation::Shutdown,
-            methods::SHUTDOWN,
-            (),
-        )
-        .await
+        self.ordinary(ChannelRuntimeOperation::Shutdown, methods::SHUTDOWN, ())
+            .await
     }
 }
 

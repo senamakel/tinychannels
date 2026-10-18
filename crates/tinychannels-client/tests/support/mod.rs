@@ -609,18 +609,9 @@ fn native_module_record() -> &'static ReleaseRecord {
                 .expect("test platform has a TinyBus module key")
                 .into_boxed_str(),
         );
-        let archive = env_prefixed(
-            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
-            "ARCHIVE_NAME",
-        );
-        let archive_sha = env_prefixed(
-            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
-            "ARCHIVE_SHA256",
-        );
-        let library_sha = env_prefixed(
-            "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
-            "LIBRARY_SHA256",
-        );
+        let archive = env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "ARCHIVE_NAME");
+        let archive_sha = env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "ARCHIVE_SHA256");
+        let library_sha = env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "LIBRARY_SHA256");
         let assets = Box::leak(
             vec![ReleaseAsset {
                 host_key,
@@ -635,10 +626,7 @@ fn native_module_record() -> &'static ReleaseRecord {
             bus_name: tinychannels_bus::BUS_NAME,
             object_path: tinychannels_bus::OBJECT_PATH,
             version: "0.1.37",
-            release_url: env_prefixed(
-                "TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST",
-                "RELEASE_URL",
-            ),
+            release_url: env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "RELEASE_URL"),
             assets,
         }
     })

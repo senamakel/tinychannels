@@ -421,8 +421,10 @@ impl Interface for UnattestedReplacementObject {
     }
 
     fn members(&self) -> Vec<MemberName> {
-        vec![MemberName::new(tinychannels_bus::methods::CHANNEL_STATUS)
-            .expect("channel status method")]
+        vec![
+            MemberName::new(tinychannels_bus::methods::CHANNEL_STATUS)
+                .expect("channel status method"),
+        ]
     }
 
     async fn call(
@@ -641,7 +643,10 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
     assert_eq!(
         lease
             .object()
-            .start_relay(relay.clone(), tinychannels_bus::config::RelayRuntimeConfig::default())
+            .start_relay(
+                relay.clone(),
+                tinychannels_bus::config::RelayRuntimeConfig::default()
+            )
             .await
             .expect("confidential relay start descriptor")
             .platform,
@@ -664,7 +669,10 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
         .expect("ordinary relay intent");
     lease.object().shutdown().await.expect("ordinary shutdown");
 
-    assert!(lease.close().await.is_ok(), "decoded STOP unit reply is ACK");
+    assert!(
+        lease.close().await.is_ok(),
+        "decoded STOP unit reply is ACK"
+    );
     let callback = fixture
         .runtime
         .connection()
@@ -675,7 +683,10 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
         )
         .expect("callback probe proxy");
     assert!(
-        callback.call::<String>("FixtureCallback", ()).await.is_err(),
+        callback
+            .call::<String>("FixtureCallback", ())
+            .await
+            .is_err(),
         "only STOP ACK withdraws the callback registration"
     );
 
@@ -684,7 +695,13 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
     // available. The failure path must not fall through to B.
     let _ = control.call::<()>("FixtureDisconnect", ()).await;
     assert!(control.call::<bool>("FixtureReady", ()).await.is_err());
-    assert!(lease.object().channel_status("discord".into()).await.is_err());
+    assert!(
+        lease
+            .object()
+            .channel_status("discord".into())
+            .await
+            .is_err()
+    );
     let after_disconnect: bool = fixture
         .control
         .call("tinychannels", "FixtureReady", ())
@@ -823,7 +840,10 @@ async fn opaque_start_and_stop_errors_remain_unacknowledged_and_keep_callback_li
         .call("FixtureStopCallCount", ())
         .await
         .expect("read stop count after unacknowledged start");
-    assert_eq!(stop_calls, 0, "unacknowledged START is never rolled back by STOP");
+    assert_eq!(
+        stop_calls, 0,
+        "unacknowledged START is never rolled back by STOP"
+    );
     assert_eq!(
         driverless_callback_probe(fixture.runtime)
             .await

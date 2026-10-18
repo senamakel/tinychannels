@@ -17,7 +17,8 @@ use tinychannels_bus::{
         ChannelSendMessageResult, DiscordChannelListResult, DiscordGuildListResult,
         DiscordPermissionCheckResult,
     },
-    methods, module_control::{ChannelControlRequest, ChannelControlResult},
+    methods,
+    module_control::{ChannelControlRequest, ChannelControlResult},
     module_progressive::{ProgressiveCommand, ProgressiveResult},
     module_relay::RelayReservation,
 };
@@ -57,19 +58,19 @@ impl Interface for FixtureService {
 
     fn members(&self) -> Vec<MemberName> {
         tinychannels_bus::METHODS
-        .into_iter()
-        .chain([
-            "FixtureCallCount",
-            "FixtureReady",
-            "FixtureReleaseAlias",
-            "FixtureDisconnect",
-            "FixtureFailStart",
-            "FixtureFailStop",
-            "FixtureStopCallCount",
-        ])
-        .into_iter()
-        .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
-        .collect()
+            .into_iter()
+            .chain([
+                "FixtureCallCount",
+                "FixtureReady",
+                "FixtureReleaseAlias",
+                "FixtureDisconnect",
+                "FixtureFailStart",
+                "FixtureFailStop",
+                "FixtureStopCallCount",
+            ])
+            .into_iter()
+            .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
+            .collect()
     }
 
     fn requires_confidential(&self, member: &MemberName) -> bool {
@@ -97,17 +98,23 @@ impl Interface for FixtureService {
             return Ok(json!(self.calls.load(Ordering::SeqCst)));
         }
         if member.as_str() == "FixtureStopCallCount" {
-            return Ok(json!(self.runtime_controls.stop_calls.load(Ordering::SeqCst)));
+            return Ok(json!(
+                self.runtime_controls.stop_calls.load(Ordering::SeqCst)
+            ));
         }
         self.calls.fetch_add(1, Ordering::SeqCst);
         match member.as_str() {
             "FixtureReady" => Ok(json!(true)),
             "FixtureFailStart" => {
-                self.runtime_controls.fail_start.store(true, Ordering::SeqCst);
+                self.runtime_controls
+                    .fail_start
+                    .store(true, Ordering::SeqCst);
                 Ok(Value::Null)
             }
             "FixtureFailStop" => {
-                self.runtime_controls.fail_stop.store(true, Ordering::SeqCst);
+                self.runtime_controls
+                    .fail_stop
+                    .store(true, Ordering::SeqCst);
                 Ok(Value::Null)
             }
             "FixtureReleaseAlias" => {
@@ -153,7 +160,9 @@ impl FixtureService {
         self.connection
             .serve_at(
                 ObjectPath::new(RUNTIME_OBJECT_PATH)?,
-                FixtureObject { calls: Arc::clone(&self.calls) },
+                FixtureObject {
+                    calls: Arc::clone(&self.calls),
+                },
             )
             .await?;
         serde_json::to_value(reservation).map_err(|_| Error::failed("fixture serialization failed"))

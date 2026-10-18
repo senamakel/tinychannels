@@ -43,9 +43,9 @@ async fn runtime_driver_builders_bind_strictly_before_any_runtime_call() {
     assert!(client.runtime_driver().await.is_err());
     assert!(
         client
-            .runtime_driver_with_dispatch(
-                tinychannels_bus::ChannelRuntimeDispatchPolicy { listener_count: 1 },
-            )
+            .runtime_driver_with_dispatch(tinychannels_bus::ChannelRuntimeDispatchPolicy {
+                listener_count: 1
+            },)
             .await
             .is_err()
     );
