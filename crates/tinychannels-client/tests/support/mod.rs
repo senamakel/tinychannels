@@ -348,6 +348,17 @@ impl RuntimeFixture {
             .release
             .add_permits(1);
     }
+
+    pub(crate) async fn wait_for_readiness_attempt(&self, previous: usize) {
+        for _ in 0..10_000 {
+            if self.readiness_attempts() > previous {
+                assert_eq!(self.bind_stage(), "readiness_in_progress");
+                return;
+            }
+            tokio::task::yield_now().await;
+        }
+        panic!("module client never entered host readiness preparation");
+    }
 }
 
 struct ReadinessGate {
@@ -509,17 +520,14 @@ impl ModuleAccess for RuntimeAccess {
 }
 
 pub(crate) async fn runtime_fixture() -> RuntimeFixture {
-    runtime_fixture_with_readiness(false, true).await
+    runtime_fixture_with_readiness(false).await
 }
 
 pub(crate) async fn gated_runtime_fixture() -> RuntimeFixture {
-    runtime_fixture_with_readiness(true, false).await
+    runtime_fixture_with_readiness(true).await
 }
 
-async fn runtime_fixture_with_readiness(
-    hold_ready: bool,
-    prepare_before_operation_client: bool,
-) -> RuntimeFixture {
+async fn runtime_fixture_with_readiness(hold_ready: bool) -> RuntimeFixture {
     let runtime = Box::leak(Box::new(
         ModuleRuntime::start(&RuntimeNames::default(), None)
             .expect("start one runtime for module and host callbacks"),
@@ -558,15 +566,6 @@ async fn runtime_fixture_with_readiness(
         readiness_attempts: Arc::clone(&readiness_attempts),
         hold_ready,
     });
-    if prepare_before_operation_client {
-        access
-            .ensure_loaded(MODULE_ID)
-            .await
-            .expect("cold native fixture loads before the bounded operations client is created");
-        access.prepare_attested(MODULE_ID).await.expect(
-            "native fixture reaches host readiness before the bounded operations client is created",
-        );
-    }
     let startup_client =
         TinyChannelsClient::new(ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access))));
     let control = ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access)))

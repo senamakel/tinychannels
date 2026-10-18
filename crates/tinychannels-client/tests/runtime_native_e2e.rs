@@ -138,7 +138,22 @@ async fn callback_probe(
 async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_handover() {
     // This process starts exactly one ModuleRuntime. It loads the digest-pinned
     // native A artifact and also owns the lease callback and replacement B.
-    let fixture = support::runtime_fixture().await;
+    let fixture = support::gated_runtime_fixture().await;
+    let startup_client = fixture.startup_client.clone();
+    let before_startup_bind = fixture.readiness_attempts();
+    let startup_bind = tokio::spawn(async move { startup_client.runtime_driver().await });
+    fixture.wait_for_readiness_attempt(before_startup_bind).await;
+    assert!(
+        !startup_bind.is_finished(),
+        "cold bind waits for host readiness while the fixture setup barrier is held"
+    );
+    fixture.release_ready();
+    let startup_driver = startup_bind
+        .await
+        .expect("default-deadline cold bind task completes")
+        .expect("cold attested bind succeeds after setup publishes READY");
+    assert!(fixture.module_ready(), "host observes READY for fixture A");
+    drop(startup_driver);
     assert!(
         fixture.module_ready(),
         "fixture startup readiness must complete before the two-second lease-operation deadline is applied"
