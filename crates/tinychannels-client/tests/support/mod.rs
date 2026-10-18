@@ -20,8 +20,8 @@ use tinybus::{
     broker::Broker,
     module::{
         AccessFuture, CachedRelease, FailureReport, FailureReporter, FailureSink, ModuleAccess,
-        ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost, ModuleRuntime, ProxyFailure,
-        ReleaseAsset, ReleaseRecord, RuntimeNames,
+        ModuleCallError, ModuleCallFailure, ModuleClient, ModuleHost, ModuleRuntime, ModuleState,
+        ProxyFailure, ReleaseAsset, ReleaseRecord, RuntimeNames,
     },
     transport::memory::MemoryBus,
 };
@@ -310,6 +310,12 @@ impl BindStage {
 impl RuntimeFixture {
     pub(crate) fn bind_stage(&self) -> &'static str {
         BindStage::from_byte(self.bind_stage.load(Ordering::SeqCst)).label()
+    }
+
+    pub(crate) fn module_ready(&self) -> bool {
+        self.runtime.host().list().iter().any(|module| {
+            matches!(module.state, ModuleState::Ready | ModuleState::Serving)
+        })
     }
 }
 

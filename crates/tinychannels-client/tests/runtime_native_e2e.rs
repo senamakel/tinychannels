@@ -139,6 +139,10 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
     // This process starts exactly one ModuleRuntime. It loads the digest-pinned
     // native A artifact and also owns the lease callback and replacement B.
     let fixture = support::runtime_fixture().await;
+    assert!(
+        fixture.module_ready(),
+        "fixture startup readiness must complete before the two-second lease-operation deadline is applied"
+    );
     let serial_driver = fixture.client.runtime_driver().await.unwrap_or_else(|_| {
         panic!(
             "bind A before any runtime reservation; native fixture stage: {}",
