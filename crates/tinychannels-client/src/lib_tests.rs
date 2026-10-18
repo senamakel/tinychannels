@@ -8,11 +8,15 @@ use tinybus::{
     Connection, InterfaceName, MemberName, ObjectPath, Proxy,
     broker::Broker,
     module::{
-        AccessFuture, FailureReport, FailureReporter, FailureSink, ModuleAccess, ProxyFailure,
-        ReleaseAsset, ReleaseRecord,
+        AccessFuture, FailureReport, FailureReporter, FailureSink, ModuleAccess, ModuleCallError,
+        ModuleCallFailure, ModuleClient, ProxyFailure, ReleaseAsset, ReleaseRecord,
     },
     service::Interface,
     transport::memory::MemoryBus,
+};
+use tinychannels_bus::{
+    ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
+    controllers::DiscordGuild,
 };
 
 #[path = "lib_runtime_tests.rs"]

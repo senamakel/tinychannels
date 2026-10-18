@@ -3,16 +3,14 @@
 use serde::de::DeserializeOwned;
 use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
-    ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
+    ChannelControllerRequest, ChannelControllerResult, ChannelRuntimeDispatchPolicy,
+    ChannelsConfig, HttpProxyPolicy,
     controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
     methods,
 };
 
 use crate::runtime::RuntimeStart;
-use crate::{
-    ChannelRuntimeDispatchPolicy, ChannelRuntimeDriver, ChannelRuntimeError,
-    ChannelRuntimeOperation,
-};
+use crate::{ChannelRuntimeDriver, ChannelRuntimeError, ChannelRuntimeOperation};
 
 #[derive(Clone, Copy)]
 pub(super) enum DiscordReply {
