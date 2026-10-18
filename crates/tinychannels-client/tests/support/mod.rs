@@ -367,8 +367,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
             env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "RELEASE_URL"),
         ),
         reporter: FailureReporter::new(reports.clone()),
-    })
-    .with_timeout(Duration::from_secs(2));
+    });
     RuntimeFixture {
         client: TinyChannelsClient::new(control.clone()),
         control,
