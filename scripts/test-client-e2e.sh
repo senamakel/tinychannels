@@ -9,14 +9,16 @@ if [[ "$#" -gt 1 || ( "$#" -eq 1 && "$1" != "--prepare-only" ) ]]; then
   exit 64
 fi
 if [[ "$#" -eq 1 ]]; then prepare_only=1; fi
-if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+case "${RUNNER_OS:-$(uname -s)}" in
+  Windows|MINGW*|MSYS*|CYGWIN*)
   if [[ "$prepare_only" -eq 1 ]]; then
     pwsh -NoProfile -File scripts/test-client-e2e.ps1 -PrepareOnly
   else
     pwsh -NoProfile -File scripts/test-client-e2e.ps1
   fi
   exit
-fi
+  ;;
+esac
 TASK_TARGET_ROOT="$repo_root/target"
 host="$(rustc -vV | sed -n 's/^host: //p')"
 case "$host" in

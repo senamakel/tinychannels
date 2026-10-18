@@ -136,6 +136,9 @@ cargo test --features email,lark
   algorithms, history/context processing, configuration preparation and text
   segmentation. It re-exports the same bus DTOs.
 - `crates/tinychannels-module/` is the loadable TinyBus module.
+- `crates/tinychannels-client/` is the host-side typed API for confidential
+  module calls and identity-scoped runtime leases. It binds the attested module
+  once, then keeps reservation and object calls on that same peer.
 - The module keeps its original `StartChannel`, `StopChannel`, `SendMessage`,
   `ListChannels` and `ChannelStatus` members, and adds relay reservation/start/
   stop/status/send plus `Shutdown`, typed `SendChannelIntent`, and send-only
