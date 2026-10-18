@@ -56,6 +56,26 @@ class ClientNativeTopologyTests(unittest.TestCase):
                 self.assertRegex(source, rf"(?m)^async fn {re.escape(name)}\(")
             self.assertNotRegex(source, r"(?m)^\s*#\[ignore(?:\(|\])")
 
+    def test_runtime_bind_diagnostic_is_finite_and_content_free(self):
+        support = (ROOT / "crates/tinychannels-client/tests/support/mod.rs").read_text(
+            encoding="utf-8"
+        )
+        runtime_test = (ROOT / "crates/tinychannels-client/tests/runtime_native_e2e.rs").read_text(
+            encoding="utf-8"
+        )
+        for stage in (
+            "preparation_not_started",
+            "cached_load_in_progress",
+            "cached_load_failed",
+            "cached_load_complete",
+            "readiness_in_progress",
+            "readiness_failed",
+            "ready_before_peer_resolution",
+        ):
+            self.assertIn(f'"{stage}"', support)
+        self.assertIn("native fixture stage: {}", runtime_test)
+        self.assertIn("fixture.bind_stage()", runtime_test)
+
     def test_native_ci_runners_call_every_target_and_enforce_test_counts(self):
         shell_runner = (ROOT / "scripts/test-client-e2e.sh").read_text(encoding="utf-8")
         powershell_runner = (ROOT / "scripts/test-client-e2e.ps1").read_text(encoding="utf-8")
