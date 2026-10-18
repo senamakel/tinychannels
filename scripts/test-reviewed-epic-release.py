@@ -180,7 +180,7 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             return repo
 
         exact = repository_with_gitlink(TINYBUS_REV)
-        stale = repository_with_gitlink("0" * 40)
+        stale = repository_with_gitlink("1" * 40)
         missing = repository_with_gitlink(None)
         self.assertEqual(gitlink_revision(exact, "vendor/tinybus"), TINYBUS_REV)
         self.assertNotEqual(gitlink_revision(stale, "vendor/tinybus"), TINYBUS_REV)
