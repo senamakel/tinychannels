@@ -519,15 +519,11 @@ impl ModuleAccess for RuntimeAccess {
     }
 }
 
-pub(crate) async fn runtime_fixture() -> RuntimeFixture {
-    runtime_fixture_with_readiness(false).await
-}
-
 pub(crate) async fn gated_runtime_fixture() -> RuntimeFixture {
-    runtime_fixture_with_readiness(true).await
+    runtime_fixture_with_readiness().await
 }
 
-async fn runtime_fixture_with_readiness(hold_ready: bool) -> RuntimeFixture {
+async fn runtime_fixture_with_readiness() -> RuntimeFixture {
     let runtime = Box::leak(Box::new(
         ModuleRuntime::start(&RuntimeNames::default(), None)
             .expect("start one runtime for module and host callbacks"),
@@ -535,27 +531,19 @@ async fn runtime_fixture_with_readiness(hold_ready: bool) -> RuntimeFixture {
     let reports = Arc::new(Reports::default());
     let bind_stage = Arc::new(AtomicU8::new(0));
     let readiness_attempts = Arc::new(AtomicUsize::new(0));
-    let readiness_gate = hold_ready.then(|| {
-        Arc::new(ReadinessGate {
-            entered: tokio::sync::Semaphore::new(0),
-            release: tokio::sync::Semaphore::new(0),
-        })
+    let readiness_gate = Arc::new(ReadinessGate {
+        entered: tokio::sync::Semaphore::new(0),
+        release: tokio::sync::Semaphore::new(0),
     });
-    let readiness_gate_guard = if let Some(gate) = &readiness_gate {
-        Some(
-            runtime
-                .serve_host_object(
-                    tinybus::BusName::new(tinychannels_bus::HOST_BUS_NAME)
-                        .expect("TinyChannels host bus name"),
-                    ObjectPath::new(READINESS_GATE_PATH).expect("fixture readiness gate path"),
-                    ReadinessGateHost(Arc::clone(gate)),
-                )
-                .await
-                .expect("serve fixture readiness gate before loading the module"),
+    let readiness_gate_guard = runtime
+        .serve_host_object(
+            tinybus::BusName::new(tinychannels_bus::HOST_BUS_NAME)
+                .expect("TinyChannels host bus name"),
+            ObjectPath::new(READINESS_GATE_PATH).expect("fixture readiness gate path"),
+            ReadinessGateHost(Arc::clone(&readiness_gate)),
         )
-    } else {
-        None
-    };
+        .await
+        .expect("serve fixture readiness gate before loading the module");
     let access = Arc::new(RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
@@ -564,7 +552,7 @@ async fn runtime_fixture_with_readiness(hold_ready: bool) -> RuntimeFixture {
         reporter: FailureReporter::new(reports.clone()),
         bind_stage: Arc::clone(&bind_stage),
         readiness_attempts: Arc::clone(&readiness_attempts),
-        hold_ready,
+        hold_ready: true,
     });
     let startup_client =
         TinyChannelsClient::new(ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access))));
@@ -580,17 +568,15 @@ async fn runtime_fixture_with_readiness(hold_ready: bool) -> RuntimeFixture {
         bind_stage,
         readiness_attempts,
         access,
-        readiness_gate,
-        _readiness_gate_guard: readiness_gate_guard,
+        readiness_gate: Some(readiness_gate),
+        _readiness_gate_guard: Some(readiness_gate_guard),
     };
-    if hold_ready {
-        fixture
-            .access
-            .ensure_loaded(MODULE_ID)
-            .await
-            .expect("gated native fixture loads before waiting at the READY barrier");
-        fixture.wait_until_setup_is_held_before_ready().await;
-    }
+    fixture
+        .access
+        .ensure_loaded(MODULE_ID)
+        .await
+        .expect("gated native fixture loads before waiting at the READY barrier");
+    fixture.wait_until_setup_is_held_before_ready().await;
     fixture
 }
 
