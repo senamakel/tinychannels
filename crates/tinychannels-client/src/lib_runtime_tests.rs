@@ -9,6 +9,22 @@ fn runtime_driver_public_type_implements_the_sdk_lease_contract() {
     assert_driver::<ChannelRuntimeDriver>();
 }
 
+#[test]
+fn runtime_errors_keep_typed_causes_without_remote_payloads() {
+    let error = ChannelRuntimeError::module(
+        ChannelRuntimeOperation::Stop,
+        tinybus::module::ModuleCallError::ModuleFault,
+    );
+    assert_eq!(error.operation(), ChannelRuntimeOperation::Stop);
+    assert_eq!(
+        error.kind(),
+        ChannelRuntimeErrorKind::Module(tinybus::module::ModuleCallError::ModuleFault)
+    );
+    assert!(error.source().is_some());
+    assert!(!format!("{error:?}").contains("private remote payload"));
+    assert!(!error.to_string().contains("private remote payload"));
+}
+
 #[tokio::test]
 async fn runtime_driver_builders_bind_strictly_before_any_runtime_call() {
     let (client, calls) = unattested_client().await;

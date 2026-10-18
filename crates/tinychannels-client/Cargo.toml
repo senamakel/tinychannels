@@ -9,6 +9,7 @@ repository = "https://github.com/tinyhumansai/tinychannels"
 publish = false
 
 [dependencies]
+async-trait = "0.1"
 tinybus = { workspace = true }
 tinychannels-bus = { path = "../tinychannels-bus" }
 serde = { version = "1", features = ["derive"] }
@@ -19,7 +20,6 @@ default = []
 native-e2e = []
 
 [dev-dependencies]
-async-trait = "0.1"
 tinybus = { workspace = true, features = ["macros", "modules"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 
