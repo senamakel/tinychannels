@@ -126,3 +126,7 @@ impl std::error::Error for ChannelRuntimeError {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "types_tests.rs"]
+mod tests;
