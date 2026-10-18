@@ -349,6 +349,17 @@ impl RuntimeFixture {
             .add_permits(1);
     }
 
+    pub(crate) async fn wait_until_gate_callback_returns(&self) {
+        self.readiness_gate
+            .as_ref()
+            .expect("gated fixture has a readiness gate")
+            .returned
+            .acquire()
+            .await
+            .expect("readiness gate stays open")
+            .forget();
+    }
+
     pub(crate) async fn wait_for_readiness_attempt(&self, previous: usize) {
         for _ in 0..10_000 {
             if self.readiness_attempts() > previous {
@@ -364,6 +375,7 @@ impl RuntimeFixture {
 struct ReadinessGate {
     entered: tokio::sync::Semaphore,
     release: tokio::sync::Semaphore,
+    returned: tokio::sync::Semaphore,
 }
 
 struct ReadinessGateHost(Arc<ReadinessGate>);
@@ -390,6 +402,7 @@ impl Interface for ReadinessGateHost {
             .await
             .map_err(|_| Error::failed("fixture readiness gate closed"))?
             .forget();
+        self.0.returned.add_permits(1);
         Ok(serde_json::Value::Null)
     }
 }
@@ -534,6 +547,7 @@ async fn runtime_fixture_with_readiness() -> RuntimeFixture {
     let readiness_gate = Arc::new(ReadinessGate {
         entered: tokio::sync::Semaphore::new(0),
         release: tokio::sync::Semaphore::new(0),
+        returned: tokio::sync::Semaphore::new(0),
     });
     let readiness_gate_guard = runtime
         .serve_host_object(

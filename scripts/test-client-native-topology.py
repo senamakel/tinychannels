@@ -18,7 +18,7 @@ TARGETS = {
         "typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_handover",
     ),
     "runtime_readiness_e2e": (
-        "cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld",
+        "withheld_ready_fails_closed_within_the_client_deadline",
     ),
     "native_module_runtime_e2e": (
         "actual_native_module_runs_provider_free_runtime_and_releases_callback_on_ack",

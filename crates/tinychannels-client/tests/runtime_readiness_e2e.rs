@@ -10,7 +10,7 @@ use tinybus::module::ModuleCallError;
 use tinychannels_client::ChannelRuntimeErrorKind;
 
 #[tokio::test(start_paused = true)]
-async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
+async fn withheld_ready_fails_closed_within_the_client_deadline() {
     // One ModuleRuntime owns the fixture and its gate for this process. The
     // module serves its object and claims its name before entering the host
     // callback gate, but TinyBus cannot publish READY until setup returns.
@@ -47,35 +47,14 @@ async fn cold_bind_waits_for_ready_and_fails_closed_when_ready_is_withheld() {
         "timed-out bind leaves fixture unready"
     );
 
-    // A default client has no extra caller deadline. It waits on the same cold
-    // setup barrier, then binds successfully after the fixture publishes READY.
-    let startup_client = fixture.startup_client.clone();
-    let before_startup_bind = fixture.readiness_attempts();
-    let startup_bind = tokio::spawn(async move { startup_client.runtime_driver().await });
-    wait_for_readiness_attempt(&fixture, before_startup_bind).await;
-    assert!(
-        !startup_bind.is_finished(),
-        "cold default-deadline bind remains pending at the setup barrier"
-    );
+    // Release the native setup task even on the negative path so its foreign
+    // Tokio runtime and the host callback do not remain blocked at process exit.
     fixture.release_ready();
-    let driver = startup_bind
+    fixture.wait_until_gate_callback_returns().await;
+    fixture
+        .runtime
+        .host()
+        .ensure_ready(tinychannels_bus::BUS_NAME)
         .await
-        .expect("default-deadline bind task completes")
-        .expect("cold attested bind succeeds after setup publishes READY");
-    assert!(
-        fixture.module_ready(),
-        "host observes READY for the fixture bus"
-    );
-    drop(driver);
-}
-
-async fn wait_for_readiness_attempt(fixture: &support::RuntimeFixture, previous: usize) {
-    for _ in 0..10_000 {
-        if fixture.readiness_attempts() > previous {
-            assert_eq!(fixture.bind_stage(), "readiness_in_progress");
-            return;
-        }
-        tokio::task::yield_now().await;
-    }
-    panic!("module client never entered host readiness preparation");
+        .expect("released readiness gate lets fixture setup finish cleanly");
 }
