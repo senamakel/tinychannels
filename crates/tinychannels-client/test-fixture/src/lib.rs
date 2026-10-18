@@ -32,7 +32,10 @@ const CONFIG_TOKEN: &str = "fixture-config-secret";
 const INVALID_INPUT: &str = "ai.tinyhumans.tinychannels.Error.InvalidInput";
 
 #[derive(Deserialize)]
-struct FixtureConfig {}
+struct FixtureConfig {
+    #[serde(default)]
+    hold_ready: bool,
+}
 
 struct FixtureService {
     connection: Connection,
@@ -50,6 +53,7 @@ struct RuntimeControls {
     reserve_release: tokio::sync::Semaphore,
     delivery_flags: Mutex<Vec<(String, bool)>>,
     stop_calls: AtomicUsize,
+    ready_release: tokio::sync::Semaphore,
     next_handle: AtomicU64,
 }
 
@@ -65,6 +69,7 @@ impl Default for RuntimeControls {
             reserve_release: tokio::sync::Semaphore::new(0),
             delivery_flags: Mutex::new(Vec::new()),
             stop_calls: AtomicUsize::new(0),
+            ready_release: tokio::sync::Semaphore::new(0),
             next_handle: AtomicU64::new(0),
         }
     }
@@ -92,6 +97,7 @@ impl Interface for FixtureService {
                 "FixturePauseReserve",
                 "FixtureWaitReserve",
                 "FixtureReleaseReserve",
+                "FixtureReleaseReady",
                 "FixtureTakeDeliveryFlags",
             ])
             .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
@@ -171,6 +177,10 @@ impl Interface for FixtureService {
             }
             "FixtureReleaseReserve" => {
                 self.runtime_controls.reserve_release.add_permits(1);
+                Ok(Value::Null)
+            }
+            "FixtureReleaseReady" => {
+                self.runtime_controls.ready_release.add_permits(1);
                 Ok(Value::Null)
             }
             "FixtureTakeDeliveryFlags" => {
@@ -722,7 +732,7 @@ fn invalid_input() -> Error {
     }
 }
 
-async fn setup(connection: Connection, _config: FixtureConfig) -> Result<()> {
+async fn setup(connection: Connection, config: FixtureConfig) -> Result<()> {
     let calls = Arc::new(AtomicUsize::new(0));
     let runtime_controls = Arc::new(RuntimeControls::default());
     connection
@@ -735,7 +745,16 @@ async fn setup(connection: Connection, _config: FixtureConfig) -> Result<()> {
             },
         )
         .await?;
-    connection.request_name(BUS_NAME).await
+    connection.request_name(BUS_NAME).await?;
+    if config.hold_ready {
+        runtime_controls
+            .ready_release
+            .acquire()
+            .await
+            .map_err(|_| Error::failed("readiness gate closed"))?
+            .forget();
+    }
+    Ok(())
 }
 
 tinybus_module::module_export! {
@@ -749,6 +768,7 @@ tinybus_module::module_export! {
             "FixtureFailStart", "FixtureFailStop", "FixtureStopCallCount",
             "FixtureMalformedReservation", "FixtureMalformedStatus",
             "FixturePauseReserve", "FixtureWaitReserve", "FixtureReleaseReserve",
+            "FixtureReleaseReady",
             "FixtureTakeDeliveryFlags",
             "ReserveRuntime", "StartRuntime", "StartRuntimeWithDispatch", "StopRuntime",
             "DescribeConfiguredChannels", "StartChannelSupervised", "StartOutboundChannel",

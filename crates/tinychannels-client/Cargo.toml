@@ -21,7 +21,7 @@ native-e2e = []
 
 [dev-dependencies]
 tinybus = { workspace = true, features = ["macros", "modules"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "test-util"] }
 
 [[test]]
 name = "native_e2e"
@@ -31,6 +31,11 @@ required-features = ["native-e2e"]
 [[test]]
 name = "runtime_native_e2e"
 path = "tests/runtime_native_e2e.rs"
+required-features = ["native-e2e"]
+
+[[test]]
+name = "runtime_readiness_e2e"
+path = "tests/runtime_readiness_e2e.rs"
 required-features = ["native-e2e"]
 
 [[test]]
