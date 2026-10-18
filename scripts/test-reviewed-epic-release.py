@@ -36,6 +36,27 @@ def workflow_run_block(step_name):
     return "\n".join(block) + "\n"
 
 
+def gitlink_revision(repo_root, path):
+    """Return a committed gitlink revision without requiring submodule contents."""
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "ls-tree", "HEAD", "--", path],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    entry = result.stdout.strip()
+    if not entry:
+        return None
+    metadata, separator, entry_path = entry.partition("\t")
+    fields = metadata.split()
+    if not separator or entry_path != path or len(fields) != 3:
+        return None
+    mode, object_type, revision = fields
+    if mode != "160000" or object_type != "commit":
+        return None
+    return revision
+
+
 def run_validator(**overrides):
     values = {
         "EVENT_NAME": "workflow_dispatch",
