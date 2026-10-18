@@ -289,7 +289,7 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
             .connection()
             .proxy(
                 tinychannels_bus::BUS_NAME,
-                &runtime_object_path(handle),
+                runtime_object_path(handle),
                 tinychannels_bus::BUS_NAME,
             )
             .expect("ordinary B object proxy")
@@ -545,12 +545,14 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
             .expect("unacknowledged START retains its callback"),
         "callback-live"
     );
+    let uncertain_object = uncertain_start_object
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .expect("SDK retains the typed object during uncertain START")
+        .clone();
     assert_eq!(
-        uncertain_start_object
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-            .expect("SDK retains the typed object during uncertain START")
+        uncertain_object
             .channel_status("discord".into())
             .await
             .expect("the captured object remains bound to A"),
@@ -697,7 +699,7 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         .connection()
         .proxy(
             tinychannels_bus::BUS_NAME,
-            &runtime_object_path(LAST_RUNTIME_HANDLE),
+            runtime_object_path(LAST_RUNTIME_HANDLE),
             tinychannels_bus::BUS_NAME,
         )
         .expect("ordinary B object after A disconnect")
