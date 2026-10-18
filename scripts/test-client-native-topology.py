@@ -65,7 +65,7 @@ class ClientNativeTopologyTests(unittest.TestCase):
         for target, count in EXPECTED_COUNTS.items():
             self.assertEqual(shell_runner.count(f"run_counted_test {count} {target}"), 1)
             self.assertIn(f"--test {target}", shell_runner)
-            self.assertIn(f"'-Name', '{target}' -ExpectedCount {count}", powershell_runner)
+            self.assertIn(f"-Name '{target}' -ExpectedCount {count}", powershell_runner)
             self.assertIn(f"'--test', '{target}'", powershell_runner)
 
         unix_e2e = (ROOT / "scripts/test-e2e.sh").read_text(encoding="utf-8")
