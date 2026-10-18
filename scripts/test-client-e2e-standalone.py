@@ -70,7 +70,13 @@ if args[0] == 'build':
     output.mkdir(parents=True, exist_ok=True)
     library = 'libtinychannels_module.dylib' if '-p' in args else 'libtinychannels_client_test_fixture.dylib'
     (output / library).write_bytes(b'fake native library: ' + library.encode())
-elif args[0] != 'test':
+elif args[0] == 'test':
+    test_name = args[args.index('--test') + 1]
+    expected = {'native_e2e': 4, 'runtime_native_e2e': 1, 'native_module_runtime_e2e': 1}[test_name]
+    if os.environ.get('TINYCHANNELS_FAKE_ZERO_TEST_TARGET') == test_name:
+        expected = 0
+    print(f'test result: ok. {expected} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out')
+else:
     raise SystemExit(f'unexpected fake cargo command: {args[0]}')
 """,
     )
@@ -110,10 +116,10 @@ elif args[0] != 'test':
             fail(f"{label} client E2E script depends on files outside its standalone repository")
     if re.search(r"\$cancelAware|&\s*bash\s+\$cancelAware", powershell_script):
         fail("PowerShell client E2E script still wraps Cargo through an external helper")
-    if len(re.findall(r"(?m)^cargo\s+(?:build|test)\b", bash_script)) != 5:
-        fail("Bash client E2E script must invoke its five Cargo commands directly")
-    if len(re.findall(r"(?m)^&\s+cargo\s+(?:build|test)\b", powershell_script)) != 5:
-        fail("PowerShell client E2E script must invoke its five Cargo commands directly")
+    if len(re.findall(r"(?m)^cargo\s+build\b", bash_script)) != 2 or "cargo test" not in bash_script:
+        fail("Bash client E2E script must build both fixtures and run counted native tests")
+    if len(re.findall(r"(?m)^&\s+cargo build\b", powershell_script)) != 2 or "& cargo @Arguments" not in powershell_script:
+        fail("PowerShell client E2E script must build both fixtures and run counted native tests")
 
     calls = [json.loads(line) for line in cargo_log.read_text(encoding="utf-8").splitlines()]
     if len(calls) != 5 or [call["args"][0] for call in calls] != [
@@ -145,7 +151,19 @@ elif args[0] != 'test':
         if not output.is_file():
             fail(f"expected local staged module archive: {output}")
 
-    print("standalone client E2E scripts use only checkout-local files; fake Cargo captured 2 builds and 3 tests")
+    empty_env = dict(env, TINYCHANNELS_FAKE_ZERO_TEST_TARGET="native_e2e")
+    empty_result = subprocess.run(
+        ["bash", str(repo / "scripts" / "test-client-e2e.sh")],
+        cwd=repo,
+        env=empty_env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if empty_result.returncode == 0 or "expected 4" not in empty_result.stderr:
+        fail("client E2E runner accepted a successful Cargo command that reported zero native tests")
+
+    print("standalone client E2E scripts use checkout-local files; count guard rejected zero native tests")
 
 
 if __name__ == "__main__":
