@@ -269,6 +269,7 @@ pub(crate) struct RuntimeFixture {
     pub(crate) runtime: &'static ModuleRuntime,
     pub(crate) reports: Arc<Reports>,
     bind_stage: Arc<AtomicU8>,
+    access: Arc<RuntimeAccess>,
     readiness_gate: Option<Arc<ReadinessGate>>,
     _readiness_gate_guard: Option<HostObjectGuard>,
 }
@@ -517,6 +518,27 @@ async fn runtime_fixture_with_readiness(
     ));
     let reports = Arc::new(Reports::default());
     let bind_stage = Arc::new(AtomicU8::new(0));
+    let readiness_gate = hold_ready.then(|| {
+        Arc::new(ReadinessGate {
+            entered: tokio::sync::Semaphore::new(0),
+            release: tokio::sync::Semaphore::new(0),
+        })
+    });
+    let readiness_gate_guard = if let Some(gate) = &readiness_gate {
+        Some(
+            runtime
+                .serve_host_object(
+                    tinybus::BusName::new(tinychannels_bus::HOST_BUS_NAME)
+                        .expect("TinyChannels host bus name"),
+                    ObjectPath::new(READINESS_GATE_PATH).expect("fixture readiness gate path"),
+                    ReadinessGateHost(Arc::clone(gate)),
+                )
+                .await
+                .expect("serve fixture readiness gate before loading the module"),
+        )
+    } else {
+        None
+    };
     let access = Arc::new(RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
@@ -542,14 +564,26 @@ async fn runtime_fixture_with_readiness(
     let control =
         ModuleClient::new(SharedRuntimeAccess(access)).with_timeout(Duration::from_secs(2));
     let client = TinyChannelsClient::new(control.clone());
-    RuntimeFixture {
+    let fixture = RuntimeFixture {
         client,
         startup_client,
         control,
         runtime,
         reports,
         bind_stage,
+        access,
+        readiness_gate,
+        _readiness_gate_guard: readiness_gate_guard,
+    };
+    if hold_ready {
+        fixture
+            .access
+            .ensure_loaded(MODULE_ID)
+            .await
+            .expect("gated native fixture loads before waiting at the READY barrier");
+        fixture.wait_until_setup_is_held_before_ready().await;
     }
+    fixture
 }
 
 /// The actual TinyChannels module cdylib, staged locally with both exact hashes.
@@ -560,7 +594,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
     ));
     let reports = Arc::new(Reports::default());
     let bind_stage = Arc::new(AtomicU8::new(0));
-    let control = ModuleClient::new(RuntimeAccess {
+    let access = Arc::new(RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
         record: native_module_record(),
@@ -572,6 +606,7 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
         bind_stage: Arc::clone(&bind_stage),
         hold_ready: false,
     });
+    let control = ModuleClient::new(SharedRuntimeAccess(Arc::clone(&access)));
     RuntimeFixture {
         client: TinyChannelsClient::new(control.clone()),
         startup_client: TinyChannelsClient::new(control.clone()),
@@ -579,6 +614,9 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
         runtime,
         reports,
         bind_stage,
+        access,
+        readiness_gate: None,
+        _readiness_gate_guard: None,
     }
 }
 
