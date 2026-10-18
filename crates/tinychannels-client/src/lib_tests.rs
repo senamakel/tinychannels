@@ -14,6 +14,9 @@ use tinybus::{
     transport::memory::MemoryBus,
 };
 
+#[path = "lib_runtime_tests.rs"]
+mod runtime_tests;
+
 const MODULE_ID: &str = "tinychannels";
 type Calls = Arc<Mutex<Vec<String>>>;
 
@@ -34,7 +37,9 @@ impl Interface for RecordingModule {
     fn members(&self) -> Vec<MemberName> {
         tinychannels_bus::METHODS
             .iter()
-            .map(|name| MemberName::new(*name).expect("valid TinyChannels method"))
+            .copied()
+            .chain(["FixtureReady"])
+            .map(|name| MemberName::new(name).expect("valid TinyChannels method"))
             .collect()
     }
 
@@ -47,6 +52,9 @@ impl Interface for RecordingModule {
             .lock()
             .map_err(|_| tinybus::Error::failed("call log poisoned"))?
             .push(member.as_str().to_owned());
+        if member.as_str() == "FixtureReady" {
+            return Ok(json!(true));
+        }
         Ok(json!({"result":"discord_guilds","value":{"raw":[]}}))
     }
 }

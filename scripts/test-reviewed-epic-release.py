@@ -12,7 +12,7 @@ WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@d463b7d93a3d6ea618e46365dffcf34ecc898462"
-TINYBUS_REV = "ed1ee4f5ee561c0320fa715eef114e0f1b888e41"
+TINYBUS_REV = "cba2de0e573f99fe4c7e45ba14e2d6b5a2a7757f"
 
 
 def workflow_run_block(step_name):
@@ -100,15 +100,15 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
                 self.assertEqual(output, "")
 
     def test_tag_must_be_v_prefixed_semver(self):
-        for value in ("0.1.35", "v0.1", "vrelease"):
+        for value in ("0.1.37", "v0.1", "vrelease"):
             with self.subTest(tag=value):
                 result, output = run_tag_resolver(value)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(output, "")
 
-        result, output = run_tag_resolver("v0.1.35")
+        result, output = run_tag_resolver("v0.1.37")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(output, "tag=v0.1.35\nversion=0.1.35\n")
+        self.assertEqual(output, "tag=v0.1.37\nversion=0.1.37\n")
 
     def test_workflow_calls_reviewed_release_with_skip_safe_numeric_pr(self):
         source = WORKFLOW.read_text(encoding="utf-8")
@@ -160,13 +160,13 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            f'tinybus = {{ version = "0.1.7", git = '
+            f'tinybus = {{ version = "0.3.2", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
         self.assertIn(
-            f'tinybus-module = {{ version = "0.1.7", git = '
+            f'tinybus-module = {{ version = "0.3.2", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
@@ -185,7 +185,7 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             'tinybus = { workspace = true, features = ["test-support"] }',
             module,
         )
-        self.assertIn('version = "0.1.7"', tinybus_workspace)
+        self.assertIn('version = "0.3.2"', tinybus_workspace)
         current = subprocess.run(
             ["git", "-C", str(ROOT / "vendor/tinybus"), "rev-parse", "HEAD"],
             check=True,
