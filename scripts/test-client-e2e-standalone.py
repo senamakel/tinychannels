@@ -154,7 +154,10 @@ else:
     environment_file = repo / "target" / "tinychannels-client-e2e.env"
     if not environment_file.is_file():
         fail("client fixture preparation did not write its reusable environment file")
-    environment = environment_file.read_text(encoding="utf-8")
+    environment_bytes = environment_file.read_bytes()
+    environment = environment_bytes.decode("utf-8")
+    if b"\r" in environment_bytes:
+        fail("prepared client fixture environment must use LF-only line endings")
     for key in (
         "TINYCHANNELS_CLIENT_TEST_CACHE",
         "TINYCHANNELS_CLIENT_TEST_ARCHIVE_NAME",
@@ -207,17 +210,34 @@ printf '%s\\0' \\
         fail("Bash sourced an invalid archive or library digest")
 
     crlf_value = r"D:\a\repo\target\fixture-cache"
-    crlf_env = repo / "target" / "windows-crlf-control.env"
-    crlf_env.write_bytes(f"export CLIENT_TEST_VALUE='{crlf_value}'\r\n".encode("utf-8"))
-    crlf_result = subprocess.run(
+    crlf_line_env = repo / "target" / "windows-crlf-line-ending-control.env"
+    crlf_line_env.write_bytes(f"export CLIENT_TEST_VALUE='{crlf_value}'\r\n".encode("utf-8"))
+    crlf_line_result = subprocess.run(
         [bash_executable, "-c", 'source "$1"; printf "%s" "$CLIENT_TEST_VALUE"',
-         "client-env-crlf-control", "target/windows-crlf-control.env"],
+         "client-env-crlf-line-ending-control", "target/windows-crlf-line-ending-control.env"],
         cwd=repo,
         check=False,
         capture_output=True,
     )
-    if crlf_result.returncode or crlf_result.stdout.decode("utf-8") != crlf_value + "\r":
-        fail("Bash CRLF control no longer reproduces the carriage return that corrupts env values")
+    trailing_cr = crlf_line_result.stdout[len(crlf_value.encode("utf-8")) :]
+    if crlf_line_result.returncode or trailing_cr not in (b"", b"\r"):
+        fail(f"Bash CRLF line-ending control had unexpected trailing bytes: {trailing_cr!r}")
+
+    embedded_cr_env = repo / "target" / "embedded-cr-control.env"
+    embedded_cr_env.write_bytes(f"export CLIENT_TEST_VALUE='{crlf_value}\r'\n".encode("utf-8"))
+    embedded_cr_result = subprocess.run(
+        [bash_executable, "-c", 'source "$1"; printf "%s" "$CLIENT_TEST_VALUE"',
+         "client-env-embedded-cr-control", "target/embedded-cr-control.env"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    if embedded_cr_result.returncode or embedded_cr_result.stdout.decode("utf-8") != crlf_value + "\r":
+        fail("Bash embedded-CR control did not preserve the corrupt environment value")
+    print(
+        "Bash CRLF trailing-byte repr: "
+        f"{trailing_cr!r}; embedded-CR control: retained; prepared env: LF-only"
+    )
 
     prepare_result = subprocess.run(
         [bash_executable, str(repo / "scripts" / "test-client-e2e.sh"), "--prepare-only"],
