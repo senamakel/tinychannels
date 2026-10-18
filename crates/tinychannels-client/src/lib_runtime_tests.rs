@@ -38,7 +38,6 @@ impl Interface for LifecyclePeer {
             tinychannels_bus::methods::RESERVE_RUNTIME,
             tinychannels_bus::methods::START_RUNTIME,
             tinychannels_bus::methods::STOP_RUNTIME,
-            "ChannelStatus",
         ]
         .into_iter()
         .map(|member| MemberName::new(member).expect("valid TinyChannels method"))
@@ -76,6 +75,15 @@ impl Interface for LifecyclePeer {
                         .map_err(|_| Error::failed("reservation gate closed"))?
                         .forget();
                 }
+                self.connection
+                    .serve_at(
+                        ObjectPath::new(OBJECT).expect("runtime object path"),
+                        ChannelObject {
+                            label: self.label,
+                            events: self.events.clone(),
+                        },
+                    )
+                    .await?;
                 Ok(serde_json::to_value(tinychannels_bus::ChannelRuntimeReservation {
                     handle: HANDLE.into(),
                     object_path: OBJECT.into(),
@@ -115,8 +123,34 @@ impl Interface for LifecyclePeer {
                 }
                 Ok(Value::Null)
             }
-            "ChannelStatus" => Ok(json!(self.label)),
             _ => Err(Error::failed("unexpected TinyChannels method")),
+        }
+    }
+}
+
+struct ChannelObject {
+    label: &'static str,
+    events: Events,
+}
+
+#[async_trait::async_trait]
+impl Interface for ChannelObject {
+    fn name(&self) -> InterfaceName {
+        InterfaceName::new(tinychannels_bus::BUS_NAME).expect("valid TinyChannels interface")
+    }
+
+    fn members(&self) -> Vec<MemberName> {
+        vec![MemberName::new("ChannelStatus").expect("valid status method")]
+    }
+
+    async fn call(&self, member: &MemberName, _: Value) -> tinybus::Result<Value> {
+        self.events
+            .lock()
+            .expect("event lock")
+            .push(format!("{}:{}", self.label, member.as_str()));
+        match member.as_str() {
+            "ChannelStatus" => Ok(json!(self.label)),
+            _ => Err(Error::failed("unexpected channel object method")),
         }
     }
 }
