@@ -142,9 +142,7 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
     let startup_client = fixture.startup_client.clone();
     let before_startup_bind = fixture.readiness_attempts();
     let startup_bind = tokio::spawn(async move { startup_client.runtime_driver().await });
-    let readiness_started = fixture
-        .readiness_attempt_started(before_startup_bind)
-        .await;
+    let readiness_started = fixture.readiness_attempt_started(before_startup_bind).await;
     let bind_pending_at_gate = !startup_bind.is_finished();
     fixture.release_ready();
     let startup_result = startup_bind.await;
@@ -160,7 +158,10 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         bind_pending_at_gate,
         "cold bind waits for host readiness while the fixture setup barrier is held"
     );
-    assert!(module_ready_after_release, "host observes READY for fixture A");
+    assert!(
+        module_ready_after_release,
+        "host observes READY for fixture A"
+    );
     drop(startup_driver);
     assert!(
         fixture.module_ready(),

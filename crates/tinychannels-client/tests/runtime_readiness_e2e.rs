@@ -20,9 +20,7 @@ async fn withheld_ready_fails_closed_within_the_client_deadline() {
     let limited_client = fixture.client.clone();
     let before_limited_bind = fixture.readiness_attempts();
     let limited_bind = tokio::spawn(async move { limited_client.runtime_driver().await });
-    let readiness_started = fixture
-        .readiness_attempt_started(before_limited_bind)
-        .await;
+    let readiness_started = fixture.readiness_attempt_started(before_limited_bind).await;
     let bind_pending_at_gate = !limited_bind.is_finished();
 
     // Native module startup and callback-gate entry above use real time. Pause
@@ -48,7 +46,10 @@ async fn withheld_ready_fails_closed_within_the_client_deadline() {
         Ok(Err(error)) => Some(error),
         _ => None,
     };
-    assert!(!module_ready_before_bind, "host must not report gated A as READY");
+    assert!(
+        !module_ready_before_bind,
+        "host must not report gated A as READY"
+    );
     assert!(
         readiness_started,
         "client entered host readiness while native setup remained gated"

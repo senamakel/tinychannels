@@ -80,6 +80,36 @@ class ClientNativeTopologyTests(unittest.TestCase):
         self.assertIn("native fixture stage: {}", runtime_test)
         self.assertIn("fixture.bind_stage()", runtime_test)
 
+    def test_readiness_deadline_pauses_only_after_foreign_gate_and_drains_before_asserts(self):
+        readiness = (ROOT / "crates/tinychannels-client/tests/runtime_readiness_e2e.rs").read_text(
+            encoding="utf-8"
+        )
+        ordered_markers = (
+            "support::gated_runtime_fixture().await",
+            ".readiness_attempt_started(before_limited_bind)",
+            "tokio::time::pause()",
+            "tokio::time::advance(Duration::from_secs(2)).await",
+            "let bind_outcome = limited_bind.await",
+            "tokio::time::resume()",
+            "fixture.release_ready()",
+            "fixture.wait_until_gate_callback_returns().await",
+            ".ensure_ready(tinychannels_bus::BUS_NAME)",
+            "assert!(!module_ready_before_bind",
+        )
+        positions = [readiness.index(marker) for marker in ordered_markers]
+        self.assertEqual(positions, sorted(positions))
+
+        runtime_test = (ROOT / "crates/tinychannels-client/tests/runtime_native_e2e.rs").read_text(
+            encoding="utf-8"
+        )
+        cold_bind = runtime_test.index("startup_client.runtime_driver()")
+        release = runtime_test.index("fixture.release_ready()", cold_bind)
+        cold_result = runtime_test.index("let startup_result = startup_bind.await", release)
+        bounded_bind = runtime_test.index("let serial_driver = fixture.client.runtime_driver()", cold_result)
+        self.assertEqual([cold_bind, release, cold_result, bounded_bind], sorted([
+            cold_bind, release, cold_result, bounded_bind
+        ]))
+
     def test_native_ci_runners_call_every_target_and_enforce_test_counts(self):
         shell_runner = (ROOT / "scripts/test-client-e2e.sh").read_text(encoding="utf-8")
         powershell_runner = (ROOT / "scripts/test-client-e2e.ps1").read_text(encoding="utf-8")
