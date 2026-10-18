@@ -14,9 +14,6 @@ use tinybus::{
     transport::memory::MemoryBus,
 };
 
-#[path = "lib_runtime_tests.rs"]
-mod runtime_tests;
-
 const MODULE_ID: &str = "tinychannels";
 type Calls = Arc<Mutex<Vec<String>>>;
 
