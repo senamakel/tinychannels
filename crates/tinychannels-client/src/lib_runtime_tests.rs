@@ -8,7 +8,7 @@ use std::{
 use serde_json::{Value, json};
 use tinybus::{
     BusName, Error, Interface, InterfaceName, MemberName, ObjectPath, broker::Broker,
-    module::{FailureReporter, ModuleRuntime, RetryPolicy, RuntimeNames},
+    module::{FailureReporter, ModuleRuntime, RetryPolicy, RuntimeLeaseDriver, RuntimeNames, StopOutcome},
     transport::memory::MemoryBus,
 };
 
@@ -24,6 +24,7 @@ struct LifecyclePeer {
     events: Events,
     reserve_started: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
     reserve_release: Option<Arc<tokio::sync::Semaphore>>,
+    stop_fails: bool,
 }
 
 #[async_trait::async_trait]
@@ -108,6 +109,9 @@ impl Interface for LifecyclePeer {
                     .and_then(Value::as_str);
                 if handle != Some(HANDLE) {
                     return Err(Error::failed("unexpected stop handle"));
+                }
+                if self.stop_fails {
+                    return Err(Error::failed("cleanup pending"));
                 }
                 Ok(Value::Null)
             }
@@ -233,6 +237,7 @@ async fn runtime_lease_stays_on_the_attested_peer_across_alias_handover() {
                 events: events.clone(),
                 reserve_started: Mutex::new(Some(reserve_started)),
                 reserve_release: Some(reserve_release.clone()),
+                stop_fails: false,
             },
         )
         .await
@@ -246,6 +251,7 @@ async fn runtime_lease_stays_on_the_attested_peer_across_alias_handover() {
                 events: events.clone(),
                 reserve_started: Mutex::new(None),
                 reserve_release: None,
+                stop_fails: false,
             },
         )
         .await
@@ -315,6 +321,65 @@ async fn runtime_lease_stays_on_the_attested_peer_across_alias_handover() {
             "peer-a:ChannelStatus",
             "peer-a:StopRuntime",
         ]
+    );
+    broker_task.abort();
+}
+
+#[tokio::test]
+async fn uncertain_stop_error_is_unacknowledged_even_when_peer_says_cleanup_pending() {
+    let bus = MemoryBus::new();
+    let broker = Broker::new();
+    let broker_task = broker.clone().spawn(bus.clone());
+    let service = Connection::connect(bus.connect().await.expect("service transport"))
+        .await
+        .expect("service connection");
+    let caller = Connection::connect(bus.connect().await.expect("caller transport"))
+        .await
+        .expect("caller connection");
+    let record = attested_record();
+    let events = Arc::new(Mutex::new(Vec::new()));
+    service
+        .serve_at(
+            ObjectPath::new(record.object_path).expect("module path"),
+            LifecyclePeer {
+                label: "peer-a",
+                connection: service.clone(),
+                events: events.clone(),
+                reserve_started: Mutex::new(None),
+                reserve_release: None,
+                stop_fails: true,
+            },
+        )
+        .await
+        .expect("serve module");
+    service
+        .request_name(record.bus_name)
+        .await
+        .expect("module owns alias");
+    broker.attest_module(
+        &service.unique_name().expect("unique bus name"),
+        tinybus::attest::Attestation {
+            name: BusName::new(record.bus_name).expect("module bus name"),
+            sha256: record.assets[0].sha256.to_owned(),
+            library_sha256: record.assets[0].library_sha256.map(str::to_owned),
+        },
+    );
+    let client = TinyChannelsClient::new(ModuleClient::new(StrictAccess {
+        connection: caller,
+        record,
+        reporter: FailureReporter::new(Arc::new(NoFailures)),
+    }));
+    let driver = client.runtime_driver().await.expect("bind attested peer");
+    let reservation = driver.reserve().await.expect("confidential reservation");
+
+    assert!(matches!(
+        driver.stop(&reservation).await,
+        StopOutcome::Unacknowledged(_)
+    ));
+    assert!(!driver.failed(&reservation));
+    assert_eq!(
+        *events.lock().expect("event log"),
+        ["peer-a:ReserveRuntime", "peer-a:StopRuntime"]
     );
     broker_task.abort();
 }
