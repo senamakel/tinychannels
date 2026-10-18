@@ -781,6 +781,7 @@ dependencies = [
  "tinybus",
  "tinybus-module",
  "tinychannels-bus",
+ "tokio",
 ]
 
 [[package]]
