@@ -9,6 +9,7 @@
 use std::{
     path::Path,
     sync::{Arc, Mutex, OnceLock},
+    time::Duration,
 };
 
 use tinybus::{
@@ -340,7 +341,7 @@ pub(crate) async fn runtime_fixture() -> RuntimeFixture {
         release: cached_release(),
         reporter: FailureReporter::new(reports.clone()),
     };
-    let control = ModuleClient::new(access);
+    let control = ModuleClient::new(access).with_timeout(Duration::from_secs(2));
     let client = TinyChannelsClient::new(control.clone());
     RuntimeFixture {
         client,
@@ -366,7 +367,8 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
             env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "RELEASE_URL"),
         ),
         reporter: FailureReporter::new(reports.clone()),
-    });
+    })
+    .with_timeout(Duration::from_secs(2));
     RuntimeFixture {
         client: TinyChannelsClient::new(control.clone()),
         control,
