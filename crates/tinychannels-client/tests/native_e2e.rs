@@ -457,6 +457,13 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
         .await
         .expect("A is live before reservation");
     assert!(ready);
+    assert!(
+        control
+            .call::<()>(tinychannels_bus::methods::START_RUNTIME, (RUNTIME_HANDLE,))
+            .await
+            .is_err(),
+        "the native fixture refuses an ordinary lifecycle call"
+    );
     control
         .call::<()>("FixtureReleaseAlias", ())
         .await
@@ -522,7 +529,27 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
         )
         .await
         .expect("reserve, export callback and start on the already-bound A");
-    assert!(matches!(
+    let ordinary_object = control
+        .object_client(RUNTIME_OBJECT_PATH)
+        .expect("test-only held object on A");
+    assert!(
+        ordinary_object
+            .call::<Vec<tinychannels_bus::module_runtime::ConfiguredChannelInfo>>(
+                tinychannels_bus::methods::DESCRIBE_CONFIGURED_CHANNELS,
+                (ChannelsConfig::default(), HttpProxyPolicy::default()),
+            )
+            .await
+            .is_err(),
+        "the native fixture refuses a confidential object call sent ordinarily"
+    );
+    assert!(
+        control
+            .call::<()>(tinychannels_bus::methods::STOP_RUNTIME, (RUNTIME_HANDLE,))
+            .await
+            .is_err(),
+        "the native fixture refuses an ordinary STOP"
+    );
+    assert_eq!(
         lease
             .object()
             .channel_status("discord".into())
