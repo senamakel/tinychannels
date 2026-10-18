@@ -45,6 +45,8 @@ struct FixtureService {
 struct RuntimeControls {
     fail_start: AtomicBool,
     fail_stop: AtomicBool,
+    malformed_reservation: AtomicBool,
+    malformed_status: AtomicBool,
     stop_calls: AtomicUsize,
     next_handle: AtomicU64,
 }
@@ -66,6 +68,8 @@ impl Interface for FixtureService {
                 "FixtureFailStart",
                 "FixtureFailStop",
                 "FixtureStopCallCount",
+                "FixtureMalformedReservation",
+                "FixtureMalformedStatus",
             ])
             .into_iter()
             .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
@@ -116,6 +120,18 @@ impl Interface for FixtureService {
                     .store(true, Ordering::SeqCst);
                 Ok(Value::Null)
             }
+            "FixtureMalformedReservation" => {
+                self.runtime_controls
+                    .malformed_reservation
+                    .store(true, Ordering::SeqCst);
+                Ok(Value::Null)
+            }
+            "FixtureMalformedStatus" => {
+                self.runtime_controls
+                    .malformed_status
+                    .store(true, Ordering::SeqCst);
+                Ok(Value::Null)
+            }
             "FixtureReleaseAlias" => {
                 self.connection.release_name(BUS_NAME).await?;
                 Ok(Value::Null)
@@ -160,6 +176,17 @@ impl Interface for FixtureService {
 
 impl FixtureService {
     async fn reserve_runtime(&self) -> Result<Value> {
+        if self
+            .runtime_controls
+            .malformed_reservation
+            .swap(false, Ordering::SeqCst)
+        {
+            return Ok(json!({
+                "handle": 17,
+                "object_path": "invalid-runtime-object",
+                "host_object_path": "invalid-host-object"
+            }));
+        }
         let handle = format!(
             "{:032x}",
             self.runtime_controls
@@ -366,6 +393,7 @@ impl FixtureService {
 
 struct FixtureObject {
     calls: Arc<AtomicUsize>,
+    runtime_controls: Arc<RuntimeControls>,
 }
 
 #[async_trait]
@@ -471,6 +499,13 @@ impl Interface for FixtureObject {
             methods::CHANNEL_STATUS => {
                 let values = arguments(&args, 1)?;
                 let _: String = decode(values, 0)?;
+                if self
+                    .runtime_controls
+                    .malformed_status
+                    .swap(false, Ordering::SeqCst)
+                {
+                    return Ok(json!({"unexpected":"object reply"}));
+                }
                 Ok(json!("peer-a"))
             }
             methods::SEND_CHANNEL_INTENT => {
