@@ -20,7 +20,7 @@ fn runtime_errors_keep_typed_causes_without_remote_payloads() {
         error.kind(),
         ChannelRuntimeErrorKind::Module(tinybus::module::ModuleCallError::ModuleFault)
     );
-    assert!(error.source().is_some());
+    assert!(std::error::Error::source(&error).is_some());
     assert!(!format!("{error:?}").contains("private remote payload"));
     assert!(!error.to_string().contains("private remote payload"));
 }

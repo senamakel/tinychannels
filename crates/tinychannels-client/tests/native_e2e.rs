@@ -621,7 +621,7 @@ async fn runtime_driver_keeps_calls_on_attested_a_after_ordinary_unattested_b_ta
         .await
         .expect("confidential prepared intent");
     assert!(prepared.legacy_message.is_null());
-    assert_eq!(
+    assert!(matches!(
         lease
             .object()
             .channel_interaction(ChannelInteractionRequest {
@@ -717,4 +717,103 @@ async fn dispatch_policy_uses_only_the_explicit_runtime_start_method() {
         .await
         .expect("StartRuntimeWithDispatch exact policy reply");
     assert!(lease.close().await.is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn opaque_start_and_stop_errors_remain_unacknowledged_and_keep_callback_live() {
+    let fixture = support::runtime_fixture().await;
+    let driver = fixture
+        .client
+        .runtime_driver()
+        .await
+        .expect("strictly bind the native fixture");
+    let bound = fixture
+        .control
+        .bind_attested("tinychannels")
+        .await
+        .expect("hold fixture controls on the same native peer");
+    bound
+        .call::<()>("FixtureFailStart", ())
+        .await
+        .expect("configure an opaque start failure");
+    let activation = fixture
+        .runtime
+        .lease(
+            driver,
+            |_, _| Ok(FixtureCallback),
+            RetryPolicy::new(Duration::from_millis(100), vec![])
+                .expect("valid start fixture policy"),
+            |_| {},
+        )
+        .await;
+    assert!(activation.is_err(), "opaque START failure is not success");
+    let stop_calls: usize = bound
+        .call("FixtureStopCallCount", ())
+        .await
+        .expect("read stop count after unacknowledged start");
+    assert_eq!(stop_calls, 0, "unacknowledged START is never rolled back by STOP");
+    assert_eq!(
+        driverless_callback_probe(fixture.runtime)
+            .await
+            .expect("unacknowledged START retains the callback"),
+        "callback-live"
+    );
+
+    // Use a separate staged module instance for STOP uncertainty so the
+    // intentionally retained START callback does not share test state.
+    let fixture = support::runtime_fixture().await;
+    let driver = fixture
+        .client
+        .runtime_driver()
+        .await
+        .expect("strictly bind the lease fixture");
+    let bound = fixture
+        .control
+        .bind_attested("tinychannels")
+        .await
+        .expect("hold lease fixture controls on the same peer");
+    let lease = fixture
+        .runtime
+        .lease(
+            driver,
+            |_, _| Ok(FixtureCallback),
+            RetryPolicy::new(Duration::from_millis(100), vec![Duration::from_millis(1)])
+                .expect("valid finite retry policy"),
+            |_| {},
+        )
+        .await
+        .expect("start the runtime before testing uncertain STOP");
+    bound
+        .call::<()>("FixtureFailStop", ())
+        .await
+        .expect("configure the opaque cleanup-pending stop failure");
+
+    assert!(lease.close().await.is_err());
+    assert!(lease.close().await.is_err());
+    let stop_calls: usize = bound
+        .call("FixtureStopCallCount", ())
+        .await
+        .expect("read the fixture's stop count");
+    assert_eq!(stop_calls, 1, "uncertain STOP is never retried");
+    assert_eq!(
+        driverless_callback_probe(fixture.runtime)
+            .await
+            .expect("unacknowledged STOP retains the exact callback"),
+        "callback-live"
+    );
+}
+
+async fn driverless_callback_probe(
+    runtime: &'static tinybus::module::ModuleRuntime,
+) -> std::result::Result<String, ModuleCallError> {
+    runtime
+        .connection()
+        .proxy(
+            tinychannels_bus::HOST_BUS_NAME,
+            RUNTIME_CALLBACK_PATH,
+            tinychannels_bus::HOST_BUS_NAME,
+        )
+        .map_err(|_| tinybus::ModuleCallError::IncompatibleContract)?
+        .call("FixtureCallback", ())
+        .await
 }

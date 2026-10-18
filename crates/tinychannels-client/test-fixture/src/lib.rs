@@ -2,7 +2,7 @@
 
 use std::sync::{
     Arc,
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 use async_trait::async_trait;
@@ -39,6 +39,14 @@ struct FixtureConfig {}
 struct FixtureService {
     connection: Connection,
     calls: Arc<AtomicUsize>,
+    runtime_controls: Arc<RuntimeControls>,
+}
+
+#[derive(Default)]
+struct RuntimeControls {
+    fail_start: AtomicBool,
+    fail_stop: AtomicBool,
+    stop_calls: AtomicUsize,
 }
 
 #[async_trait]
@@ -55,6 +63,9 @@ impl Interface for FixtureService {
             "FixtureReady",
             "FixtureReleaseAlias",
             "FixtureDisconnect",
+            "FixtureFailStart",
+            "FixtureFailStop",
+            "FixtureStopCallCount",
         ])
         .into_iter()
         .map(|method| MemberName::new(method).expect("TinyChannels member is valid"))
@@ -85,9 +96,20 @@ impl Interface for FixtureService {
         if member.as_str() == "FixtureCallCount" {
             return Ok(json!(self.calls.load(Ordering::SeqCst)));
         }
+        if member.as_str() == "FixtureStopCallCount" {
+            return Ok(json!(self.runtime_controls.stop_calls.load(Ordering::SeqCst)));
+        }
         self.calls.fetch_add(1, Ordering::SeqCst);
         match member.as_str() {
             "FixtureReady" => Ok(json!(true)),
+            "FixtureFailStart" => {
+                self.runtime_controls.fail_start.store(true, Ordering::SeqCst);
+                Ok(Value::Null)
+            }
+            "FixtureFailStop" => {
+                self.runtime_controls.fail_stop.store(true, Ordering::SeqCst);
+                Ok(Value::Null)
+            }
             "FixtureReleaseAlias" => {
                 self.connection.release_name(BUS_NAME).await?;
                 Ok(Value::Null)
@@ -103,8 +125,14 @@ impl Interface for FixtureService {
             methods::START_RUNTIME => self.start_runtime(args, false).await,
             methods::START_RUNTIME_WITH_DISPATCH => self.start_runtime(args, true).await,
             methods::STOP_RUNTIME => {
+                self.runtime_controls
+                    .stop_calls
+                    .fetch_add(1, Ordering::SeqCst);
                 if first_string(&args)? != RUNTIME_HANDLE {
                     return Err(Error::failed("runtime stop handle mismatch"));
+                }
+                if self.runtime_controls.fail_stop.load(Ordering::SeqCst) {
+                    return Err(Error::failed("cleanup pending"));
                 }
                 Ok(Value::Null)
             }
@@ -125,9 +153,7 @@ impl FixtureService {
         self.connection
             .serve_at(
                 ObjectPath::new(RUNTIME_OBJECT_PATH)?,
-                FixtureObject {
-                    calls: Arc::clone(&self.calls),
-                },
+                FixtureObject { calls: Arc::clone(&self.calls) },
             )
             .await?;
         serde_json::to_value(reservation).map_err(|_| Error::failed("fixture serialization failed"))
@@ -143,6 +169,9 @@ impl FixtureService {
             if policy.listener_count != 2 {
                 return Err(Error::failed("runtime dispatch policy mismatch"));
             }
+        }
+        if self.runtime_controls.fail_start.load(Ordering::SeqCst) {
+            return Err(Error::failed("cleanup pending"));
         }
         let callback = self
             .connection
@@ -537,12 +566,14 @@ fn invalid_input() -> Error {
 
 async fn setup(connection: Connection, _config: FixtureConfig) -> Result<()> {
     let calls = Arc::new(AtomicUsize::new(0));
+    let runtime_controls = Arc::new(RuntimeControls::default());
     connection
         .serve_at(
             ObjectPath::new(OBJECT_PATH)?,
             FixtureService {
                 connection: connection.clone(),
                 calls,
+                runtime_controls,
             },
         )
         .await?;
@@ -557,6 +588,7 @@ tinybus_module::module_export! {
         methods = [
             "ChannelController", "CheckChannelHealth", "FixtureCallCount",
             "FixtureReady", "FixtureReleaseAlias", "FixtureDisconnect",
+            "FixtureFailStart", "FixtureFailStop", "FixtureStopCallCount",
             "ReserveRuntime", "StartRuntime", "StartRuntimeWithDispatch", "StopRuntime",
             "DescribeConfiguredChannels", "StartChannelSupervised", "StartOutboundChannel",
             "PrepareChannelControl", "ExecuteProgressive", "PrepareOutboundIntent",
