@@ -39,6 +39,7 @@ the host connection. These proofs remain separate from controlled peer
 handover.
 
 Run `scripts/test-features.sh` for the all-feature lanes. It stages the local
-artifacts before invoking Cargo, including the four client native targets and
-their expected test counts. Those targets remain required; a bare Cargo
-all-features invocation does not substitute for the staged native suite.
+artifacts before the feature-enabled Cargo run, including the four client
+native targets and their expected test counts. Those targets remain required;
+a bare Cargo all-features invocation does not substitute for the staged native
+suite.

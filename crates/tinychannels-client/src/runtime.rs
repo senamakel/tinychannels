@@ -5,8 +5,7 @@ use serde::de::DeserializeOwned;
 use tinybus::{
     BusName, ObjectPath,
     module::{
-        BoundModuleClient, ModuleCallError, ModuleObjectClient, RuntimeLeaseDriver, StartOutcome,
-        StopOutcome,
+        BoundModuleClient, ModuleObjectClient, RuntimeLeaseDriver, StartOutcome, StopOutcome,
     },
 };
 use tinychannels_bus::{
