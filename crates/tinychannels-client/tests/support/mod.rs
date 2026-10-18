@@ -1,6 +1,10 @@
 //! Cached native module fixtures for the public client integration tests.
 
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+#![allow(
+    dead_code,
+    reason = "the native fixtures are shared by separate integration targets"
+)]
 
 use std::{
     path::Path,

@@ -85,8 +85,10 @@ impl Interface for UnattestedReplacementObject {
     }
 
     fn members(&self) -> Vec<MemberName> {
-        vec![MemberName::new(tinychannels_bus::methods::CHANNEL_STATUS)
-            .expect("channel status method")]
+        vec![
+            MemberName::new(tinychannels_bus::methods::CHANNEL_STATUS)
+                .expect("channel status method"),
+        ]
     }
 
     async fn call(
@@ -221,13 +223,15 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         .expect("read B's owner")
         .expect("B owns the alias");
     assert!(b_owner.is_unique());
-    assert!(fixture
-        .runtime
-        .connection()
-        .attestation(b_owner)
-        .await
-        .expect("public B attestation lookup")
-        .is_none());
+    assert!(
+        fixture
+            .runtime
+            .connection()
+            .attestation(b_owner)
+            .await
+            .expect("public B attestation lookup")
+            .is_none()
+    );
     let b_ready: bool = fixture
         .runtime
         .connection()
@@ -292,12 +296,14 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
 
     // Exact typed object request/response projections. The fixture decodes
     // positional arguments and marks confidential members as such.
-    assert!(serial_lease
-        .object()
-        .describe_configured_channels(ChannelsConfig::default(), HttpProxyPolicy::default())
-        .await
-        .expect("confidential DescribeConfiguredChannels")
-        .is_empty());
+    assert!(
+        serial_lease
+            .object()
+            .describe_configured_channels(ChannelsConfig::default(), HttpProxyPolicy::default())
+            .await
+            .expect("confidential DescribeConfiguredChannels")
+            .is_empty()
+    );
     serial_lease
         .object()
         .start_channel_supervised(
@@ -370,7 +376,10 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
     assert_eq!(
         serial_lease
             .object()
-            .start_relay(relay.clone(), tinychannels_bus::config::RelayRuntimeConfig::default())
+            .start_relay(
+                relay.clone(),
+                tinychannels_bus::config::RelayRuntimeConfig::default()
+            )
             .await
             .expect("confidential StartRelay response"),
         tinychannels_bus::relay::CapabilityDescriptor::default()
@@ -399,21 +408,28 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
     let ordinary_a_object = control
         .object_client(&runtime_object_path(FIRST_RUNTIME_HANDLE))
         .expect("test-only held object on A");
-    assert!(ordinary_a_object
-        .call::<Vec<tinychannels_bus::module_runtime::ConfiguredChannelInfo>>(
-            tinychannels_bus::methods::DESCRIBE_CONFIGURED_CHANNELS,
-            (ChannelsConfig::default(), HttpProxyPolicy::default()),
-        )
-        .await
-        .is_err());
-    assert!(control
-        .call::<()>(
-            tinychannels_bus::methods::STOP_RUNTIME,
-            (runtime_handle(FIRST_RUNTIME_HANDLE),),
-        )
-        .await
-        .is_err());
-    assert!(serial_lease.close().await.is_ok(), "decoded STOP unit is ACK");
+    assert!(
+        ordinary_a_object
+            .call::<Vec<tinychannels_bus::module_runtime::ConfiguredChannelInfo>>(
+                tinychannels_bus::methods::DESCRIBE_CONFIGURED_CHANNELS,
+                (ChannelsConfig::default(), HttpProxyPolicy::default()),
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        control
+            .call::<()>(
+                tinychannels_bus::methods::STOP_RUNTIME,
+                (runtime_handle(FIRST_RUNTIME_HANDLE),),
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        serial_lease.close().await.is_ok(),
+        "decoded STOP unit is ACK"
+    );
     assert!(callback_probe(fixture.runtime, &serial_path).await.is_err());
 
     let dispatch_lease = fixture
@@ -456,8 +472,7 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
             move |reservation, object| {
                 *uncertain_start_capture
                     .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                    Some(object.clone());
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(object.clone());
                 *uncertain_start_path_capture
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner) =
@@ -495,7 +510,10 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         .call("FixtureStopCallCount", ())
         .await
         .expect("read stop count after uncertain start");
-    assert_eq!(stops_after_uncertain_start, 2, "Unacknowledged START sends no STOP");
+    assert_eq!(
+        stops_after_uncertain_start, 2,
+        "Unacknowledged START sends no STOP"
+    );
 
     control
         .call::<()>("FixtureFailStop", ())
@@ -514,11 +532,8 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
                     Some(reservation.host_object_path.clone());
                 Ok(FixtureCallback)
             },
-            RetryPolicy::new(
-                Duration::from_millis(100),
-                vec![Duration::from_millis(1)],
-            )
-            .expect("finite retry policy cannot retry opaque STOP"),
+            RetryPolicy::new(Duration::from_millis(100), vec![Duration::from_millis(1)])
+                .expect("finite retry policy cannot retry opaque STOP"),
             |_| {},
         )
         .await
@@ -562,11 +577,13 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
     // object fails while the ordinary B controls remain available.
     let _ = control.call::<()>("FixtureDisconnect", ()).await;
     assert!(control.call::<bool>("FixtureReady", ()).await.is_err());
-    assert!(stop_lease
-        .object()
-        .channel_status("discord".into())
-        .await
-        .is_err());
+    assert!(
+        stop_lease
+            .object()
+            .channel_status("discord".into())
+            .await
+            .is_err()
+    );
     let b_ready_after_disconnect: bool = fixture
         .control
         .call("tinychannels", "FixtureReady", ())

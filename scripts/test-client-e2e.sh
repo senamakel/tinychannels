@@ -25,6 +25,7 @@ esac
 fixture_manifest="$repo_root/crates/tinychannels-client/test-fixture/Cargo.toml"
 fixture_library="$TASK_TARGET_ROOT/debug/$library_name"
 native_module_library="$TASK_TARGET_ROOT/debug/$native_library_name"
+cancel_aware="$repo_root/../../scripts/ci-cancel-aware.sh"
 stage="$TASK_TARGET_ROOT/tinychannels-client-e2e"
 cache="$stage/cache"
 archive_name="tinychannels-module-client-test.tar.gz"
@@ -34,8 +35,8 @@ native_cache="$native_stage/cache"
 native_archive_name="tinychannels-module-native-test.tar.gz"
 native_archive="$native_stage/$native_archive_name"
 
-cargo build --manifest-path "$fixture_manifest" --locked --target-dir "$TASK_TARGET_ROOT"
-cargo build --manifest-path "$repo_root/Cargo.toml" --locked --target-dir "$TASK_TARGET_ROOT" -p tinychannels-module
+"$cancel_aware" cargo build --manifest-path "$fixture_manifest" --locked --target-dir "$TASK_TARGET_ROOT"
+"$cancel_aware" cargo build --manifest-path "$repo_root/Cargo.toml" --locked --target-dir "$TASK_TARGET_ROOT" -p tinychannels-module
 rm -rf "$stage"
 rm -rf "$native_stage"
 mkdir -p "$cache"
@@ -77,9 +78,9 @@ export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256="$native_archive_ha
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256="$native_library_sha256"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37"
 
-cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+"$cancel_aware" cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test native_e2e -- --test-threads=1
-cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+"$cancel_aware" cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test runtime_native_e2e -- --test-threads=1
-cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
+"$cancel_aware" cargo test --manifest-path "$repo_root/Cargo.toml" --locked \
   -p tinychannels-client --features native-e2e --test native_module_runtime_e2e -- --test-threads=1

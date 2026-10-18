@@ -342,4 +342,3 @@ async fn wrong_release_pins_and_unattested_peers_are_refused_before_business_cal
         owner
     );
 }
-

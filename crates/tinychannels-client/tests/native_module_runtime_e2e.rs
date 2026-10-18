@@ -10,7 +10,7 @@ use std::{
 mod support;
 
 use tinybus::{Interface, InterfaceName, MemberName, module::RetryPolicy};
-use tinychannels_bus::{ChannelsConfig, HttpProxyPolicy, ChannelRuntimeReservation};
+use tinychannels_bus::{ChannelRuntimeReservation, ChannelsConfig, HttpProxyPolicy};
 
 #[derive(Clone)]
 struct FixtureCallback;

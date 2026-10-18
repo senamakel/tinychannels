@@ -138,7 +138,11 @@ impl Interface for FixtureService {
                 if handle.len() != 32 {
                     return Err(Error::failed("runtime stop handle mismatch"));
                 }
-                if self.runtime_controls.fail_stop.swap(false, Ordering::SeqCst) {
+                if self
+                    .runtime_controls
+                    .fail_stop
+                    .swap(false, Ordering::SeqCst)
+                {
                     return Err(Error::failed("cleanup pending"));
                 }
                 let (object_path, _) = runtime_paths(handle);
@@ -194,7 +198,11 @@ impl FixtureService {
                 return Err(Error::failed("runtime dispatch policy mismatch"));
             }
         }
-        if self.runtime_controls.fail_start.swap(false, Ordering::SeqCst) {
+        if self
+            .runtime_controls
+            .fail_start
+            .swap(false, Ordering::SeqCst)
+        {
             return Err(Error::failed("cleanup pending"));
         }
         let (_, callback_path) = runtime_paths(handle);
