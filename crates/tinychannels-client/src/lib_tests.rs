@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 use tinybus::{
-    Connection, InterfaceName, MemberName, ObjectPath,
+    Connection, InterfaceName, MemberName, ObjectPath, Proxy,
     broker::Broker,
     module::{
         AccessFuture, FailureReport, FailureReporter, FailureSink, ModuleAccess, ProxyFailure,
@@ -99,7 +99,7 @@ impl ModuleAccess for TestAccess {
     }
 }
 
-async fn unattested_client() -> (TinyChannelsClient, Calls) {
+async fn unattested_client() -> (TinyChannelsClient, Calls, Proxy) {
     let host_key = Box::leak(
         tinybus::module::platform::host_candidates()
             .into_iter()
@@ -148,12 +148,19 @@ async fn unattested_client() -> (TinyChannelsClient, Calls) {
     let caller = Connection::connect(bus.connect().await.expect("caller transport"))
         .await
         .expect("caller connection");
+    let control = caller
+        .proxy(
+            tinychannels_bus::BUS_NAME,
+            tinychannels_bus::OBJECT_PATH,
+            tinychannels_bus::BUS_NAME,
+        )
+        .expect("ordinary fixture control proxy");
     let module = ModuleClient::new(TestAccess {
         record,
         connection: caller,
         reporter: FailureReporter::new(Arc::new(NoFailures)),
     });
-    (TinyChannelsClient::new(module), calls)
+    (TinyChannelsClient::new(module), calls, control)
 }
 
 #[test]
@@ -243,7 +250,7 @@ fn discord_requests_keep_the_confidential_controller_wire_shape() {
 
 #[tokio::test]
 async fn discord_credentials_never_fall_back_when_peer_proof_is_missing() {
-    let (client, calls) = unattested_client().await;
+    let (client, calls, _) = unattested_client().await;
     let guilds = client
         .discord_list_guilds(
             ChannelsConfig::default(),

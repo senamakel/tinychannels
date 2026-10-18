@@ -27,20 +27,14 @@ fn runtime_errors_keep_typed_causes_without_remote_payloads() {
 
 #[tokio::test]
 async fn runtime_driver_builders_bind_strictly_before_any_runtime_call() {
-    let (client, calls) = unattested_client().await;
+    let (client, calls, control) = unattested_client().await;
 
     // The peer is alive and ordinary calls work, so refusing the runtime API
     // proves strict binding rather than a missing module or bus connection.
-    let ready: bool = client
-        .module
-        .call(MODULE_ID, "FixtureReady", ())
+    let ready: bool = control
+        .call("FixtureReady", ())
         .await
-        .unwrap_or_else(|error| {
-            panic!(
-                "ordinary readiness control succeeds on the live peer: {error:?}; calls={:?}",
-                calls.lock().expect("call log")
-            )
-        });
+        .expect("ordinary readiness control succeeds on the live peer");
     assert!(ready);
     let before = calls.lock().expect("call log").clone();
     assert_eq!(before, ["FixtureReady"]);
