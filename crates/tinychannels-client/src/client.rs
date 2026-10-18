@@ -9,7 +9,10 @@ use tinychannels_bus::{
 };
 
 use crate::runtime::RuntimeStart;
-use crate::{ChannelRuntimeDispatchPolicy, ChannelRuntimeDriver, ChannelRuntimeError};
+use crate::{
+    ChannelRuntimeDispatchPolicy, ChannelRuntimeDriver, ChannelRuntimeError,
+    ChannelRuntimeOperation,
+};
 
 #[derive(Clone, Copy)]
 pub(super) enum DiscordReply {
@@ -67,7 +70,7 @@ impl TinyChannelsClient {
             .map_err(|failure| {
                 ChannelRuntimeError::module(ChannelRuntimeOperation::Bind, failure.kind)
             })?;
-        Ok(ChannelRuntimeDriver { bound, start })
+        Ok(ChannelRuntimeDriver::new(bound, start))
     }
 
     /// List Discord guilds visible to the configured bot.

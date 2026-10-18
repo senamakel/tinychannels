@@ -70,14 +70,14 @@ pub struct ChannelRuntimeError {
 }
 
 impl ChannelRuntimeError {
-    pub(crate) fn module(operation: ChannelRuntimeOperation, kind: ModuleCallError) -> Self {
+    pub(super) fn module(operation: ChannelRuntimeOperation, kind: ModuleCallError) -> Self {
         Self {
             operation,
             kind: ChannelRuntimeErrorKind::Module(kind),
         }
     }
 
-    pub(crate) fn contract(
+    pub(super) fn contract(
         operation: ChannelRuntimeOperation,
         kind: ChannelRuntimeErrorKind,
     ) -> Self {

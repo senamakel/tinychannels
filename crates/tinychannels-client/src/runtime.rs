@@ -38,6 +38,12 @@ pub struct ChannelRuntimeDriver {
     start: RuntimeStart,
 }
 
+impl ChannelRuntimeDriver {
+    pub(super) fn new(bound: BoundModuleClient, start: RuntimeStart) -> Self {
+        Self { bound, start }
+    }
+}
+
 #[async_trait]
 impl RuntimeLeaseDriver for ChannelRuntimeDriver {
     type Reservation = ChannelRuntimeReservation;
