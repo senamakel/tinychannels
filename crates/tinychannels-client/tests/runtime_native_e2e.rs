@@ -137,7 +137,7 @@ async fn callback_probe(
             tinychannels_bus::HOST_BUS_NAME,
             path,
             tinychannels_bus::HOST_BUS_NAME,
-        )
+        )?
         .call("FixtureCallback", ())
         .await
 }
