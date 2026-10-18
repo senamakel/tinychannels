@@ -462,6 +462,58 @@ async fn typed_driver_preserves_peer_through_dispatch_uncertainty_and_alias_hand
         .await
         .expect("ordinary Shutdown");
 
+    let delivery_flags: Vec<(String, bool)> = control
+        .call("FixtureTakeDeliveryFlags", ())
+        .await
+        .expect("read broker-authenticated call classifications");
+    let confidential_methods = [
+        tinychannels_bus::methods::RESERVE_RUNTIME,
+        tinychannels_bus::methods::START_RUNTIME,
+        tinychannels_bus::methods::START_RUNTIME_WITH_DISPATCH,
+        tinychannels_bus::methods::STOP_RUNTIME,
+        tinychannels_bus::methods::DESCRIBE_CONFIGURED_CHANNELS,
+        tinychannels_bus::methods::START_CHANNEL_SUPERVISED,
+        tinychannels_bus::methods::START_OUTBOUND_CHANNEL,
+        tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+        tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
+        tinychannels_bus::methods::PREPARE_OUTBOUND_INTENT,
+        tinychannels_bus::methods::CHANNEL_INTERACTION,
+        tinychannels_bus::methods::START_RELAY,
+    ];
+    let tested_methods = [
+        tinychannels_bus::methods::RESERVE_RUNTIME,
+        tinychannels_bus::methods::START_RUNTIME,
+        tinychannels_bus::methods::START_RUNTIME_WITH_DISPATCH,
+        tinychannels_bus::methods::STOP_RUNTIME,
+        tinychannels_bus::methods::DESCRIBE_CONFIGURED_CHANNELS,
+        tinychannels_bus::methods::START_CHANNEL_SUPERVISED,
+        tinychannels_bus::methods::START_OUTBOUND_CHANNEL,
+        tinychannels_bus::methods::PREPARE_CHANNEL_CONTROL,
+        tinychannels_bus::methods::EXECUTE_PROGRESSIVE,
+        tinychannels_bus::methods::PREPARE_OUTBOUND_INTENT,
+        tinychannels_bus::methods::CHANNEL_INTERACTION,
+        tinychannels_bus::methods::START_RELAY,
+        tinychannels_bus::methods::RESERVE_RELAY,
+        tinychannels_bus::methods::STOP_RELAY,
+        tinychannels_bus::methods::CHANNEL_STATUS,
+        tinychannels_bus::methods::SEND_CHANNEL_INTENT,
+        tinychannels_bus::methods::SEND_RELAY_INTENT,
+        tinychannels_bus::methods::SHUTDOWN,
+    ];
+    for method in tested_methods {
+        assert!(
+            delivery_flags.iter().any(|(seen, _)| seen == method),
+            "the fixture observed the typed wrapper call for {method}"
+        );
+    }
+    for (method, confidential) in &delivery_flags {
+        assert_eq!(
+            *confidential,
+            confidential_methods.contains(&method.as_str()),
+            "delivery flag for {method}"
+        );
+    }
+
     let ordinary_a_object = control
         .object_client(&runtime_object_path(FIRST_RUNTIME_HANDLE))
         .expect("test-only held object on A");
