@@ -14,13 +14,14 @@ mod support;
 
 use tinybus::{
     BusName, Error, Interface, InterfaceName, MemberName, ObjectPath,
-    module::{ModuleCallError, RetryPolicy},
+    module::{ModuleCallError, RetryPolicy, RuntimeLeaseDriver},
 };
 use tinychannels_bus::{
-    ChannelControlRequest, ChannelControlResult, ChannelInteraction, ChannelInteractionRequest,
-    ChannelInteractionResult, ChannelMessagePreparation, ChannelOutboundIntent,
+    ChannelInteraction, ChannelInteractionRequest, ChannelInteractionResult, ChannelOutboundIntent,
     ChannelRuntimeDispatchPolicy, ChannelSupervisionPolicy, ChannelsConfig, HttpProxyPolicy,
-    ProgressiveCommand, ProgressiveResult, RelayReservation,
+    module_control::{ChannelControlRequest, ChannelControlResult},
+    module_progressive::{ProgressiveCommand, ProgressiveResult},
+    module_relay::RelayReservation,
 };
 use tinychannels_client::{ChannelRuntimeClient, ChannelRuntimeErrorKind};
 
@@ -128,7 +129,7 @@ fn runtime_callback_path(handle: u64) -> String {
 async fn callback_probe(
     runtime: &'static tinybus::module::ModuleRuntime,
     path: &str,
-) -> std::result::Result<String, ModuleCallError> {
+) -> tinybus::Result<String> {
     runtime
         .connection()
         .proxy(
