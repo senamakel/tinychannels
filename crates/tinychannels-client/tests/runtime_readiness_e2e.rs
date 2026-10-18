@@ -23,7 +23,9 @@ async fn withheld_ready_fails_closed_within_the_client_deadline() {
     let limited_client = fixture.client.clone();
     let before_limited_bind = fixture.readiness_attempts();
     let limited_bind = tokio::spawn(async move { limited_client.runtime_driver().await });
-    wait_for_readiness_attempt(&fixture, before_limited_bind).await;
+    fixture
+        .wait_for_readiness_attempt(before_limited_bind)
+        .await;
     assert!(
         !limited_bind.is_finished(),
         "a live fixture object is not a completed attested bind while READY is withheld"
