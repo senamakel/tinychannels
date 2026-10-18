@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use tinybus::{
     BusName, ObjectPath,
-    module::{BoundModuleClient, ModuleCallError, ModuleCallFailure, ModuleObjectClient, RuntimeLeaseDriver, StartOutcome, StopOutcome},
+    module::{BoundModuleClient, ModuleCallError, ModuleObjectClient, RuntimeLeaseDriver, StartOutcome, StopOutcome},
 };
 use tinychannels_bus::{
     ChannelInteractionRequest, ChannelInteractionResult, ChannelOutboundIntent,
@@ -19,7 +19,7 @@ use tinychannels_bus::{
 use crate::{ChannelRuntimeError, ChannelRuntimeErrorKind, ChannelRuntimeOperation};
 
 #[derive(Clone, Copy)]
-enum RuntimeStart {
+pub(super) enum RuntimeStart {
     Serial,
     Dispatch(ChannelRuntimeDispatchPolicy),
 }

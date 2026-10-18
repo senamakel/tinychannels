@@ -26,7 +26,7 @@ impl ChannelRuntimeReservation {
     ///
     /// The error is deliberately content-free so callers can report it without
     /// exposing a supplied handle or object path.
-    pub fn validate(&self) -> Result<(), &'static str> {
+    pub fn validate(&self) -> crate::Result<()> {
         const INVALID: &str = "invalid channel runtime reservation";
 
         if self.handle.len() != 32
@@ -35,14 +35,14 @@ impl ChannelRuntimeReservation {
                 .bytes()
                 .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
         {
-            return Err(INVALID);
+            return Err(crate::TinyChannelsError::new(INVALID));
         }
 
         let runtime_suffix = format!("/runtime_{}", self.handle);
         if self.object_path != format!("{}{}", crate::OBJECT_PATH, runtime_suffix)
             || self.host_object_path != format!("{}{}", crate::HOST_OBJECT_PATH, runtime_suffix)
         {
-            return Err(INVALID);
+            return Err(crate::TinyChannelsError::new(INVALID));
         }
 
         Ok(())

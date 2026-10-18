@@ -1,13 +1,14 @@
 //! Typed top-level module operations.
 
 use serde::de::DeserializeOwned;
-use tinybus::{module::{ModuleCallError, ModuleCallFailure, ModuleClient},};
+use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy, methods,
     controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
 };
 
-use crate::{ChannelRuntimeDispatchPolicy, ChannelRuntimeDriver, ChannelRuntimeError, RuntimeStart};
+use crate::{ChannelRuntimeDispatchPolicy, ChannelRuntimeDriver, ChannelRuntimeError};
+use crate::runtime::RuntimeStart;
 
 /// Typed host client for the TinyChannels module.
 ///
