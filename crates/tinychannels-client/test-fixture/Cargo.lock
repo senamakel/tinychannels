@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus"
-version = "0.2.2"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "flate2",
@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus-macros"
-version = "0.2.2"
+version = "0.3.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -746,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus-module"
-version = "0.2.2"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "serde",
@@ -758,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.35"
+version = "0.1.37"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -773,7 +773,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-client-test-fixture"
-version = "0.1.36"
+version = "0.1.37"
 dependencies = [
  "async-trait",
  "serde",
