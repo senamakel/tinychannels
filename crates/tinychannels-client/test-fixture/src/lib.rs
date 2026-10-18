@@ -2,7 +2,7 @@
 
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 
 use async_trait::async_trait;
@@ -28,11 +28,9 @@ const OBJECT_PATH: &str = tinychannels_bus::OBJECT_PATH;
 const TOKEN: &str = "fixture-call-secret";
 const CONFIG_TOKEN: &str = "fixture-config-secret";
 const INVALID_INPUT: &str = "ai.tinyhumans.tinychannels.Error.InvalidInput";
-const RUNTIME_HANDLE: &str = "0123456789abcdef0123456789abcdef";
-const RUNTIME_OBJECT_PATH: &str =
-    "/ai/tinyhumans/tinychannels/Channels/runtime_0123456789abcdef0123456789abcdef";
-const RUNTIME_CALLBACK_PATH: &str =
-    "/ai/tinyhumans/tinychannels/ChannelsHost/runtime_0123456789abcdef0123456789abcdef";
+const FIRST_RUNTIME_HANDLE: &str = "00000000000000000000000000000001";
+const FIRST_RUNTIME_OBJECT_PATH: &str =
+    "/ai/tinyhumans/tinychannels/Channels/runtime_00000000000000000000000000000001";
 
 #[derive(Deserialize)]
 struct FixtureConfig {}
@@ -48,6 +46,7 @@ struct RuntimeControls {
     fail_start: AtomicBool,
     fail_stop: AtomicBool,
     stop_calls: AtomicUsize,
+    next_handle: AtomicU64,
 }
 
 #[async_trait]
@@ -135,12 +134,17 @@ impl Interface for FixtureService {
                 self.runtime_controls
                     .stop_calls
                     .fetch_add(1, Ordering::SeqCst);
-                if first_string(&args)? != RUNTIME_HANDLE {
+                let handle = first_string(&args)?;
+                if handle.len() != 32 {
                     return Err(Error::failed("runtime stop handle mismatch"));
                 }
-                if self.runtime_controls.fail_stop.load(Ordering::SeqCst) {
+                if self.runtime_controls.fail_stop.swap(false, Ordering::SeqCst) {
                     return Err(Error::failed("cleanup pending"));
                 }
+                let (object_path, _) = runtime_paths(handle);
+                self.connection
+                    .unserve(&ObjectPath::new(&object_path)?)
+                    .await;
                 Ok(Value::Null)
             }
             methods::CHANNEL_CONTROLLER => self.channel_controller(args),
@@ -152,14 +156,22 @@ impl Interface for FixtureService {
 
 impl FixtureService {
     async fn reserve_runtime(&self) -> Result<Value> {
+        let handle = format!(
+            "{:032x}",
+            self.runtime_controls
+                .next_handle
+                .fetch_add(1, Ordering::SeqCst)
+                + 1
+        );
+        let (object_path, host_object_path) = runtime_paths(&handle);
         let reservation = ChannelRuntimeReservation {
-            handle: RUNTIME_HANDLE.into(),
-            object_path: RUNTIME_OBJECT_PATH.into(),
-            host_object_path: RUNTIME_CALLBACK_PATH.into(),
+            handle,
+            object_path: object_path.clone(),
+            host_object_path,
         };
         self.connection
             .serve_at(
-                ObjectPath::new(RUNTIME_OBJECT_PATH)?,
+                ObjectPath::new(&object_path)?,
                 FixtureObject {
                     calls: Arc::clone(&self.calls),
                 },
@@ -170,7 +182,10 @@ impl FixtureService {
 
     async fn start_runtime(&self, args: Value, with_dispatch: bool) -> Result<Value> {
         let values = arguments(&args, if with_dispatch { 2 } else { 1 })?;
-        if values.first().and_then(Value::as_str) != Some(RUNTIME_HANDLE) {
+        let Some(handle) = values.first().and_then(Value::as_str) else {
+            return Err(Error::failed("runtime start handle mismatch"));
+        };
+        if handle.len() != 32 {
             return Err(Error::failed("runtime start handle mismatch"));
         }
         if with_dispatch {
@@ -179,14 +194,15 @@ impl FixtureService {
                 return Err(Error::failed("runtime dispatch policy mismatch"));
             }
         }
-        if self.runtime_controls.fail_start.load(Ordering::SeqCst) {
+        if self.runtime_controls.fail_start.swap(false, Ordering::SeqCst) {
             return Err(Error::failed("cleanup pending"));
         }
+        let (_, callback_path) = runtime_paths(handle);
         let callback = self
             .connection
             .proxy(
                 tinychannels_bus::HOST_BUS_NAME,
-                RUNTIME_CALLBACK_PATH,
+                &callback_path,
                 tinychannels_bus::HOST_BUS_NAME,
             )?
             .call::<String>("FixtureCallback", ())
@@ -514,6 +530,13 @@ fn first_string(args: &Value) -> Result<&str> {
         .and_then(|values| values.first())
         .and_then(Value::as_str)
         .ok_or_else(|| Error::failed("fixture runtime handle is missing"))
+}
+
+fn runtime_paths(handle: &str) -> (String, String) {
+    (
+        format!("{OBJECT_PATH}/runtime_{handle}"),
+        format!("{}/runtime_{handle}", tinychannels_bus::HOST_OBJECT_PATH),
+    )
 }
 
 fn validate_request(
