@@ -263,6 +263,7 @@ pub(crate) async fn fixture() -> Fixture {
 /// A locally cached native module loaded on the same broker used by SDK leases.
 pub(crate) struct RuntimeFixture {
     pub(crate) client: TinyChannelsClient,
+    pub(crate) startup_client: TinyChannelsClient,
     pub(crate) control: ModuleClient,
     pub(crate) runtime: &'static ModuleRuntime,
     pub(crate) reports: Arc<Reports>,
@@ -314,7 +315,8 @@ impl RuntimeFixture {
 
     pub(crate) fn module_ready(&self) -> bool {
         self.runtime.host().list().iter().any(|module| {
-            matches!(module.state, ModuleState::Ready | ModuleState::Serving)
+            module.manifest.bus_name.as_str() == tinychannels_bus::BUS_NAME
+                && matches!(module.state, ModuleState::Ready | ModuleState::Serving)
         })
     }
 }
@@ -326,6 +328,39 @@ struct RuntimeAccess {
     release: CachedRelease<'static>,
     reporter: FailureReporter,
     bind_stage: Arc<AtomicU8>,
+    hold_ready: bool,
+}
+
+struct SharedRuntimeAccess(Arc<RuntimeAccess>);
+
+impl ModuleAccess for SharedRuntimeAccess {
+    fn find(&self, id: &str) -> Option<&'static ReleaseRecord> {
+        self.0.find(id)
+    }
+
+    fn enabled(&self) -> bool {
+        self.0.enabled()
+    }
+
+    fn reporter(&self) -> &FailureReporter {
+        self.0.reporter()
+    }
+
+    fn ensure_loaded<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        self.0.ensure_loaded(id)
+    }
+
+    fn prepare_attested<'a>(&'a self, id: &'a str) -> AccessFuture<'a, Result<(), String>> {
+        self.0.prepare_attested(id)
+    }
+
+    fn proxy<'a>(
+        &'a self,
+        bus_name: &'a str,
+        object_path: &'a str,
+    ) -> AccessFuture<'a, Result<Proxy, ProxyFailure>> {
+        self.0.proxy(bus_name, object_path)
+    }
 }
 
 impl ModuleAccess for RuntimeAccess {
@@ -351,7 +386,10 @@ impl ModuleAccess for RuntimeAccess {
                     let result = self
                         .runtime
                         .host()
-                        .load_github_release_cached(&self.release, serde_json::json!({}))
+                        .load_github_release_cached(
+                            &self.release,
+                            serde_json::json!({ "hold_ready": self.hold_ready }),
+                        )
                         .map(|_| ());
                     if result.is_err() {
                         self.bind_stage
@@ -407,24 +445,51 @@ impl ModuleAccess for RuntimeAccess {
 }
 
 pub(crate) async fn runtime_fixture() -> RuntimeFixture {
+    runtime_fixture_with_readiness(false, true).await
+}
+
+pub(crate) async fn gated_runtime_fixture() -> RuntimeFixture {
+    runtime_fixture_with_readiness(true, false).await
+}
+
+async fn runtime_fixture_with_readiness(
+    hold_ready: bool,
+    prepare_before_operation_client: bool,
+) -> RuntimeFixture {
     let runtime = Box::leak(Box::new(
         ModuleRuntime::start(&RuntimeNames::default(), None)
             .expect("start one runtime for module and host callbacks"),
     ));
     let reports = Arc::new(Reports::default());
     let bind_stage = Arc::new(AtomicU8::new(0));
-    let access = RuntimeAccess {
+    let access = Arc::new(RuntimeAccess {
         runtime,
         loaded: OnceCell::new(),
         record: record(Pin::Correct),
         release: cached_release(),
         reporter: FailureReporter::new(reports.clone()),
         bind_stage: Arc::clone(&bind_stage),
-    };
-    let control = ModuleClient::new(access).with_timeout(Duration::from_secs(2));
+        hold_ready,
+    });
+    if prepare_before_operation_client {
+        access
+            .ensure_loaded(MODULE_ID)
+            .await
+            .expect("cold native fixture loads before the bounded operations client is created");
+        access
+            .prepare_attested(MODULE_ID)
+            .await
+            .expect("native fixture reaches host readiness before the bounded operations client is created");
+    }
+    let startup_client = TinyChannelsClient::new(ModuleClient::new(SharedRuntimeAccess(
+        Arc::clone(&access),
+    )));
+    let control =
+        ModuleClient::new(SharedRuntimeAccess(access)).with_timeout(Duration::from_secs(2));
     let client = TinyChannelsClient::new(control.clone());
     RuntimeFixture {
         client,
+        startup_client,
         control,
         runtime,
         reports,
@@ -450,9 +515,11 @@ pub(crate) async fn native_module_runtime_fixture() -> RuntimeFixture {
         ),
         reporter: FailureReporter::new(reports.clone()),
         bind_stage: Arc::clone(&bind_stage),
+        hold_ready: false,
     });
     RuntimeFixture {
         client: TinyChannelsClient::new(control.clone()),
+        startup_client: TinyChannelsClient::new(control.clone()),
         control,
         runtime,
         reports,
