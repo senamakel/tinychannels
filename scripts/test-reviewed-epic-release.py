@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
-REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@d463b7d93a3d6ea618e46365dffcf34ecc898462"
-TINYBUS_REV = "ed1ee4f5ee561c0320fa715eef114e0f1b888e41"
+REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@6ed83b04aab2d8977ec62e966cb914531e534fa4"
+TINYBUS_REV = "207a9a7df15e44fdba00a807d0f7eaf21904ba0e"
 
 
 def workflow_run_block(step_name):
@@ -34,6 +34,27 @@ def workflow_run_block(step_name):
     if not block:
         raise AssertionError(f"workflow run block is empty for {step_name}")
     return "\n".join(block) + "\n"
+
+
+def gitlink_revision(repo_root, path):
+    """Return a committed gitlink revision without requiring submodule contents."""
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "ls-tree", "HEAD", "--", path],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    entry = result.stdout.strip()
+    if not entry:
+        return None
+    metadata, separator, entry_path = entry.partition("\t")
+    fields = metadata.split()
+    if not separator or entry_path != path or len(fields) != 3:
+        return None
+    mode, object_type, revision = fields
+    if mode != "160000" or object_type != "commit":
+        return None
+    return revision
 
 
 def run_validator(**overrides):
@@ -100,15 +121,15 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
                 self.assertEqual(output, "")
 
     def test_tag_must_be_v_prefixed_semver(self):
-        for value in ("0.1.35", "v0.1", "vrelease"):
+        for value in ("0.1.37", "v0.1", "vrelease"):
             with self.subTest(tag=value):
                 result, output = run_tag_resolver(value)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(output, "")
 
-        result, output = run_tag_resolver("v0.1.35")
+        result, output = run_tag_resolver("v0.1.37")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(output, "tag=v0.1.35\nversion=0.1.35\n")
+        self.assertEqual(output, "tag=v0.1.37\nversion=0.1.37\n")
 
     def test_workflow_calls_reviewed_release_with_skip_safe_numeric_pr(self):
         source = WORKFLOW.read_text(encoding="utf-8")
@@ -151,22 +172,57 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         self.assertIn("if: inputs.mode == 'reviewed'", source)
         self.assertFalse((ROOT / ".github/workflows/epic-release.yml").exists())
 
+    def test_gitlink_lookup_accepts_exact_and_rejects_stale_or_missing(self):
+        def repository_with_gitlink(revision):
+            temp = tempfile.TemporaryDirectory()
+            self.addCleanup(temp.cleanup)
+            repo = Path(temp.name)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.name", "Test"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.email", "test@example.invalid"],
+                check=True,
+            )
+            if revision is not None:
+                subprocess.run(
+                    [
+                        "git", "-C", str(repo), "update-index", "--add", "--cacheinfo",
+                        f"160000,{revision},vendor/tinybus",
+                    ],
+                    check=True,
+                )
+            subprocess.run(
+                ["git", "-C", str(repo), "commit", "--allow-empty", "-qm", "fixture"],
+                check=True,
+            )
+            return repo
+
+        exact = repository_with_gitlink(TINYBUS_REV)
+        stale = repository_with_gitlink("1" * 40)
+        missing = repository_with_gitlink(None)
+        self.assertEqual(gitlink_revision(exact, "vendor/tinybus"), TINYBUS_REV)
+        self.assertNotEqual(gitlink_revision(stale, "vendor/tinybus"), TINYBUS_REV)
+        self.assertIsNone(gitlink_revision(missing, "vendor/tinybus"))
+
     def test_tinybus_and_module_sdk_share_the_published_workspace_source(self):
         workspace = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
         module = (ROOT / "crates/tinychannels-module/Cargo.toml").read_text(
             encoding="utf-8"
         )
-        tinybus_workspace = (ROOT / "vendor/tinybus/Cargo.toml").read_text(
+        fixture = (ROOT / "crates/tinychannels-client/test-fixture/Cargo.toml").read_text(
             encoding="utf-8"
         )
         self.assertIn(
-            f'tinybus = {{ version = "0.1.7", git = '
+            f'tinybus = {{ version = "0.3.3", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
         self.assertIn(
-            f'tinybus-module = {{ version = "0.1.7", git = '
+            f'tinybus-module = {{ version = "0.3.3", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
@@ -185,14 +241,15 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             'tinybus = { workspace = true, features = ["test-support"] }',
             module,
         )
-        self.assertIn('version = "0.1.7"', tinybus_workspace)
-        current = subprocess.run(
-            ["git", "-C", str(ROOT / "vendor/tinybus"), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        self.assertEqual(current, TINYBUS_REV)
+        self.assertIn(
+            'tinybus = { version = "0.3.3", path = "../../../vendor/tinybus/crates/tinybus"',
+            fixture,
+        )
+        self.assertIn(
+            'tinybus-module = { version = "0.3.3", path = "../../../vendor/tinybus/crates/tinybus-module"',
+            fixture,
+        )
+        self.assertEqual(gitlink_revision(ROOT, "vendor/tinybus"), TINYBUS_REV)
 
     def test_ordinary_tag_release_caller_remains_in_place(self):
         source = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")

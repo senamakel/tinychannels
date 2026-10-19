@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.35"
+version = "0.1.37"
 dependencies = [
  "anyhow",
  "async-trait",
