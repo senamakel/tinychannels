@@ -87,21 +87,23 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
         .await
         .unwrap()
         .unwrap();
-    let migration = connection.proxy(
-        module_peer.as_str(),
-        tinystoragedrivers_tinybus::migration::MIGRATION_OBJECT_PATH,
-        tinystoragedrivers_tinybus::migration::MIGRATION_INTERFACE,
-    ).unwrap();
-    let announcement: serde_json::Value = migration
-        .call_confidential(
-            tinystoragedrivers_tinybus::migration::GET_SCHEMA_MEMBER,
-            (),
+    let migration = connection
+        .proxy(
+            module_peer.as_str(),
+            tinystoragedrivers_tinybus::migration::MIGRATION_OBJECT_PATH,
+            tinystoragedrivers_tinybus::migration::MIGRATION_INTERFACE,
         )
+        .unwrap();
+    let announcement: serde_json::Value = migration
+        .call_confidential(tinystoragedrivers_tinybus::migration::GET_SCHEMA_MEMBER, ())
         .await
         .unwrap();
     assert_eq!(announcement["declaration"]["owner"], "channels");
     assert_eq!(
-        announcement["declaration"]["steps"].as_array().unwrap().len(),
+        announcement["declaration"]["steps"]
+            .as_array()
+            .unwrap()
+            .len(),
         14,
         "public ModuleRuntime must expose the compiled module's complete schema"
     );
