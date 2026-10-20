@@ -1,6 +1,6 @@
 use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf, sync::Arc, time::Duration};
-use tinybus::{Connection, broker::Broker, module::ModuleHost, transport::memory::MemoryTransport};
+use tinybus::module::{ModuleRuntime, RuntimeNames};
 use tinychannels_bus::{BUS_NAME, ChannelRuntimeReservation, HOST_BUS_NAME, OBJECT_PATH, methods};
 
 #[derive(Clone, Default)]
@@ -67,15 +67,9 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
         ),
     )
     .unwrap();
-    let broker = Broker::new_restricted_module_control();
-    let (broker_transport, client_transport) = MemoryTransport::pair();
-    broker
-        .attach_module_controller(Arc::new(broker_transport))
-        .unwrap();
-    let connection = Connection::connect(Box::new(client_transport))
-        .await
-        .unwrap();
-    let modules = ModuleHost::new(broker.clone());
+    let runtime = ModuleRuntime::start(&RuntimeNames::default(), None).unwrap();
+    let connection = runtime.connection();
+    let modules = runtime.host();
     let loaded = modules.load_file(&staged).unwrap();
     modules
         .ensure_ready(loaded.manifest.bus_name.as_str())
@@ -87,6 +81,29 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
             .await
             .unwrap()
             .is_some()
+    );
+    let module_peer = connection
+        .name_owner(loaded.manifest.bus_name.as_str())
+        .await
+        .unwrap()
+        .unwrap();
+    let migration = connection.proxy(
+        module_peer.as_str(),
+        tinystoragedrivers_tinybus::migration::MIGRATION_OBJECT_PATH,
+        tinystoragedrivers_tinybus::migration::MIGRATION_INTERFACE,
+    ).unwrap();
+    let announcement: serde_json::Value = migration
+        .call_confidential(
+            tinystoragedrivers_tinybus::migration::GET_SCHEMA_MEMBER,
+            (),
+        )
+        .await
+        .unwrap();
+    assert_eq!(announcement["declaration"]["owner"], "channels");
+    assert_eq!(
+        announcement["declaration"]["steps"].as_array().unwrap().len(),
+        14,
+        "public ModuleRuntime must expose the compiled module's complete schema"
     );
     let provided = loaded.manifest.provides.first().unwrap();
     let actual: Vec<_> = provided
