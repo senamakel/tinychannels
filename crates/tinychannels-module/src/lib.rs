@@ -21,6 +21,7 @@ mod email;
 mod health;
 pub mod host;
 mod interaction;
+mod migration;
 mod prepare_connect;
 mod progressive;
 mod provider;

@@ -1201,6 +1201,11 @@ async fn setup(connection: Connection) -> BusResult<()> {
     Ok(())
 }
 
+async fn setup_with_context(context: tinybus_module::ModuleSetupContext) -> BusResult<()> {
+    crate::migration::setup(&context).await?;
+    setup(context.connection().clone()).await
+}
+
 fn intent_to_legacy_message(
     intent: &ChannelOutboundIntent,
 ) -> Result<SendMessage, serde_json::Error> {
@@ -1252,9 +1257,12 @@ fn delivery_store_error(error: DeliveryQueueError) -> BusError {
 )]
 pub(crate) mod exports {
     tinybus_module::module_export_optional_static! {
-        setup = super::setup,
+        setup_with_context = super::setup_with_context,
         worker_threads = 4,
-        provides = ["ai.tinyhumans.tinychannels.Channels"],
+        provides = [
+            "ai.tinyhumans.tinychannels.Channels",
+            "org.tinystoragedrivers.Migration",
+        ],
         methods = [
             "StartChannel",
             "StopChannel",

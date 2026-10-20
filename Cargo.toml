@@ -32,9 +32,13 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 version = "0.1.37"
 
 [workspace.dependencies]
-tinybus = { version = "0.3.3", git = "https://github.com/tinyhumansai/tinybus", rev = "207a9a7df15e44fdba00a807d0f7eaf21904ba0e", default-features = false }
-tinybus-module = { version = "0.3.3", git = "https://github.com/tinyhumansai/tinybus", rev = "207a9a7df15e44fdba00a807d0f7eaf21904ba0e", default-features = false }
-tinystoragedrivers-bus = { version = "1.5.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "c9ea6ff1615b77b55d7269403af5fd11bedc9ce8", default-features = false }
+tinybus = { version = "0.3.9", git = "https://github.com/tinyhumansai/tinybus", rev = "3792a1d85f3dd171682dc45d310ee0f03836f038", default-features = false }
+tinybus-module = { version = "0.3.9", git = "https://github.com/tinyhumansai/tinybus", rev = "3792a1d85f3dd171682dc45d310ee0f03836f038", default-features = false }
+tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "7354214b8834b71bb0acb4a7c93b3efa051001b8" }
+tinystoragedrivers-bus = { version = "1.9.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "7354214b8834b71bb0acb4a7c93b3efa051001b8", default-features = false }
+tinystoragedrivers-client = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "7354214b8834b71bb0acb4a7c93b3efa051001b8" }
+tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "7354214b8834b71bb0acb4a7c93b3efa051001b8" }
+tinystoragedrivers-tinybus = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "7354214b8834b71bb0acb4a7c93b3efa051001b8", features = ["migration-delivery"] }
 
 [package]
 rust-version = "1.94"
@@ -106,7 +110,7 @@ tinychannels-bus = { path = "crates/tinychannels-bus" }
 tinychannels-runtime = { path = "crates/tinychannels-runtime" }
 # Storage ports only: no driver crate and no database client. The host (or the
 # bus client in the module crate) supplies the backend.
-tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v1.0.0" }
+tinystoragedrivers-core = { workspace = true }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.23"
