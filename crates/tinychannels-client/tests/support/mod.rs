@@ -476,7 +476,11 @@ impl ModuleAccess for RuntimeAccess {
                         .host()
                         .load_github_release_cached(
                             &self.release,
-                            serde_json::json!({ "hold_ready": self.hold_ready }),
+                            if self.hold_ready {
+                                serde_json::json!({ "hold_ready": true })
+                            } else {
+                                serde_json::json!({})
+                            },
                         )
                         .map(|_| ());
                     if result.is_err() {
