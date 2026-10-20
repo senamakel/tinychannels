@@ -32,27 +32,28 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tinystoragedrivers_core::{
-    CollectionSpec, DocumentStore, DocumentStoreExt, Filter, Precondition, Query, StorageError,
+    CollectionSpec, DocumentStore, DocumentStoreExt, Filter, Key, Precondition, Query,
+    StorageError, WriteOptions,
 };
+
+use super::schema::{self, SCHEMA_VERSION};
 use wacore::store::InMemoryBackend;
 use wacore::store::error::{Result as StoreResult, StoreError};
 use wacore::store::traits::DeviceStore;
 
 const LOG_PREFIX: &str = "[whatsapp-store]";
 
-pub(crate) const DEVICE: &str = tinychannels_bus::storage_needs::WHATSAPP_DEVICE_COLLECTION;
-pub(crate) const IDENTITY: &str = tinychannels_bus::storage_needs::WHATSAPP_IDENTITY_COLLECTION;
-pub(crate) const SESSION: &str = tinychannels_bus::storage_needs::WHATSAPP_SESSION_COLLECTION;
-pub(crate) const PREKEY: &str = tinychannels_bus::storage_needs::WHATSAPP_PREKEY_COLLECTION;
-pub(crate) const SIGNED_PREKEY: &str =
-    tinychannels_bus::storage_needs::WHATSAPP_SIGNED_PREKEY_COLLECTION;
-pub(crate) const SENDER_KEY: &str = tinychannels_bus::storage_needs::WHATSAPP_SENDER_KEY_COLLECTION;
-pub(crate) const SYNC_KEY: &str = tinychannels_bus::storage_needs::WHATSAPP_SYNC_KEY_COLLECTION;
-pub(crate) const LID_MAPPING: &str =
-    tinychannels_bus::storage_needs::WHATSAPP_LID_MAPPING_COLLECTION;
+pub(crate) const DEVICE: &str = schema::WHATSAPP_DEVICE;
+pub(crate) const IDENTITY: &str = schema::WHATSAPP_IDENTITY;
+pub(crate) const SESSION: &str = schema::WHATSAPP_SESSION;
+pub(crate) const PREKEY: &str = schema::WHATSAPP_PREKEY;
+pub(crate) const SIGNED_PREKEY: &str = schema::WHATSAPP_SIGNED_PREKEY;
+pub(crate) const SENDER_KEY: &str = schema::WHATSAPP_SENDER_KEY;
+pub(crate) const SYNC_KEY: &str = schema::WHATSAPP_SYNC_KEY;
+pub(crate) const LID_MAPPING: &str = schema::WHATSAPP_LID_MAPPING;
 
 /// Every collection the backend writes, for declaration and tests.
-pub const COLLECTIONS: [&str; 8] = tinychannels_bus::storage_needs::WHATSAPP_COLLECTIONS;
+pub const COLLECTIONS: [&str; 8] = schema::WHATSAPP_COLLECTIONS;
 
 /// A WhatsApp Web session backend whose pairing state survives a restart.
 pub struct DocumentWhatsAppBackend {
@@ -125,8 +126,12 @@ impl DocumentWhatsAppBackend {
         Ok(backend)
     }
 
+    /// `Key::of([account, key])`, so an address holding `:` or `/` stays unambiguous.
     fn id(&self, key: &str) -> String {
-        format!("{}:{key}", self.account)
+        Key::of([self.account.as_str(), key]).map_or_else(
+            |_| format!("{}/{key}", self.account),
+            |k| k.as_str().to_owned(),
+        )
     }
 
     /// Write one record: the document carries `account` and `key` beside `body`.
@@ -141,7 +146,13 @@ impl DocumentWhatsAppBackend {
             object.insert("key".into(), json!(key));
         }
         self.docs
-            .put(collection, &self.id(key), body, Precondition::None)
+            .put_with(
+                collection,
+                &self.id(key),
+                body,
+                Precondition::None,
+                WriteOptions::new().schema(SCHEMA_VERSION),
+            )
             .await
             .map(|_| ())
             .map_err(store_err)

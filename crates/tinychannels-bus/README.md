@@ -15,6 +15,12 @@ features disabled for storage declaration types. It contains no TinyBus,
 storage client/runtime or backend driver, HTTP/socket transport, database,
 task executor, scheduler, crypto/entropy implementation, or concrete provider.
 
+Storage names, needs, and serialized record DTOs remain contract data here.
+The `tinychannels` implementation owns executable schema projection,
+migration steps, legacy decoding, and conversions between wire records and
+stored DTOs. The empty `storage` feature remains for feature-list compatibility
+and adds no storage implementation dependency.
+
 DTOs are defined once here. `tinychannels-runtime` and `tinychannels` re-export
 these same Rust types. Hosts should name wire values through this crate and
 execute behavior through the compiled module. The root library compatibility
