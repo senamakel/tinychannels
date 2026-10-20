@@ -62,7 +62,10 @@ FORBIDDEN_SOURCE = (
     (re.compile(r"\bstd::fs\b|\btokio::fs\b"), "filesystem implementation"),
     (re.compile(r"\bstd::process\b|\btokio::process\b"), "process execution"),
     (re.compile(r"\bstd::env\b"), "process environment access"),
+    (re.compile(r"\bstd::time\b"), "clock access"),
     (re.compile(r"\bstd::thread\b"), "thread execution"),
+    (re.compile(r"\bstd::sync::(?:mpsc|atomic)::"), "thread/IPC coordination"),
+    (re.compile(r"\bparking_lot::"), "runtime synchronization"),
     (re.compile(r"\btokio::(?:spawn|task::|time::)"), "Tokio task/time execution"),
     (
         re.compile(
@@ -79,6 +82,10 @@ FORBIDDEN_SOURCE = (
         "database or HTTP implementation",
     ),
     (re.compile(r"\bimpl\s+Channel\s+for\b"), "concrete provider executor"),
+    (
+        re.compile(r"\b(?:sha2|hmac|rand|uuid)::"),
+        "cryptographic, random, or identity implementation",
+    ),
     (
         re.compile(
             r"\bfn\s+(?:build_session_key|classify_send_error|"
@@ -99,12 +106,23 @@ def source_violations(source_text, source_path=None):
     if source_path is not None and Path(source_path).name != "traits.rs":
         if re.search(r"\basync\s+fn\b", source_text):
             errors.append("async implementation outside the channel interface")
+        if re.search(r"\basync_trait\b", source_text):
+            errors.append("async trait macro outside the channel interface")
     return errors
 
 
 def source_tree_violations(source_root=BUS_SOURCE):
     """Scan production Rust files while leaving colocated behavior tests alone."""
     errors = []
+    storage = Path(source_root) / "storage"
+    for name in ("schema.rs", "migrate.rs", "schema_tests.rs", "migrate_tests.rs"):
+        if (storage / name).exists():
+            errors.append(f"{(storage / name).relative_to(ROOT)}: executable storage schema belongs to tinychannels")
+    records = storage / "records.rs"
+    if records.exists():
+        text = records.read_text(encoding="utf-8")
+        if "impl From<" in text or "to_stored_ms" in text or "from_stored_ms" in text:
+            errors.append(f"{records.relative_to(ROOT)}: storage projections belong to tinychannels")
     for source in sorted(Path(source_root).rglob("*.rs")):
         if source.name.endswith("_tests.rs"):
             continue
@@ -115,7 +133,7 @@ def source_tree_violations(source_root=BUS_SOURCE):
     return errors
 
 
-def reachable_normal_build(metadata):
+def reachable_normal_build(metadata, root_package="tinychannels-bus"):
     """Resolve the bus package's complete normal/build closure, fail closed."""
     errors = []
     packages = metadata.get("packages")
@@ -153,11 +171,11 @@ def reachable_normal_build(metadata):
     bus_ids = [
         package_id
         for package_id, package in packages_by_id.items()
-        if package["name"] == "tinychannels-bus"
+        if package["name"] == root_package
     ]
     if len(bus_ids) != 1:
         return packages_by_id, nodes_by_id, set(), errors + [
-            f"expected one tinychannels-bus package, found {len(bus_ids)}"
+            f"expected one {root_package} package, found {len(bus_ids)}"
         ]
 
     reachable = set()
@@ -214,7 +232,17 @@ def dependency_violations(metadata):
     packages = [packages_by_id[package_id] for package_id in reachable]
     names = {package["name"] for package in packages}
     missing = sorted(ALLOWED_PACKAGES - names)
-    unsafe = sorted(names - ALLOWED_PACKAGES)
+    core_packages = [
+        package for package in packages if package["name"] == "tinystoragedrivers-core"
+    ]
+    if core_packages:
+        errors.append("TSD core must remain outside every bus feature closure")
+
+    unsafe = sorted(
+        packages_by_id[package_id]["name"]
+        for package_id in reachable
+        if packages_by_id[package_id]["name"] not in ALLOWED_PACKAGES
+    )
     if missing:
         errors.append(f"normal/build graph is incomplete; missing packages: {missing}")
     if unsafe:
@@ -280,15 +308,25 @@ def main(argv=None):
         print("\n".join(f"- {error}" for error in source_errors), file=sys.stderr)
         return 1
 
-    features = list(tomllib.loads(BUS_MANIFEST.read_text(encoding="utf-8")).get("features", {}))
-    for mode in ("default", "all"):
+    features = [
+        feature
+        for feature in tomllib.loads(BUS_MANIFEST.read_text(encoding="utf-8")).get("features", {})
+        if feature != "storage"
+    ]
+    for mode in ("default", "all", "storage"):
         probe = ROOT / "target/bus-purity" / mode
         (probe / "src").mkdir(parents=True, exist_ok=True)
         (probe / "src/lib.rs").write_text("pub use tinychannels_bus::*;\n", encoding="utf-8")
         dependency = (
             "tinychannels-bus = { path = "
             + json.dumps(str(ROOT / "crates/tinychannels-bus"))
-            + (", features = " + json.dumps(features) if mode == "all" else "")
+            + (
+                ", features = " + json.dumps(features)
+                if mode == "all"
+                else ', features = ["storage"]'
+                if mode == "storage"
+                else ""
+            )
             + " }\n"
         )
         (probe / "Cargo.toml").write_text(

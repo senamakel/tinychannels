@@ -7,66 +7,22 @@ use std::sync::LazyLock;
 
 use tinystoragedrivers_bus::{CollectionSpec, StorageNeeds};
 
-/// Delivery queue collection for pending entries.
-pub const DELIVERY_PENDING_COLLECTION: &str = "channels_delivery_pending";
-/// Delivery queue collection for permanently failed entries.
-pub const DELIVERY_FAILED_COLLECTION: &str = "channels_delivery_failed";
-/// Delivery queue collection for terminal idempotency results.
-pub const DELIVERY_RESULTS_COLLECTION: &str = "channels_delivery_results";
-
-/// Remote-control collection for chat-to-thread bindings.
-pub const REMOTE_BINDINGS_COLLECTION: &str = "channel_remote_bindings";
-/// Remote-control collection for in-flight chat turns.
-pub const REMOTE_BUSY_COLLECTION: &str = "channel_remote_busy";
-/// Remote-control collection for the legacy-import marker.
-pub const REMOTE_META_COLLECTION: &str = "channel_remote_meta";
-
-/// WhatsApp Web collection for linked-device state.
-pub const WHATSAPP_DEVICE_COLLECTION: &str = "whatsapp_device";
-/// WhatsApp Web collection for identity records.
-pub const WHATSAPP_IDENTITY_COLLECTION: &str = "whatsapp_identity";
-/// WhatsApp Web collection for Signal sessions.
-pub const WHATSAPP_SESSION_COLLECTION: &str = "whatsapp_session";
-/// WhatsApp Web collection for pre-keys.
-pub const WHATSAPP_PREKEY_COLLECTION: &str = "whatsapp_prekey";
-/// WhatsApp Web collection for signed pre-keys.
-pub const WHATSAPP_SIGNED_PREKEY_COLLECTION: &str = "whatsapp_signed_prekey";
-/// WhatsApp Web collection for sender keys.
-pub const WHATSAPP_SENDER_KEY_COLLECTION: &str = "whatsapp_sender_key";
-/// WhatsApp Web collection for app-state synchronization keys.
-pub const WHATSAPP_SYNC_KEY_COLLECTION: &str = "whatsapp_sync_key";
-/// WhatsApp Web collection for LID-to-phone mappings.
-pub const WHATSAPP_LID_MAPPING_COLLECTION: &str = "whatsapp_lid_mapping";
-
-/// All collections written by the durable WhatsApp Web backend.
-pub const WHATSAPP_COLLECTIONS: [&str; 8] = [
-    WHATSAPP_DEVICE_COLLECTION,
-    WHATSAPP_IDENTITY_COLLECTION,
-    WHATSAPP_SESSION_COLLECTION,
-    WHATSAPP_PREKEY_COLLECTION,
-    WHATSAPP_SIGNED_PREKEY_COLLECTION,
-    WHATSAPP_SENDER_KEY_COLLECTION,
-    WHATSAPP_SYNC_KEY_COLLECTION,
-    WHATSAPP_LID_MAPPING_COLLECTION,
-];
+pub use crate::storage_names::{
+    DELIVERY_FAILED as DELIVERY_FAILED_COLLECTION, DELIVERY_PENDING as DELIVERY_PENDING_COLLECTION,
+    DELIVERY_RESULTS as DELIVERY_RESULTS_COLLECTION, REMOTE_BINDINGS as REMOTE_BINDINGS_COLLECTION,
+    REMOTE_BUSY as REMOTE_BUSY_COLLECTION, REMOTE_META as REMOTE_META_COLLECTION,
+    WHATSAPP_COLLECTIONS, WHATSAPP_DEVICE as WHATSAPP_DEVICE_COLLECTION,
+    WHATSAPP_IDENTITY as WHATSAPP_IDENTITY_COLLECTION,
+    WHATSAPP_LID_MAPPING as WHATSAPP_LID_MAPPING_COLLECTION,
+    WHATSAPP_PREKEY as WHATSAPP_PREKEY_COLLECTION,
+    WHATSAPP_SENDER_KEY as WHATSAPP_SENDER_KEY_COLLECTION,
+    WHATSAPP_SESSION as WHATSAPP_SESSION_COLLECTION,
+    WHATSAPP_SIGNED_PREKEY as WHATSAPP_SIGNED_PREKEY_COLLECTION,
+    WHATSAPP_SYNC_KEY as WHATSAPP_SYNC_KEY_COLLECTION,
+};
 
 static COLLECTIONS: LazyLock<[CollectionSpec; 14]> = LazyLock::new(|| {
-    [
-        collection(DELIVERY_PENDING_COLLECTION),
-        collection(DELIVERY_FAILED_COLLECTION),
-        collection(DELIVERY_RESULTS_COLLECTION),
-        collection(REMOTE_BINDINGS_COLLECTION),
-        collection(REMOTE_BUSY_COLLECTION),
-        collection(REMOTE_META_COLLECTION),
-        collection(WHATSAPP_DEVICE_COLLECTION),
-        collection(WHATSAPP_IDENTITY_COLLECTION),
-        collection(WHATSAPP_SESSION_COLLECTION),
-        collection(WHATSAPP_PREKEY_COLLECTION),
-        collection(WHATSAPP_SIGNED_PREKEY_COLLECTION),
-        collection(WHATSAPP_SENDER_KEY_COLLECTION),
-        collection(WHATSAPP_SYNC_KEY_COLLECTION),
-        collection(WHATSAPP_LID_MAPPING_COLLECTION),
-    ]
+    std::array::from_fn(|index| collection(crate::storage_names::COLLECTIONS[index]))
 });
 
 fn collection(name: &str) -> CollectionSpec {

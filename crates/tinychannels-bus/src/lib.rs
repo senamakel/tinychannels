@@ -24,6 +24,8 @@ pub mod module_runtime;
 pub mod module_supervision;
 pub mod names;
 pub mod relay;
+pub mod storage;
+pub mod storage_names;
 pub mod storage_needs;
 pub mod traits;
 pub mod version;
