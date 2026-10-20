@@ -1,7 +1,6 @@
 use super::*;
-use serde_json::json;
-use tinystoragedrivers_core::schema::{Item, Step, TransformKind};
 use tinychannels::storage::schema::{COLLECTIONS, OWNER, SCHEMA_VERSION, storage_schema};
+use tinystoragedrivers_core::schema::{Item, Step, TransformKind};
 use tinystoragedrivers_tinybus::migration::{
     DocumentsTransformRequest, MigrationPayload, MigrationPayloadReply,
 };
@@ -37,7 +36,11 @@ const EXPECTED_STEPS: [(&str, &str, &str); 14] = [
         "channel_remote_meta",
         "channels.remote_meta",
     ),
-    ("whatsapp-device-v2", "whatsapp_device", "channels.whatsapp_device"),
+    (
+        "whatsapp-device-v2",
+        "whatsapp_device",
+        "channels.whatsapp_device",
+    ),
     (
         "whatsapp-identity-v2",
         "whatsapp_identity",
@@ -79,7 +82,10 @@ const EXPECTED_STEPS: [(&str, &str, &str); 14] = [
 fn declaration_exports_all_fourteen_module_scoped_document_steps() {
     let schema = storage_schema();
     let declaration = declaration_from_owner_schema(&schema);
-    assert!(declaration.is_ok(), "every declared step has an operation mapping");
+    assert!(
+        declaration.is_ok(),
+        "every declared step has an operation mapping"
+    );
     let Some(declaration) = declaration.ok() else {
         return;
     };
@@ -124,13 +130,11 @@ fn each_existing_owner_selector_dispatches_to_its_actual_document_callback() {
             assert_eq!(operation_selector(step.id), Some("missing-selector"));
             continue;
         };
-        let reply = handler.transform(MigrationPayload::Documents(
-            DocumentsTransformRequest {
-                operation: operation.to_owned(),
-                version: OPERATION_VERSION,
-                records: Vec::new(),
-            },
-        ));
+        let reply = handler.transform(MigrationPayload::Documents(DocumentsTransformRequest {
+            operation: operation.to_owned(),
+            version: OPERATION_VERSION,
+            records: Vec::new(),
+        }));
         assert!(matches!(
             reply,
             MigrationPayloadReply::Documents(Ok(records)) if records.is_empty()
@@ -149,11 +153,8 @@ fn unmapped_steps_and_non_module_items_fail_closed() {
     ));
     assert!(declaration_from_owner_schema(&schema).is_err());
 
-    let non_module = storage_schema().collection(
-        "channels.untrusted_fixture",
-        1,
-        ScopeClass::Tenant,
-    );
+    let non_module =
+        storage_schema().collection("channels.untrusted_fixture", 1, ScopeClass::Tenant);
     assert!(validate_module_scope(&non_module).is_err());
 }
 
@@ -162,13 +163,11 @@ fn unknown_operations_and_versions_are_rejected() {
     let handler = ChannelMigration {
         schema: storage_schema(),
     };
-    let reply = handler.transform(MigrationPayload::Documents(
-        DocumentsTransformRequest {
-            operation: "unknown.channel.operation".to_owned(),
-            version: OPERATION_VERSION,
-            records: Vec::new(),
-        },
-    ));
+    let reply = handler.transform(MigrationPayload::Documents(DocumentsTransformRequest {
+        operation: "unknown.channel.operation".to_owned(),
+        version: OPERATION_VERSION,
+        records: Vec::new(),
+    }));
     assert!(matches!(
         reply,
         MigrationPayloadReply::Documents(Err(TransformError {
@@ -180,13 +179,11 @@ fn unknown_operations_and_versions_are_rejected() {
     let Some(operation) = operation_selector(EXPECTED_STEPS[0].0) else {
         return;
     };
-    let reply = handler.transform(MigrationPayload::Documents(
-        DocumentsTransformRequest {
-            operation: operation.to_owned(),
-            version: OPERATION_VERSION + 1,
-            records: Vec::new(),
-        },
-    ));
+    let reply = handler.transform(MigrationPayload::Documents(DocumentsTransformRequest {
+        operation: operation.to_owned(),
+        version: OPERATION_VERSION + 1,
+        records: Vec::new(),
+    }));
     assert!(matches!(
         reply,
         MigrationPayloadReply::Documents(Err(TransformError {

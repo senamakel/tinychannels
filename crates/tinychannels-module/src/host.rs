@@ -121,6 +121,8 @@ pub struct HostChannels {
     owner: Arc<Owner>,
     connection: Connection,
     object_path: Arc<str>,
+    /// Optional route for a governed, module-specific storage lease.
+    storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
     /// The host's storage objects, connected on first use and then shared by
     /// every clone.
     storage: Arc<Mutex<Option<tinystoragedrivers_core::ScopedStorage>>>,
@@ -133,12 +135,35 @@ impl std::fmt::Debug for HostChannels {
     }
 }
 impl HostChannels {
+    #[cfg(test)]
     pub(crate) fn new_at_with_dispatch(
         connection: Connection,
         object_path: String,
         max_in_flight: usize,
     ) -> Self {
-        Self::new_at_inner(connection, object_path, Some(max_in_flight))
+        Self::new_at_inner(connection, object_path, Some(max_in_flight), None)
+    }
+
+    pub(crate) fn new_at_with_storage_descriptor(
+        connection: Connection,
+        object_path: String,
+        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+    ) -> Self {
+        Self::new_at_inner(connection, object_path, None, storage_descriptor)
+    }
+
+    pub(crate) fn new_at_with_dispatch_and_storage_descriptor(
+        connection: Connection,
+        object_path: String,
+        max_in_flight: usize,
+        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+    ) -> Self {
+        Self::new_at_inner(
+            connection,
+            object_path,
+            Some(max_in_flight),
+            storage_descriptor,
+        )
     }
 
     /// Start one owned callback consumer. Explicit shutdown drains and joins it.
@@ -147,15 +172,28 @@ impl HostChannels {
         Self::new_at(connection, HOST_OBJECT_PATH.to_owned())
     }
 
+    pub(crate) fn new_with_storage_descriptor(
+        connection: Connection,
+        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+    ) -> Self {
+        Self::new_at_inner(
+            connection,
+            HOST_OBJECT_PATH.to_owned(),
+            None,
+            storage_descriptor,
+        )
+    }
+
     /// Bind all callbacks to an immutable runtime-specific host object.
     pub(crate) fn new_at(connection: Connection, object_path: String) -> Self {
-        Self::new_at_inner(connection, object_path, None)
+        Self::new_at_inner(connection, object_path, None, None)
     }
 
     fn new_at_inner(
         connection: Connection,
         object_path: String,
         dispatch_limit: Option<usize>,
+        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
     ) -> Self {
         let object_path: Arc<str> = object_path.into();
         let callback_path = object_path.clone();
@@ -283,6 +321,7 @@ impl HostChannels {
             outbox,
             connection,
             object_path,
+            storage_descriptor,
             storage: Arc::new(Mutex::new(None)),
             owner: Arc::new(Owner {
                 worker: Mutex::new(Some(worker)),
@@ -313,7 +352,26 @@ impl HostChannels {
         if let Some(scoped) = slot.as_ref() {
             return Ok(scoped.clone());
         }
-        let bus = tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?;
+        let bus = match &self.storage_descriptor {
+            Some(descriptor) => {
+                let transport = tinystoragedrivers_busproxy::BusTransport::connect_bound(
+                    self.connection.clone(),
+                    descriptor.clone(),
+                )
+                .await
+                .map_err(|_| {
+                    tinystoragedrivers_core::StorageError::unavailable(
+                        "storage descriptor unavailable",
+                    )
+                })?;
+                tinystoragedrivers_client::BusStorage::connect(
+                    Arc::new(transport),
+                    tinystoragedrivers_busproxy::module_scope_label(),
+                )
+                .await?
+            }
+            None => tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?,
+        };
         let scoped = bus.for_scope(&tinystoragedrivers_busproxy::module_scope_label())?;
         *slot = Some(scoped.clone());
         Ok(scoped)

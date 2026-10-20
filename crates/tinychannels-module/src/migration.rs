@@ -72,12 +72,18 @@ impl ChannelMigration {
         Ok(step)
     }
 
-    fn documents(&self, operation: &str, version: u32, records: Vec<tinystoragedrivers_core::schema::SourceRecord>) -> MigrationPayloadReply {
+    fn documents(
+        &self,
+        operation: &str,
+        version: u32,
+        records: Vec<tinystoragedrivers_core::schema::SourceRecord>,
+    ) -> MigrationPayloadReply {
         let result = self
             .step(operation, version)
             .and_then(|step| match &step.run {
-                StepBody::Documents(transform) => transform(records)
-                    .map_err(|_| invalid_transform()),
+                StepBody::Documents(transform) => {
+                    transform(records).map_err(|_| invalid_transform())
+                }
                 StepBody::Streams(_) | StepBody::Blobs(_) => Err(unsupported_operation()),
             });
         MigrationPayloadReply::Documents(result)

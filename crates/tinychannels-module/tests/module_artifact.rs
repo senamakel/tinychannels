@@ -2,17 +2,24 @@ use base64::Engine as _;
 use futures_util::{SinkExt, StreamExt};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use tinybus::Result;
-use tinybus::test_support::{admit_module, start_bus, wait_until_serving};
+use tinybus::{
+    Result,
+    broker::Broker,
+    module::ModuleHost,
+    test_support::{admit_module, wait_until_serving},
+    transport::memory::MemoryTransport,
+};
 use tinychannels::relay::{CapabilityDescriptor, ConnectorToGatewayFrame, GatewayToConnectorFrame};
 use tinychannels_bus::module_email::EmailSendRequest;
 use tinychannels_bus::module_relay::RelayReservation;
 use tinychannels_bus::{ChannelOutboundIntent, ChannelsConfig, OutboundPayload, SendMessage};
-use tinystoragedrivers_busproxy::{PerCallerEndpoint, serve};
-use tinystoragedrivers_client::StorageServer;
-use tinystoragedrivers_core::{DocumentStoreExt, MemoryStorage, Query, Scope, StorageBackend};
+use tinystoragedrivers_core::{DocumentStoreExt, Query, Scope, StorageBackend};
+use tinystoragedrivers_tinybus::migration::MigrationModuleClient;
 use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
+
+#[path = "support/migration_artifact.rs"]
+mod migration_artifact;
 
 #[derive(Clone)]
 struct Callback(
@@ -161,13 +168,112 @@ impl Callback {
 #[tokio::test]
 #[ignore = "run through scripts/verify-module-artifact.sh"]
 async fn compiled_artifact_exposes_confidential_controller_proxy_and_websocket_lifecycle() {
-    let (module_host, connection, _broker_task) = start_bus().await.unwrap();
+    let artifact = std::env::var_os("TINYCHANNELS_MODULE_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap();
+    let unselected = ModuleHost::new(Broker::new());
+    let unselected_info = unselected.load_file(&artifact).unwrap();
+    assert!(
+        unselected
+            .ensure_ready(unselected_info.manifest.bus_name.as_str())
+            .await
+            .is_err(),
+        "migration setup must fail closed without the selected host binding"
+    );
+    drop(unselected);
+
+    let broker = Broker::new_restricted_module_control();
+    let (broker_transport, client_transport) = MemoryTransport::pair();
+    broker
+        .attach_module_controller(Arc::new(broker_transport))
+        .unwrap();
+    let connection = tinybus::Connection::connect(Box::new(client_transport))
+        .await
+        .unwrap();
+    let (outsider_broker_transport, outsider_client_transport) = MemoryTransport::pair();
+    broker.attach(Arc::new(outsider_broker_transport));
+    let outsider = tinybus::Connection::connect(Box::new(outsider_client_transport))
+        .await
+        .unwrap();
+    connection
+        .request_name(tinystoragedrivers_tinybus::migration::MIGRATION_INTERFACE)
+        .await
+        .unwrap();
+    let module_host = ModuleHost::new(broker.clone());
     let info = admit_module(
         &module_host,
         "TINYCHANNELS_MODULE_ARTIFACT",
         "tinychannels-module",
     )
     .unwrap();
+    module_host
+        .ensure_ready(info.manifest.bus_name.as_str())
+        .await
+        .unwrap();
+    module_host
+        .ensure_ready(info.manifest.bus_name.as_str())
+        .await
+        .unwrap();
+    assert!(
+        connection
+            .attestation(info.manifest.bus_name.clone())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    let module_peer = connection
+        .name_owner(info.manifest.bus_name.as_str())
+        .await
+        .unwrap()
+        .unwrap();
+    migration_artifact::verify_prelease_migration(
+        &connection,
+        &outsider,
+        &module_host,
+        &info,
+        &module_peer,
+    )
+    .await
+    .unwrap();
+    let current_storage =
+        migration_artifact::register_current_storage(&module_host, &connection, &module_peer)
+            .await
+            .unwrap();
+    module_host
+        .reinitialize(
+            &info.name,
+            serde_json::json!({"storage_descriptor": current_storage.descriptor.clone()}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        connection
+            .name_owner(info.manifest.bus_name.as_str())
+            .await
+            .unwrap(),
+        Some(module_peer.clone()),
+        "reinitialization must preserve the admitted module identity"
+    );
+    let current_migration = MigrationModuleClient::discover(&connection, &module_peer)
+        .await
+        .unwrap();
+    assert_eq!(current_migration.declaration().owner.as_str(), "channels");
+    let reinitialized_proxy = connection
+        .proxy(
+            tinychannels_bus::BUS_NAME,
+            tinychannels_bus::OBJECT_PATH,
+            tinychannels_bus::BUS_NAME,
+        )
+        .unwrap();
+    let available: Vec<String> = reinitialized_proxy
+        .call_confidential("ListChannels", ())
+        .await
+        .unwrap();
+    assert!(available.is_empty());
+    let current_migration = MigrationModuleClient::discover(&connection, &module_peer)
+        .await
+        .unwrap();
+    assert_eq!(current_migration.declaration().owner.as_str(), "channels");
     let interface = info
         .manifest
         .provides
@@ -187,16 +293,6 @@ async fn compiled_artifact_exposes_confidential_controller_proxy_and_websocket_l
         members, contract,
         "compiled artifact must match the bus contract"
     );
-
-    // Delivery records live in the host's storage, which the module reaches over
-    // the storage bus; serve an in-memory backend for it.
-    let storage = MemoryStorage::new();
-    let served_backend = storage.clone();
-    let endpoint = PerCallerEndpoint::new(move |_sender| {
-        let scoped = served_backend.for_scope(&Scope::local()).ok()?;
-        Some(StorageServer::new(scoped))
-    });
-    let _storage_host = serve(&connection, Arc::new(endpoint)).await.unwrap();
 
     let callbacks = Callback(
         Arc::new(Mutex::new(Vec::new())),
@@ -346,7 +442,10 @@ async fn compiled_artifact_exposes_confidential_controller_proxy_and_websocket_l
         assert!(host.1.lock().await.pending.is_empty());
     }
     // ...it writes both scopes' required deliveries to the host's storage.
-    let docs = storage.for_scope(&Scope::local()).unwrap();
+    let docs = current_storage
+        .backend
+        .for_scope(&Scope::new("channels-current-only").unwrap())
+        .unwrap();
     let mut pending: Vec<String> = docs
         .documents()
         .query_all(
@@ -696,8 +795,9 @@ async fn compiled_artifact_exposes_confidential_controller_proxy_and_websocket_l
             .is_err()
     );
     assert!(
-        storage
-            .for_scope(&Scope::local())
+        current_storage
+            .backend
+            .for_scope(&Scope::new("channels-current-only").unwrap())
             .unwrap()
             .documents()
             .get(
@@ -721,6 +821,118 @@ async fn compiled_artifact_exposes_confidential_controller_proxy_and_websocket_l
             .await
             .is_err()
     );
+    let (second_lease, second_descriptor) = current_storage
+        .add_lease("channels-current-second", &module_peer)
+        .await
+        .unwrap();
+    module_host
+        .reinitialize(
+            &info.name,
+            serde_json::json!({"storage_descriptor": second_descriptor}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        connection
+            .name_owner(info.manifest.bus_name.as_str())
+            .await
+            .unwrap(),
+        Some(module_peer.clone())
+    );
+    let isolated = ChannelOutboundIntent {
+        idempotency_key: "artifact-second-lease".into(),
+        channel_id: "not-running".into(),
+        durability: tinychannels::DeliveryDurability::Required,
+        ..Default::default()
+    };
+    let _ = proxy
+        .call::<tinychannels_bus::controllers::ChannelSendMessageResult>(
+            "SendChannelIntent",
+            ("not-running", isolated),
+        )
+        .await;
+    let first_scope = current_storage
+        .backend
+        .for_scope(&Scope::new("channels-current-only").unwrap())
+        .unwrap();
+    let second_scope = current_storage
+        .backend
+        .for_scope(&Scope::new("channels-current-second").unwrap())
+        .unwrap();
+    assert!(
+        first_scope
+            .documents()
+            .get(
+                tinychannels::storage::delivery::PENDING_COLLECTION,
+                "artifact-second-lease",
+            )
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        second_scope
+            .documents()
+            .get(
+                tinychannels::storage::delivery::PENDING_COLLECTION,
+                "artifact-second-lease",
+            )
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert!(current_storage.revoke_default_lease().await);
+    let still_bound = ChannelOutboundIntent {
+        idempotency_key: "artifact-second-lease-after-first-revoke".into(),
+        channel_id: "not-running".into(),
+        durability: tinychannels::DeliveryDurability::Required,
+        ..Default::default()
+    };
+    let _ = proxy
+        .call::<tinychannels_bus::controllers::ChannelSendMessageResult>(
+            "SendChannelIntent",
+            ("not-running", still_bound),
+        )
+        .await;
+    assert!(
+        second_scope
+            .documents()
+            .get(
+                tinychannels::storage::delivery::PENDING_COLLECTION,
+                "artifact-second-lease-after-first-revoke",
+            )
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert!(current_storage.revoke_lease(&second_lease).await);
+    let revoked = ChannelOutboundIntent {
+        idempotency_key: "artifact-revoked-lease".into(),
+        channel_id: "not-running".into(),
+        durability: tinychannels::DeliveryDurability::Required,
+        ..Default::default()
+    };
+    assert!(
+        proxy
+            .call::<tinychannels_bus::controllers::ChannelSendMessageResult>(
+                "SendChannelIntent",
+                ("not-running", revoked),
+            )
+            .await
+            .is_err()
+    );
+    let _: Vec<String> = proxy.call("ListChannels", ()).await.unwrap();
+    let (_shutdown_lease, shutdown_descriptor) = current_storage
+        .add_lease("channels-current-shutdown", &module_peer)
+        .await
+        .unwrap();
+    module_host
+        .reinitialize(
+            &info.name,
+            serde_json::json!({"storage_descriptor": shutdown_descriptor}),
+        )
+        .await
+        .unwrap();
     let (url, remote) = relay_server().await;
     assert!(
         proxy
@@ -949,6 +1161,7 @@ async fn compiled_artifact_exposes_confidential_controller_proxy_and_websocket_l
     assert!(!shutdown.is_finished(), "shutdown joins accepted SMTP work");
     smtp_release.send(()).unwrap();
     shutdown.await.unwrap().unwrap();
+    current_storage.shutdown().await.unwrap();
     let shutdown_mime = smtp_server.await.unwrap();
     assert_eq!(
         mime_attachment_bytes(&shutdown_mime, "shutdown.txt"),

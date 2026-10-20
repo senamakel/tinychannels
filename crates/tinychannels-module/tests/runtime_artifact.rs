@@ -67,9 +67,27 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
         ),
     )
     .unwrap();
-    let broker = Broker::new();
+    let broker = Broker::new_restricted_module_control();
+    let (broker_transport, client_transport) = MemoryTransport::pair();
+    broker
+        .attach_module_controller(Arc::new(broker_transport))
+        .unwrap();
+    let connection = Connection::connect(Box::new(client_transport))
+        .await
+        .unwrap();
     let modules = ModuleHost::new(broker.clone());
     let loaded = modules.load_file(&staged).unwrap();
+    modules
+        .ensure_ready(loaded.manifest.bus_name.as_str())
+        .await
+        .unwrap();
+    assert!(
+        connection
+            .attestation(loaded.manifest.bus_name.clone())
+            .await
+            .unwrap()
+            .is_some()
+    );
     let provided = loaded.manifest.provides.first().unwrap();
     let actual: Vec<_> = provided
         .methods
@@ -77,9 +95,6 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
         .map(|method| method.as_str())
         .collect();
     assert_eq!(actual, tinychannels_bus::METHODS);
-    let (client, broker_transport) = MemoryTransport::pair();
-    broker.attach(Arc::new(broker_transport));
-    let connection = Connection::connect(Box::new(client)).await.unwrap();
     connection.request_name(HOST_BUS_NAME).await.unwrap();
     let proxy = connection.proxy(BUS_NAME, OBJECT_PATH, BUS_NAME).unwrap();
     let bounded_proxy = connection

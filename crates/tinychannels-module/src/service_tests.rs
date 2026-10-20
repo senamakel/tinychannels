@@ -26,6 +26,38 @@ fn whatsapp(cloud: bool) -> ChannelsConfig {
 }
 
 #[test]
+fn module_setup_config_preserves_null_and_empty_legacy_defaults() {
+    let null: ModuleSetupConfig = serde_json::from_str("null").unwrap();
+    let empty: ModuleSetupConfig = serde_json::from_str("{}").unwrap();
+    assert!(null.storage_descriptor().is_none());
+    assert!(empty.storage_descriptor().is_none());
+}
+
+#[test]
+fn module_setup_config_accepts_only_an_optional_storage_descriptor() {
+    let configured: ModuleSetupConfig = serde_json::from_value(serde_json::json!({
+        "storage_descriptor": {
+            "service_peer": ":1.23",
+            "registration_id": 4,
+            "object_root": "/org/tinystoragedrivers/Storage/Leases/4"
+        }
+    }))
+    .unwrap();
+    let descriptor = configured.storage_descriptor().unwrap();
+    assert_eq!(descriptor.service_peer(), ":1.23");
+    assert_eq!(
+        descriptor.object_root(),
+        "/org/tinystoragedrivers/Storage/Leases/4"
+    );
+    assert!(
+        serde_json::from_value::<ModuleSetupConfig>(serde_json::json!({
+            "unexpected": true
+        }))
+        .is_err()
+    );
+}
+
+#[test]
 fn linq_is_refused_because_its_inbound_path_is_a_webhook() {
     assert!(webhook_backed("linq", &ChannelsConfig::default()));
 }
