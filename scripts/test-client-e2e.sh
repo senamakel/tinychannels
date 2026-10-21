@@ -87,7 +87,7 @@ export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE="$native_cache"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME="$native_archive_name"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256="$native_archive_hash"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256="$native_library_sha256"
-export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.39"
 
 write_environment_file() {
   local env_file="$TASK_TARGET_ROOT/tinychannels-client-e2e.env"

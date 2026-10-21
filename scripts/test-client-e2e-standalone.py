@@ -265,7 +265,7 @@ printf '%s\\0' \\
         fail("Bash sourced an unexpected local fixture archive name")
     if not normalized_native_cache.endswith("/target/tinychannels-module-client-native-e2e/cache"):
         fail(f"Bash sourced an incorrect production module cache path: {values[4]!r}")
-    if values[8] != "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.37":
+    if values[8] != "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.39":
         fail("Bash sourced an unexpected local module release URL")
     if any(not re.fullmatch(r"[0-9a-f]{64}", values[index]) for index in (2, 3, 6, 7)):
         fail("Bash sourced an invalid archive or library digest")
