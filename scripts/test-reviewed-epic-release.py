@@ -233,6 +233,13 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             workspace,
         )
         self.assertIn(
+            '[patch."https://github.com/tinyhumansai/tinybus?rev='
+            '6b3c5b0cc14b1d07b68055b17a937b11de613efd"]\n'
+            'tinybus = { path = "vendor/tinybus/crates/tinybus" }\n'
+            'tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }',
+            workspace,
+        )
+        self.assertIn(
             'tinybus = { workspace = true, features = ["macros", "modules"] }',
             module,
         )
