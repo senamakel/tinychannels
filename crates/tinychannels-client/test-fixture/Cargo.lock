@@ -758,7 +758,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -773,7 +773,7 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-client-test-fixture"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "async-trait",
  "serde",
