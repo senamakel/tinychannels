@@ -8,7 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "proofs/storage-needs-consumer/Cargo.toml"
-PIN = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b"
+PIN = "078d2dee0f299d97dbc22fa7210bd64098a4bf59"
 EXPECTED_STORAGE_SOURCE = (
     "git+https://github.com/tinyhumansai/tinystoragedrivers"
     f"?rev={PIN}#{PIN}"
@@ -151,7 +151,7 @@ def violations(metadata, tree_output):
         )
     else:
         package = storage_bus[0]
-        if package["version"] != "1.9.0":
+        if package["version"] != "1.10.0":
             errors.append(f"unexpected storage bus version: {package['version']}")
         if package.get("source") != EXPECTED_STORAGE_SOURCE:
             errors.append("storage bus source ID is not the exact canonical revision")

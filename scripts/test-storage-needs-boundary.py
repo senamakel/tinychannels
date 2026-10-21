@@ -22,7 +22,7 @@ def fixture(extra_packages=(), tokio_features=("sync",), storage_features=()):
         {
             "id": "storage",
             "name": "tinystoragedrivers-bus",
-            "version": "1.9.0",
+            "version": "1.10.0",
             "source": EXPECTED_STORAGE_SOURCE,
         },
         {"id": "tokio", "name": "tokio", "version": "1.0.0"},
@@ -56,7 +56,7 @@ def tree_output(extra_lines=()):
         [
             "tinychannels-storage-needs-consumer v0.1.0",
             "tinychannels-bus v0.1.34",
-            "tinystoragedrivers-bus v1.9.0",
+            "tinystoragedrivers-bus v1.10.0",
             "tokio v1.0.0",
             *extra_lines,
         ]
@@ -126,7 +126,7 @@ class StorageNeedsBoundaryTests(unittest.TestCase):
         metadata = fixture()
         metadata["packages"][2]["source"] = (
             "git+https://github.com/tinyhumansai/tinystoragedrivers"
-            "?tag=v1.9.0#" + BOUNDARY.PIN
+            "?tag=v1.10.0#" + BOUNDARY.PIN
         )
         errors = BOUNDARY.violations(metadata, tree_output())
         self.assertIn("storage bus source ID is not the exact canonical revision", errors)
