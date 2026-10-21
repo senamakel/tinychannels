@@ -36,7 +36,7 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 
 [workspace.package]
 # Releases update this sole workspace version before packaging every crate.
-version = "0.1.39"
+version = "0.1.40"
 
 [workspace.dependencies]
 tinybus = { version = "=0.3.12", git = "https://github.com/tinyhumansai/tinybus", rev = "34d3bd6dda099e54cee11a2f96f28a21da9e0759", default-features = false }

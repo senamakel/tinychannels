@@ -29,7 +29,7 @@ use tinychannels_client::TinyChannelsClient;
 use tokio::sync::OnceCell;
 
 const MODULE_ID: &str = "tinychannels";
-const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.39";
+const RELEASE_URL: &str = "https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.40";
 const READINESS_GATE_PATH: &str =
     "/ai/tinyhumans/tinychannels/ChannelsHost/test_fixture_ready_gate";
 
@@ -839,7 +839,7 @@ pub(crate) fn record(pin: Pin) -> &'static ReleaseRecord {
             id: MODULE_ID,
             bus_name: tinychannels_bus::BUS_NAME,
             object_path: tinychannels_bus::OBJECT_PATH,
-            version: "0.1.39",
+            version: "0.1.40",
             release_url: RELEASE_URL,
             assets,
         }
@@ -893,7 +893,7 @@ fn native_module_record() -> &'static ReleaseRecord {
             id: MODULE_ID,
             bus_name: tinychannels_bus::BUS_NAME,
             object_path: tinychannels_bus::OBJECT_PATH,
-            version: "0.1.39",
+            version: "0.1.40",
             release_url: env_prefixed("TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST", "RELEASE_URL"),
             assets,
         }

@@ -140,7 +140,7 @@ async fn unattested_client() -> (TinyChannelsClient, Calls, Proxy) {
         id: MODULE_ID,
         bus_name: tinychannels_bus::BUS_NAME,
         object_path: tinychannels_bus::OBJECT_PATH,
-        version: "0.1.39",
+        version: "0.1.40",
         release_url: "https://example.invalid/tinychannels",
         assets,
     }));
