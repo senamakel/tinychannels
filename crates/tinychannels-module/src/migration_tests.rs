@@ -1,10 +1,11 @@
 use super::*;
 use tinychannels::storage::schema::{COLLECTIONS, OWNER, SCHEMA_VERSION, storage_schema};
 use tinystoragedrivers_core::StorageError;
-use tinystoragedrivers_core::schema::{Item, Step, TransformKind};
+use tinystoragedrivers_core::schema::{
+    BlobTargetRequest, Item, Step, StreamEntriesRequest, StreamPlanRequest, TransformKind,
+};
 use tinystoragedrivers_tinybus::migration::{
-    BlobTargetRequest, DocumentsTransformRequest, MigrationPayload, MigrationPayloadReply,
-    StreamEntriesRequest, StreamPlanRequest,
+    DocumentsTransformRequest, MigrationPayload, MigrationPayloadReply,
 };
 
 const EXPECTED_STEPS: [(&str, &str, &str); 14] = [
