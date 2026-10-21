@@ -15,8 +15,12 @@ use tinybus::{
     transport::memory::MemoryBus,
 };
 use tinychannels_bus::{
-    ChannelControllerRequest, ChannelControllerResult, ChannelsConfig, HttpProxyPolicy,
+    ChannelAuthMode, ChannelControllerRequest, ChannelControllerResult, ChannelsConfig,
+    HttpProxyPolicy,
     controllers::DiscordGuild,
+    module_inbound::PrepareChannelIdentityRequest,
+    module_inbound::{ChannelInboundSource, PrepareChannelInboundRequest},
+    module_runtime::ChannelMessagePreparation,
 };
 
 #[path = "lib_runtime_tests.rs"]
@@ -24,6 +28,13 @@ mod runtime_tests;
 
 const MODULE_ID: &str = "tinychannels";
 type Calls = Arc<Mutex<Vec<String>>>;
+
+fn take_error<T>(result: Result<T, ModuleCallFailure>, message: &str) -> ModuleCallFailure {
+    match result {
+        Err(error) => error,
+        Ok(_) => panic!("{message}"),
+    }
+}
 
 struct NoFailures;
 
@@ -129,7 +140,7 @@ async fn unattested_client() -> (TinyChannelsClient, Calls, Proxy) {
         id: MODULE_ID,
         bus_name: tinychannels_bus::BUS_NAME,
         object_path: tinychannels_bus::OBJECT_PATH,
-        version: "0.1.39",
+        version: "0.1.40",
         release_url: "https://example.invalid/tinychannels",
         assets,
     }));
@@ -206,6 +217,32 @@ fn discord_replies_decode_only_the_matching_raw_projection() {
 }
 
 #[test]
+fn connection_preparation_accepts_only_the_prepared_connect_result() {
+    let prepared = tinychannels_bus::module_controller::PreparedChannelConnection {
+        result: tinychannels_bus::controllers::ChannelConnectionResult {
+            status: "connected".into(),
+            restart_required: true,
+            auth_action: None,
+            message: None,
+        },
+        config_update: None,
+    };
+    let decoded = TinyChannelsClient::decode_prepared_connection(
+        ChannelControllerResult::PreparedConnect(Box::new(prepared)),
+    )
+    .expect("the matching prepared connection is accepted");
+    assert_eq!(decoded.result.status, "connected");
+    assert!(decoded.result.restart_required);
+
+    assert!(
+        TinyChannelsClient::decode_prepared_connection(ChannelControllerResult::DiscordGuilds(
+            Default::default()
+        ),)
+        .is_none()
+    );
+}
+
+#[test]
 fn discord_requests_keep_the_confidential_controller_wire_shape() {
     let config = ChannelsConfig::default();
     let proxy = HttpProxyPolicy::default();
@@ -256,7 +293,7 @@ fn discord_requests_keep_the_confidential_controller_wire_shape() {
 }
 
 #[tokio::test]
-async fn discord_credentials_never_fall_back_when_peer_proof_is_missing() {
+async fn confidential_calls_never_fall_back_when_peer_proof_is_missing() {
     let (client, calls, _) = unattested_client().await;
     let guilds = client
         .discord_list_guilds(
@@ -285,12 +322,61 @@ async fn discord_credentials_never_fall_back_when_peer_proof_is_missing() {
     let health = client
         .check_health(ChannelsConfig::default(), HttpProxyPolicy::default(), 1_000)
         .await;
+    let connection = client
+        .prepare_connection(
+            ChannelsConfig::default(),
+            "discord".into(),
+            ChannelAuthMode::BotToken,
+            json!({"bot_token":"fixture-private-token"}),
+            HttpProxyPolicy::default(),
+        )
+        .await;
+    let outbound = client
+        .prepare_outbound_intent(
+            "discord".into(),
+            ChannelMessagePreparation::Legacy(json!({"content":"fixture-private-token"})),
+        )
+        .await;
+    let identity = client
+        .prepare_identity(PrepareChannelIdentityRequest {
+            channel: "discord:fixture".into(),
+            sender: Some("fixture-private-token".into()),
+            reply_target: Some("fixture-private-target".into()),
+            thread_ts: None,
+        })
+        .await;
+    let inbound = client
+        .prepare_inbound(PrepareChannelInboundRequest {
+            source: ChannelInboundSource::Legacy {
+                message: tinychannels_bus::ChannelMessage {
+                    id: "fixture-message".into(),
+                    channel: "discord:fixture".into(),
+                    sender: "fixture-private-token".into(),
+                    reply_target: "fixture-private-target".into(),
+                    content: "fixture-private-content".into(),
+                    timestamp: 0,
+                    thread_ts: None,
+                    sender_name: None,
+                },
+                envelope: None,
+            },
+            namespace: "main".into(),
+            session_policy: Default::default(),
+        })
+        .await;
 
     for error in [
-        guilds.expect_err("unattested guild call must be rejected"),
-        channels.expect_err("unattested channel call must be rejected"),
-        permissions.expect_err("unattested permission call must be rejected"),
-        health.expect_err("unattested health call must be rejected"),
+        take_error(guilds, "unattested guild call must be rejected"),
+        take_error(channels, "unattested channel call must be rejected"),
+        take_error(permissions, "unattested permission call must be rejected"),
+        take_error(health, "unattested health call must be rejected"),
+        take_error(
+            connection,
+            "unattested connection preparation must be rejected",
+        ),
+        take_error(outbound, "unattested outbound preparation must be rejected"),
+        take_error(identity, "unattested identity preparation must be rejected"),
+        take_error(inbound, "unattested inbound preparation must be rejected"),
     ] {
         assert_eq!(error.kind, ModuleCallError::Unavailable);
         assert!(!format!("{error:?}").contains("fixture-private-token"));

@@ -30,7 +30,7 @@ def metadata_fixture(
     for name in sorted(BUS_PURITY.ALLOWED_PACKAGES):
         version = {
             "tinychannels-bus": "0.1.35",
-            "tinystoragedrivers-bus": "1.9.0",
+            "tinystoragedrivers-bus": "1.10.0",
             "tokio": "1.0.0",
         }.get(name, "1.0.0")
         package = {"id": f"pkg:{name}", "name": name, "version": version}
@@ -255,11 +255,11 @@ static NEEDS: LazyLock<StorageNeeds<'static>> = LazyLock::new(build_metadata);
             metadata_fixture(
                 storage_source=(
                     "git+https://github.com/tinyhumansai/tinystoragedrivers"
-                    f"?tag=v1.9.0#{BUS_PURITY.TSD_REV}"
+                    f"?tag=v1.10.0#{BUS_PURITY.TSD_REV}"
                 )
             )
         )
-        self.assertTrue(any("canonical TSD 1.9.0" in error for error in errors))
+        self.assertTrue(any("canonical TSD 1.10.0" in error for error in errors))
 
     def test_incomplete_metadata_fails_closed(self):
         errors = BUS_PURITY.dependency_violations(

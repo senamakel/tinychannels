@@ -12,7 +12,7 @@ WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@6ed83b04aab2d8977ec62e966cb914531e534fa4"
-TINYBUS_REV = "9e14f65666b11782ec1054aba576114026d180f8"
+TINYBUS_REV = "34d3bd6dda099e54cee11a2f96f28a21da9e0759"
 
 
 def workflow_run_block(step_name):
@@ -216,18 +216,25 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            f'tinybus = {{ version = "=0.3.11", git = '
+            f'tinybus = {{ version = "=0.3.12", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
         self.assertIn(
-            f'tinybus-module = {{ version = "=0.3.11", git = '
+            f'tinybus-module = {{ version = "=0.3.12", git = '
             f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
         self.assertIn(
+            'tinybus = { path = "vendor/tinybus/crates/tinybus" }\n'
+            'tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }',
+            workspace,
+        )
+        self.assertIn(
+            '[patch."https://github.com/tinyhumansai/tinybus?rev='
+            '6b3c5b0cc14b1d07b68055b17a937b11de613efd"]\n'
             'tinybus = { path = "vendor/tinybus/crates/tinybus" }\n'
             'tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }',
             workspace,
@@ -242,11 +249,11 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             module,
         )
         self.assertIn(
-            'tinybus = { version = "0.3.11", path = "../../../vendor/tinybus/crates/tinybus"',
+            'tinybus = { version = "0.3.12", path = "../../../vendor/tinybus/crates/tinybus"',
             fixture,
         )
         self.assertIn(
-            'tinybus-module = { version = "0.3.11", path = "../../../vendor/tinybus/crates/tinybus-module"',
+            'tinybus-module = { version = "0.3.12", path = "../../../vendor/tinybus/crates/tinybus-module"',
             fixture,
         )
         self.assertEqual(gitlink_revision(ROOT, "vendor/tinybus"), TINYBUS_REV)
