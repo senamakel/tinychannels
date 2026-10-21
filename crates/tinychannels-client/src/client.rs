@@ -3,10 +3,16 @@
 use serde::de::DeserializeOwned;
 use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
-    ChannelControllerRequest, ChannelControllerResult, ChannelRuntimeDispatchPolicy,
-    ChannelsConfig, HttpProxyPolicy,
+    ChannelAuthMode, ChannelControllerRequest, ChannelControllerResult,
+    ChannelRuntimeDispatchPolicy, ChannelsConfig, HttpProxyPolicy,
     controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
     methods,
+    module_controller::PreparedChannelConnection,
+    module_inbound::{
+        PrepareChannelIdentityRequest, PrepareChannelInboundRequest, PreparedChannelIdentity,
+        PreparedChannelInbound,
+    },
+    module_runtime::{ChannelMessagePreparation, PreparedChannelIntent},
 };
 
 use crate::runtime::RuntimeStart;
@@ -146,6 +152,74 @@ impl TinyChannelsClient {
             .await
     }
 
+    /// Validate a provider connection through TinyChannels before the host
+    /// persists its configuration or credentials.
+    ///
+    /// Credentials and proxy settings are sent only through the confidential,
+    /// attested module route. A response that is not `PreparedConnect` is
+    /// reported as a malformed module reply.
+    pub async fn prepare_connection(
+        &self,
+        config: ChannelsConfig,
+        channel: String,
+        auth_mode: ChannelAuthMode,
+        credentials: serde_json::Value,
+        proxy: HttpProxyPolicy,
+    ) -> Result<PreparedChannelConnection, ModuleCallFailure> {
+        let request = ChannelControllerRequest::PrepareConnect {
+            config,
+            channel,
+            auth_mode,
+            credentials,
+            proxy,
+        };
+        let response: ChannelControllerResult = self
+            .module
+            .call_attested_detailed("tinychannels", methods::CHANNEL_CONTROLLER, (request,))
+            .await?;
+        Self::decode_prepared_connection(response).ok_or_else(|| self.malformed_reply())
+    }
+
+    /// Prepare legacy or typed content as an outbound intent inside
+    /// TinyChannels before the host forwards it to its configured backend.
+    pub async fn prepare_outbound_intent(
+        &self,
+        channel: String,
+        preparation: ChannelMessagePreparation,
+    ) -> Result<PreparedChannelIntent, ModuleCallFailure> {
+        self.module
+            .call_attested_detailed(
+                "tinychannels",
+                methods::PREPARE_OUTBOUND_INTENT,
+                (channel, preparation),
+            )
+            .await
+    }
+
+    /// Derive persisted identity keys from module-owned channel semantics.
+    pub async fn prepare_identity(
+        &self,
+        request: PrepareChannelIdentityRequest,
+    ) -> Result<PreparedChannelIdentity, ModuleCallFailure> {
+        self.module
+            .call_attested_detailed(
+                "tinychannels",
+                methods::PREPARE_CHANNEL_IDENTITY,
+                (request,),
+            )
+            .await
+    }
+
+    /// Prepare an inbound message projection and its persisted identity keys.
+    pub async fn prepare_inbound(
+        &self,
+        request: PrepareChannelInboundRequest,
+    ) -> Result<PreparedChannelInbound, ModuleCallFailure> {
+        self.module
+            .call_attested_detailed("tinychannels", methods::PREPARE_CHANNEL_INBOUND, (request,))
+            .await
+    }
+
     async fn discord<T: DeserializeOwned>(
         &self,
         request: ChannelControllerRequest,
@@ -182,5 +256,14 @@ impl TinyChannelsClient {
             _ => None,
         };
         raw.and_then(|value| serde_json::from_value(value).ok())
+    }
+
+    pub(super) fn decode_prepared_connection(
+        response: ChannelControllerResult,
+    ) -> Option<PreparedChannelConnection> {
+        match response {
+            ChannelControllerResult::PreparedConnect(prepared) => Some(*prepared),
+            _ => None,
+        }
     }
 }
