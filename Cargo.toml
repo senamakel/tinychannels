@@ -27,6 +27,13 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 tinybus = { path = "vendor/tinybus/crates/tinybus" }
 tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 
+# TSD 1.10 pins its TinyBus dependency to this exact revision. Patch that
+# source identity too, so every workspace member shares the published 0.3.12
+# connection and module types.
+[patch."https://github.com/tinyhumansai/tinybus?rev=6b3c5b0cc14b1d07b68055b17a937b11de613efd"]
+tinybus = { path = "vendor/tinybus/crates/tinybus" }
+tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
+
 [workspace.package]
 # Releases update this sole workspace version before packaging every crate.
 version = "0.1.39"

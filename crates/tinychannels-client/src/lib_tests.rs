@@ -359,14 +359,14 @@ async fn confidential_calls_never_fall_back_when_peer_proof_is_missing() {
         .await;
 
     for error in [
-        guilds.expect_err("unattested guild call must be rejected"),
-        channels.expect_err("unattested channel call must be rejected"),
-        permissions.expect_err("unattested permission call must be rejected"),
-        health.expect_err("unattested health call must be rejected"),
-        connection.expect_err("unattested connection preparation must be rejected"),
-        outbound.expect_err("unattested outbound preparation must be rejected"),
-        identity.expect_err("unattested identity preparation must be rejected"),
-        inbound.expect_err("unattested inbound preparation must be rejected"),
+        guilds.err().expect("unattested guild call must be rejected"),
+        channels.err().expect("unattested channel call must be rejected"),
+        permissions.err().expect("unattested permission call must be rejected"),
+        health.err().expect("unattested health call must be rejected"),
+        connection.err().expect("unattested connection preparation must be rejected"),
+        outbound.err().expect("unattested outbound preparation must be rejected"),
+        identity.err().expect("unattested identity preparation must be rejected"),
+        inbound.err().expect("unattested inbound preparation must be rejected"),
     ] {
         assert_eq!(error.kind, ModuleCallError::Unavailable);
         assert!(!format!("{error:?}").contains("fixture-private-token"));
