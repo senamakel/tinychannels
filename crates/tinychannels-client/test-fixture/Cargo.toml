@@ -12,8 +12,8 @@ crate-type = ["cdylib"]
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tinybus = { version = "0.3.3", path = "../../../vendor/tinybus/crates/tinybus", default-features = false, features = ["macros", "modules"] }
-tinybus-module = { version = "0.3.3", path = "../../../vendor/tinybus/crates/tinybus-module" }
+tinybus = { version = "0.3.11", path = "../../../vendor/tinybus/crates/tinybus", default-features = false, features = ["macros", "modules"] }
+tinybus-module = { version = "0.3.11", path = "../../../vendor/tinybus/crates/tinybus-module" }
 tinychannels-bus = { path = "../../tinychannels-bus" }
 tokio = { version = "1", features = ["sync"] }
 

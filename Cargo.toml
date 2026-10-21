@@ -32,9 +32,14 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 version = "0.1.37"
 
 [workspace.dependencies]
-tinybus = { version = "0.3.3", git = "https://github.com/tinyhumansai/tinybus", rev = "207a9a7df15e44fdba00a807d0f7eaf21904ba0e", default-features = false }
-tinybus-module = { version = "0.3.3", git = "https://github.com/tinyhumansai/tinybus", rev = "207a9a7df15e44fdba00a807d0f7eaf21904ba0e", default-features = false }
-tinystoragedrivers-bus = { version = "1.5.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "c9ea6ff1615b77b55d7269403af5fd11bedc9ce8", default-features = false }
+tinybus = { version = "=0.3.11", git = "https://github.com/tinyhumansai/tinybus", rev = "9e14f65666b11782ec1054aba576114026d180f8", default-features = false }
+tinybus-module = { version = "=0.3.11", git = "https://github.com/tinyhumansai/tinybus", rev = "9e14f65666b11782ec1054aba576114026d180f8", default-features = false }
+tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b" }
+tinystoragedrivers-bus = { version = "1.9.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b", default-features = false }
+tinystoragedrivers-client = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b" }
+tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b" }
+tinystoragedrivers-tinybus = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b", features = ["migration-delivery"] }
+tokio-tungstenite = { version = "=0.30.1", git = "https://github.com/snapview/tokio-tungstenite", rev = "2319406b8c8bd697f28f47bc7ca92ba2b4e91283", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 
 [package]
 rust-version = "1.94"
@@ -106,7 +111,7 @@ tinychannels-bus = { path = "crates/tinychannels-bus" }
 tinychannels-runtime = { path = "crates/tinychannels-runtime" }
 # Storage ports only: no driver crate and no database client. The host (or the
 # bus client in the module crate) supplies the backend.
-tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", tag = "v1.0.0" }
+tinystoragedrivers-core = { workspace = true }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.23"
@@ -131,7 +136,7 @@ sha2 = "0.11"
 thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["fs", "io-util", "macros", "net", "process", "rt", "sync", "time"] }
 tokio-rustls = { version = "0.26.4", default-features = false, features = ["ring", "logging", "tls12"] }
-tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+tokio-tungstenite = { workspace = true }
 tracing = "0.1"
 url = "2"
 urlencoding = "2.1"

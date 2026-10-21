@@ -13,7 +13,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 BUS_SOURCE = ROOT / "crates/tinychannels-bus/src"
 BUS_MANIFEST = ROOT / "crates/tinychannels-bus/Cargo.toml"
-TSD_REV = "c9ea6ff1615b77b55d7269403af5fd11bedc9ce8"
+TSD_REV = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b"
 TSD_SOURCE = (
     "git+https://github.com/tinyhumansai/tinystoragedrivers"
     f"?rev={TSD_REV}#{TSD_REV}"
@@ -262,8 +262,8 @@ def dependency_violations(metadata):
         )
     else:
         package = tsd_packages[0]
-        if package.get("version") != "1.5.0" or package.get("source") != TSD_SOURCE:
-            errors.append("storage bus must be canonical TSD 1.5.0 at the pinned revision")
+        if package.get("version") != "1.9.0" or package.get("source") != TSD_SOURCE:
+            errors.append("storage bus must be canonical TSD 1.9.0 at the pinned revision")
         node = nodes_by_id.get(package["id"])
         features = node.get("features") if node else None
         if not isinstance(features, list):

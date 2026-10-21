@@ -34,6 +34,7 @@
 //! `tinychannels::factory`. This module has no keyring and cannot resolve a
 //! placeholder.
 
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tinychannels::config::WhatsAppConfigExt as _;
@@ -1188,17 +1189,70 @@ async fn finish_start_admission(
     Ok(())
 }
 
-async fn setup(connection: Connection) -> BusResult<()> {
-    let host = HostChannels::new(connection.clone());
+#[derive(Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+struct StorageSetupOptions {
+    storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ModuleSetupConfig {
+    Null(()),
+    Options(StorageSetupOptions),
+}
+
+impl ModuleSetupConfig {
+    fn storage_descriptor(
+        self,
+    ) -> Option<tinystoragedrivers_busproxy::governed::StorageDescriptor> {
+        match self {
+            Self::Null(()) => None,
+            Self::Options(options) => options.storage_descriptor,
+        }
+    }
+}
+
+async fn setup_with_storage_descriptor(
+    connection: Connection,
+    storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+) -> BusResult<()> {
+    let host =
+        HostChannels::new_with_storage_descriptor(connection.clone(), storage_descriptor.clone());
+    if storage_descriptor.is_some() {
+        host.storage()
+            .await
+            .map_err(|_| BusError::failed("configured storage descriptor unavailable"))?;
+    }
     let channels = Channels::new(
-        host,
-        Some(Arc::new(crate::runtime::Runtimes::new(connection.clone()))),
+        host.clone(),
+        Some(Arc::new(
+            crate::runtime::Runtimes::new_with_storage_descriptor(
+                connection.clone(),
+                storage_descriptor,
+            ),
+        )),
     );
-    connection
-        .serve_at(OBJECT_PATH.try_into()?, channels)
-        .await?;
-    connection.request_name(BUS_NAME).await?;
-    Ok(())
+    let result = async {
+        connection
+            .serve_at(OBJECT_PATH.try_into()?, channels)
+            .await?;
+        connection.request_name(BUS_NAME).await?;
+        Ok(())
+    }
+    .await;
+    if result.is_err() {
+        let _ = host.shutdown().await;
+    }
+    result
+}
+
+async fn setup_with_context(
+    context: tinybus_module::ModuleSetupContext,
+    config: ModuleSetupConfig,
+) -> BusResult<()> {
+    crate::migration::setup(&context).await?;
+    setup_with_storage_descriptor(context.connection().clone(), config.storage_descriptor()).await
 }
 
 fn intent_to_legacy_message(
@@ -1252,9 +1306,13 @@ fn delivery_store_error(error: DeliveryQueueError) -> BusError {
 )]
 pub(crate) mod exports {
     tinybus_module::module_export_optional_static! {
-        setup = super::setup,
+        setup_with_context = super::setup_with_context,
+        config = super::ModuleSetupConfig,
         worker_threads = 4,
-        provides = ["ai.tinyhumans.tinychannels.Channels"],
+        provides = [
+            "ai.tinyhumans.tinychannels.Channels",
+            "org.tinystoragedrivers.Migration",
+        ],
         methods = [
             "StartChannel",
             "StopChannel",
