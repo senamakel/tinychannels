@@ -370,7 +370,10 @@ async fn confidential_calls_never_fall_back_when_peer_proof_is_missing() {
         take_error(channels, "unattested channel call must be rejected"),
         take_error(permissions, "unattested permission call must be rejected"),
         take_error(health, "unattested health call must be rejected"),
-        take_error(connection, "unattested connection preparation must be rejected"),
+        take_error(
+            connection,
+            "unattested connection preparation must be rejected",
+        ),
         take_error(outbound, "unattested outbound preparation must be rejected"),
         take_error(identity, "unattested identity preparation must be rejected"),
         take_error(inbound, "unattested inbound preparation must be rejected"),
