@@ -1,8 +1,10 @@
 use super::*;
 use tinychannels::storage::schema::{COLLECTIONS, OWNER, SCHEMA_VERSION, storage_schema};
+use tinystoragedrivers_core::StorageError;
 use tinystoragedrivers_core::schema::{Item, Step, TransformKind};
 use tinystoragedrivers_tinybus::migration::{
-    DocumentsTransformRequest, MigrationPayload, MigrationPayloadReply,
+    BlobTargetRequest, DocumentsTransformRequest, MigrationPayload, MigrationPayloadReply,
+    StreamEntriesRequest, StreamPlanRequest,
 };
 
 const EXPECTED_STEPS: [(&str, &str, &str); 14] = [
@@ -190,5 +192,101 @@ fn unknown_operations_and_versions_are_rejected() {
             kind: TransformErrorKind::UnsupportedVersion,
             ..
         }))
+    ));
+}
+
+#[test]
+fn document_dispatch_rejects_stream_and_blob_steps() {
+    let mut stream_schema = storage_schema();
+    stream_schema.steps[0].run = StepBody::Streams(Arc::new(|_, _| Ok(None)));
+    let mut blob_schema = storage_schema();
+    blob_schema.steps[0].run = StepBody::Blobs(Arc::new(|_, _, _| Ok(None)));
+
+    for schema in [stream_schema, blob_schema] {
+        let handler = ChannelMigration { schema };
+        let reply = handler.transform(MigrationPayload::Documents(DocumentsTransformRequest {
+            operation: operation_selector(EXPECTED_STEPS[0].0).unwrap().to_owned(),
+            version: OPERATION_VERSION,
+            records: Vec::new(),
+        }));
+        assert!(matches!(
+            reply,
+            MigrationPayloadReply::Documents(Err(TransformError {
+                kind: TransformErrorKind::UnsupportedOperation,
+                ..
+            }))
+        ));
+    }
+}
+
+#[test]
+fn non_document_payloads_are_rejected_with_their_matching_reply_kind() {
+    let handler = ChannelMigration {
+        schema: storage_schema(),
+    };
+    let replies = [
+        handler.transform(MigrationPayload::BlobTarget(BlobTargetRequest {
+            operation: "channels.blob".to_owned(),
+            version: OPERATION_VERSION,
+            source: "legacy/blob".to_owned(),
+        })),
+        handler.transform(MigrationPayload::StreamPlan(StreamPlanRequest {
+            operation: "channels.stream-plan".to_owned(),
+            version: OPERATION_VERSION,
+            source: "legacy/stream".to_owned(),
+        })),
+        handler.transform(MigrationPayload::StreamEntries(StreamEntriesRequest {
+            operation: "channels.stream-entries".to_owned(),
+            version: OPERATION_VERSION,
+            entries: Vec::new(),
+        })),
+    ];
+    assert!(matches!(
+        replies[0],
+        MigrationPayloadReply::BlobTarget(Err(TransformError {
+            kind: TransformErrorKind::UnsupportedOperation,
+            ..
+        }))
+    ));
+    assert!(matches!(
+        replies[1],
+        MigrationPayloadReply::StreamPlan(Err(TransformError {
+            kind: TransformErrorKind::UnsupportedOperation,
+            ..
+        }))
+    ));
+    assert!(matches!(
+        replies[2],
+        MigrationPayloadReply::StreamEntries(Err(TransformError {
+            kind: TransformErrorKind::UnsupportedOperation,
+            ..
+        }))
+    ));
+}
+
+#[test]
+fn owner_transform_errors_are_returned_as_sanitized_invalid_input() {
+    let mut schema = storage_schema();
+    schema.steps[0] = Step::new(
+        "delivery-pending-v2",
+        "channels.delivery_pending",
+        1,
+        2,
+        |_| Err(StorageError::invalid_input("private backend detail")),
+    )
+    .source("channels_delivery_pending");
+    let handler = ChannelMigration { schema };
+
+    let reply = handler.transform(MigrationPayload::Documents(DocumentsTransformRequest {
+        operation: operation_selector(EXPECTED_STEPS[0].0).unwrap().to_owned(),
+        version: OPERATION_VERSION,
+        records: Vec::new(),
+    }));
+    assert!(matches!(
+        reply,
+        MigrationPayloadReply::Documents(Err(TransformError {
+            kind: TransformErrorKind::InvalidInput,
+            message,
+        })) if message == "channel migration transform failed"
     ));
 }
