@@ -29,6 +29,13 @@ mod runtime_tests;
 const MODULE_ID: &str = "tinychannels";
 type Calls = Arc<Mutex<Vec<String>>>;
 
+fn take_error<T>(result: Result<T, ModuleCallFailure>, message: &str) -> ModuleCallFailure {
+    match result {
+        Err(error) => error,
+        Ok(_) => panic!("{message}"),
+    }
+}
+
 struct NoFailures;
 
 impl FailureSink for NoFailures {
@@ -359,14 +366,14 @@ async fn confidential_calls_never_fall_back_when_peer_proof_is_missing() {
         .await;
 
     for error in [
-        guilds.err().expect("unattested guild call must be rejected"),
-        channels.err().expect("unattested channel call must be rejected"),
-        permissions.err().expect("unattested permission call must be rejected"),
-        health.err().expect("unattested health call must be rejected"),
-        connection.err().expect("unattested connection preparation must be rejected"),
-        outbound.err().expect("unattested outbound preparation must be rejected"),
-        identity.err().expect("unattested identity preparation must be rejected"),
-        inbound.err().expect("unattested inbound preparation must be rejected"),
+        take_error(guilds, "unattested guild call must be rejected"),
+        take_error(channels, "unattested channel call must be rejected"),
+        take_error(permissions, "unattested permission call must be rejected"),
+        take_error(health, "unattested health call must be rejected"),
+        take_error(connection, "unattested connection preparation must be rejected"),
+        take_error(outbound, "unattested outbound preparation must be rejected"),
+        take_error(identity, "unattested identity preparation must be rejected"),
+        take_error(inbound, "unattested inbound preparation must be rejected"),
     ] {
         assert_eq!(error.kind, ModuleCallError::Unavailable);
         assert!(!format!("{error:?}").contains("fixture-private-token"));
