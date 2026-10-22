@@ -37,7 +37,7 @@
 //! It invokes `ProcessInbound` concurrently while the notification consumer
 //! still owns status/persistence/event ordering. Its barriers drain the accepted
 //! turn frontier and shutdown joins the dispatcher. Legacy callers retain the
-//! serial `DeliverInbound` contract described above.
+//! serial v22 `DeliverInbound` envelope contract described above.
 //!
 //! # Failures are logged, not retried
 //!
@@ -49,6 +49,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use tinybus::{Connection, Error, Result};
+use tinychannels_bus::ChannelEvent;
 use tinychannels_bus::names::{HOST_BUS_NAME, HOST_OBJECT_PATH, host_methods};
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult};
 use tinychannels_bus::{HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult};
@@ -81,6 +82,10 @@ enum Notification {
     },
     PublishEvent {
         publication: HostEventPublication,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    DeliverEvent {
+        event: Box<ChannelEvent>,
         reply: oneshot::Sender<Result<()>>,
     },
     Barrier {
@@ -121,11 +126,9 @@ pub struct HostChannels {
     owner: Arc<Owner>,
     connection: Connection,
     object_path: Arc<str>,
-    /// Optional route for a governed, module-specific storage lease.
-    storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
     /// The host's storage objects, connected on first use and then shared by
     /// every clone.
-    storage: Arc<Mutex<Option<tinystoragedrivers_core::ScopedStorage>>>,
+    storage: Arc<Mutex<Option<tinystoragedrivers_api::Storage>>>,
 }
 impl std::fmt::Debug for HostChannels {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -135,35 +138,12 @@ impl std::fmt::Debug for HostChannels {
     }
 }
 impl HostChannels {
-    #[cfg(test)]
     pub(crate) fn new_at_with_dispatch(
         connection: Connection,
         object_path: String,
         max_in_flight: usize,
     ) -> Self {
-        Self::new_at_inner(connection, object_path, Some(max_in_flight), None)
-    }
-
-    pub(crate) fn new_at_with_storage_descriptor(
-        connection: Connection,
-        object_path: String,
-        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
-    ) -> Self {
-        Self::new_at_inner(connection, object_path, None, storage_descriptor)
-    }
-
-    pub(crate) fn new_at_with_dispatch_and_storage_descriptor(
-        connection: Connection,
-        object_path: String,
-        max_in_flight: usize,
-        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
-    ) -> Self {
-        Self::new_at_inner(
-            connection,
-            object_path,
-            Some(max_in_flight),
-            storage_descriptor,
-        )
+        Self::new_at_inner(connection, object_path, Some(max_in_flight))
     }
 
     /// Start one owned callback consumer. Explicit shutdown drains and joins it.
@@ -172,28 +152,15 @@ impl HostChannels {
         Self::new_at(connection, HOST_OBJECT_PATH.to_owned())
     }
 
-    pub(crate) fn new_with_storage_descriptor(
-        connection: Connection,
-        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
-    ) -> Self {
-        Self::new_at_inner(
-            connection,
-            HOST_OBJECT_PATH.to_owned(),
-            None,
-            storage_descriptor,
-        )
-    }
-
     /// Bind all callbacks to an immutable runtime-specific host object.
     pub(crate) fn new_at(connection: Connection, object_path: String) -> Self {
-        Self::new_at_inner(connection, object_path, None, None)
+        Self::new_at_inner(connection, object_path, None)
     }
 
     fn new_at_inner(
         connection: Connection,
         object_path: String,
         dispatch_limit: Option<usize>,
-        storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
     ) -> Self {
         let object_path: Arc<str> = object_path.into();
         let callback_path = object_path.clone();
@@ -277,6 +244,19 @@ impl HostChannels {
                     let _ = reply.send(result);
                     continue;
                 }
+                if let Notification::DeliverEvent { event, reply } = notification {
+                    let result = async {
+                        let proxy = callback_connection.proxy(
+                            HOST_BUS_NAME,
+                            callback_path.as_ref(),
+                            HOST_BUS_NAME,
+                        )?;
+                        proxy.call::<()>(host_methods::DELIVER_EVENT, *event).await
+                    }
+                    .await;
+                    let _ = reply.send(result);
+                    continue;
+                }
                 let inbound = matches!(notification, Notification::DeliverInbound { .. });
                 let result = async {
                     let proxy = callback_connection.proxy(
@@ -301,6 +281,7 @@ impl HostChannels {
                         }
                         Notification::PersistAllowedIdentity { .. } => unreachable!(),
                         Notification::PublishEvent { .. } => unreachable!(),
+                        Notification::DeliverEvent { .. } => unreachable!(),
                         Notification::Barrier { .. } => Ok(()),
                     }
                 }
@@ -321,7 +302,6 @@ impl HostChannels {
             outbox,
             connection,
             object_path,
-            storage_descriptor,
             storage: Arc::new(Mutex::new(None)),
             owner: Arc::new(Owner {
                 worker: Mutex::new(Some(worker)),
@@ -346,42 +326,21 @@ impl HostChannels {
     /// serving storage later is picked up by the next call.
     pub(crate) async fn storage(
         &self,
-    ) -> tinystoragedrivers_core::Result<tinystoragedrivers_core::ScopedStorage> {
-        use tinystoragedrivers_core::StorageBackend;
+    ) -> tinystoragedrivers_types::Result<tinystoragedrivers_api::Storage> {
         let mut slot = self.storage.lock().await;
         if let Some(scoped) = slot.as_ref() {
             return Ok(scoped.clone());
         }
-        let bus = match &self.storage_descriptor {
-            Some(descriptor) => {
-                let transport = tinystoragedrivers_busproxy::BusTransport::connect_bound(
-                    self.connection.clone(),
-                    descriptor.clone(),
-                )
-                .await
-                .map_err(|_| {
-                    tinystoragedrivers_core::StorageError::unavailable(
-                        "storage descriptor unavailable",
-                    )
-                })?;
-                tinystoragedrivers_client::BusStorage::connect(
-                    Arc::new(transport),
-                    tinystoragedrivers_busproxy::module_scope_label(),
-                )
-                .await?
-            }
-            None => tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?,
-        };
-        let scoped = bus.for_scope(&tinystoragedrivers_busproxy::module_scope_label())?;
-        *slot = Some(scoped.clone());
-        Ok(scoped)
+        let storage = tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?;
+        *slot = Some(storage.clone());
+        Ok(storage)
     }
 
     /// The scoped document store, for the delivery, remote-session and
     /// WhatsApp session records.
     pub(crate) async fn documents(
         &self,
-    ) -> tinystoragedrivers_core::Result<Arc<dyn tinystoragedrivers_core::DocumentStore>> {
+    ) -> tinystoragedrivers_types::Result<Arc<dyn tinystoragedrivers_api::DocumentStore>> {
         Ok(Arc::clone(self.storage().await?.documents()))
     }
 
@@ -488,8 +447,71 @@ impl HostChannels {
             .map_err(|_| Error::failed("event publication was interrupted"))?
     }
 
+    /// Deliver one typed provider event over the scoped host callback.
+    pub async fn deliver_event(&self, event: ChannelEvent) -> Result<()> {
+        if serde_json::to_vec(&event).map_or(true, |bytes| bytes.len() > MAX_CALLBACK_BYTES) {
+            return Err(Error::failed("channel event callback byte limit exceeded"));
+        }
+        let (reply, wait) = oneshot::channel();
+        let _publication = self.owner.publication.lock().await;
+        if self.owner.terminal.load(Ordering::SeqCst) {
+            return Err(Error::failed("callback consumer is closed"));
+        }
+        self.outbox
+            .send(Notification::DeliverEvent {
+                event: Box::new(event),
+                reply,
+            })
+            .await
+            .map_err(|_| Error::failed("callback consumer is closed"))?;
+        drop(_publication);
+        match wait
+            .await
+            .map_err(|_| Error::failed("event delivery was interrupted"))?
+        {
+            Err(error)
+                if error.wire_name() == "ai.tinyhumans.tinybus.Error.NameHasNoOwner"
+                    || error.wire_name() == "ai.tinyhumans.tinybus.Error.MemberNotFound" =>
+            {
+                Ok(())
+            }
+            result => result,
+        }
+    }
+
     /// Enqueue one inbound message; a flush observes delivery failures.
-    pub async fn deliver_inbound(&self, channel: &str, message: serde_json::Value) {
+    pub async fn deliver_inbound(
+        &self,
+        channel: &str,
+        envelope: tinychannels_bus::ChannelInboundEnvelope,
+    ) {
+        let Ok(message) = serde_json::to_value(envelope) else {
+            record_failure(
+                &self.owner.failure,
+                "inbound envelope could not be encoded".into(),
+            );
+            return;
+        };
+        self.deliver_inbound_value(channel, message).await;
+    }
+
+    /// Enqueue authenticated relay provenance with its normalized envelope.
+    pub async fn deliver_relay_inbound(
+        &self,
+        channel: &str,
+        delivery: tinychannels_bus::module_relay::RelayInboundDelivery,
+    ) {
+        let Ok(message) = serde_json::to_value(delivery) else {
+            record_failure(
+                &self.owner.failure,
+                "relay envelope could not be encoded".into(),
+            );
+            return;
+        };
+        self.deliver_inbound_value(channel, message).await;
+    }
+
+    async fn deliver_inbound_value(&self, channel: &str, message: serde_json::Value) {
         if serde_json::to_vec(&message).map_or(true, |bytes| bytes.len() > MAX_CALLBACK_BYTES) {
             record_failure(
                 &self.owner.failure,

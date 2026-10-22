@@ -14,27 +14,27 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 # The provider stack. This is the whole point of the module: these dependencies
 # live in the loaded `cdylib` instead of in every host binary.
-# `whatsapp-web` is here because `StartChannel` deliberately *permits* the
-# WhatsApp Web configuration — it is the one WhatsApp variant with a real listen
-# loop. Without the feature the factory compiles its gate-off branch, returns no
-# provider, and the request fails as `NotConfigured`: a guard that allows a
-# configuration the build cannot serve.
-tinychannels = { path = "../..", features = ["email", "lark", "whatsapp-web", "relay-websocket"] }
+# The WhatsApp Web stack (whatsapp-rust, wacore, waproto) is optional: it is
+# pulled in by this crate's own `whatsapp-web` feature, which is on by default
+# so the released cdylib carries it. Without the feature `StartChannel`'s
+# factory compiles its gate-off branch, returns no provider and the request
+# fails as `NotConfigured`. Hosts that link the module only to exercise the
+# other providers (for example a test fixture) can opt out with
+# `default-features = false`.
+tinychannels = { path = "../..", features = ["email", "lark", "relay-websocket"] }
 # The transport-free vocabulary shared with the host.
 tinychannels-bus = { path = "../tinychannels-bus" }
 # TinyBus provides the typed service interface and dynamic module host ABI.
-tinybus = { workspace = true, features = ["macros", "modules"] }
+tinybus = { version = ">=0.1.4, <0.2", default-features = false, features = ["macros", "modules"] }
 # The module-side SDK owns its runtime and exports the stable C entrypoints.
-tinybus-module = { workspace = true }
+tinybus-module = ">=0.1.4, <0.2"
 # Provider listen loops are long-lived tasks the module owns.
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 # Storage over the bus: the module reaches host storage through the same port
 # traits a linked library gets, never through per-module persistence callbacks.
-tinystoragedrivers-core = { workspace = true }
-tinystoragedrivers-bus = { workspace = true }
-tinystoragedrivers-client = { workspace = true }
-tinystoragedrivers-busproxy = { workspace = true }
-tinystoragedrivers-tinybus = { workspace = true }
+tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
+tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
+tinystoragedrivers-busproxy = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.11"
@@ -44,18 +44,23 @@ anyhow = "1"
 tracing = "0.1"
 log = "0.4"
 async-trait = "0.1"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-tinybus = { workspace = true, features = ["test-support"] }
+tinybus = { version = ">=0.1.4, <0.2", default-features = false, features = ["test-support"] }
+tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "05eaada962decbab33bafa4763d2bd1a67f6b456" }
 tempfile = "3"
 tokio = { version = "1", features = ["test-util"] }
 serde_json = "1"
 futures-util = "0.3"
-tokio-tungstenite = { workspace = true, features = ["handshake"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 base64 = "0.23"
 
 [features]
-default = []
+default = ["whatsapp-web"]
+# Builds the WhatsApp Web provider into the module (on by default).
+whatsapp-web = ["tinychannels/whatsapp-web"]
 linked = ["static-link"]
 static-link = []
+test-support = []
