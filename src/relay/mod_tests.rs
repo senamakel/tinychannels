@@ -332,6 +332,50 @@ fn relay_send_action_projects_text_outbound_intent() {
 }
 
 #[test]
+fn relay_accepts_ordered_text_parts_and_rejects_rich_typed_parts() {
+    let mut intent = ChannelOutboundIntent {
+        payload: OutboundPayload::Parts {
+            parts: vec![
+                tinychannels_bus::OutboundContentPart::Content {
+                    part: tinychannels_bus::channel::ContentPart::Text {
+                        text: "first".into(),
+                        markdown_dialect: None,
+                    },
+                },
+                tinychannels_bus::OutboundContentPart::Content {
+                    part: tinychannels_bus::channel::ContentPart::Text {
+                        text: "second".into(),
+                        markdown_dialect: None,
+                    },
+                },
+            ],
+        },
+        ..Default::default()
+    };
+    let action = relay_send_action_from_outbound_intent(&intent).unwrap();
+    assert_eq!(action["content"], "first\nsecond");
+
+    intent.payload = OutboundPayload::Parts {
+        parts: vec![tinychannels_bus::OutboundContentPart::Content {
+            part: tinychannels_bus::channel::ContentPart::Location {
+                latitude: 1.0,
+                longitude: 2.0,
+                label: None,
+                address: None,
+                accuracy_meters: None,
+                live_until_unix_ms: None,
+            },
+        }],
+    };
+    assert!(
+        relay_send_action_from_outbound_intent(&intent)
+            .unwrap_err()
+            .to_string()
+            .contains("relay does not support typed channel content")
+    );
+}
+
+#[test]
 fn relay_send_action_preserves_legacy_native_payload_in_metadata() {
     let intent = outbound_intent_from_legacy_message(
         "telegram",

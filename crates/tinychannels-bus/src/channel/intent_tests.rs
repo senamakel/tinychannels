@@ -104,3 +104,97 @@ fn legacy_payloads_adapt_to_typed_content_without_dropping_text() {
             if media.url.as_deref() == Some("https://example.test/image.png")
     ));
 }
+
+#[test]
+fn each_legacy_payload_variant_adapts_to_its_matching_typed_part() {
+    let cases = [
+        (
+            OutboundPayload::Voice {
+                media_url: "https://example.test/voice.ogg".into(),
+            },
+            1,
+        ),
+        (
+            OutboundPayload::Files {
+                file_urls: vec!["https://example.test/file.pdf".into()],
+            },
+            1,
+        ),
+        (
+            OutboundPayload::Poll {
+                question: "Pick one".into(),
+                options: vec!["A".into(), "B".into()],
+            },
+            1,
+        ),
+        (
+            OutboundPayload::PresentationBlocks {
+                blocks: serde_json::json!([{"type": "section"}]),
+            },
+            1,
+        ),
+        (
+            OutboundPayload::NativeChannelData {
+                data: serde_json::json!({"content": "native"}),
+            },
+            1,
+        ),
+        (
+            OutboundPayload::Media {
+                text: None,
+                media_urls: vec![],
+            },
+            0,
+        ),
+    ];
+
+    for (payload, expected_parts) in cases {
+        let typed = ChannelOutboundMessage::from_intent(&ChannelOutboundIntent {
+            channel_id: "telegram".into(),
+            conversation_id: "fallback-room".into(),
+            payload,
+            ..Default::default()
+        });
+        assert_eq!(typed.parts.len(), expected_parts);
+    }
+}
+
+#[test]
+fn typed_text_projection_preserves_reference_addressing_and_rejects_formatted_text() {
+    let intent = ChannelOutboundIntent {
+        channel_ref: Some(ChannelRef {
+            id: "telegram:account".into(),
+            account_id: None,
+        }),
+        conversation_ref: Some(ConversationRef {
+            id: "ref-room".into(),
+            thread_id: Some("ref-thread".into()),
+            ..Default::default()
+        }),
+        thread_id: None,
+        idempotency_key: "key".into(),
+        payload: OutboundPayload::Text {
+            text: "hello".into(),
+        },
+        ..Default::default()
+    };
+    let typed = ChannelOutboundMessage::from_intent(&intent);
+    assert_eq!(typed.channel_id, "telegram:account");
+    assert_eq!(typed.conversation_id, "ref-room");
+    assert_eq!(typed.thread_id.as_deref(), Some("ref-thread"));
+    let legacy = typed.to_legacy_message().unwrap();
+    assert_eq!(legacy.recipient, "ref-room");
+    assert_eq!(legacy.thread_ts.as_deref(), Some("ref-thread"));
+    assert_eq!(legacy.idempotency_key.as_deref(), Some("key"));
+
+    let formatted = ChannelOutboundMessage {
+        parts: vec![OutboundContentPart::Content {
+            part: ContentPart::Text {
+                text: "hello".into(),
+                markdown_dialect: Some("commonmark".into()),
+            },
+        }],
+        ..typed
+    };
+    assert!(formatted.to_legacy_message().is_err());
+}

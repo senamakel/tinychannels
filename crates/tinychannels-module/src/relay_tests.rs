@@ -195,6 +195,44 @@ async fn required_relay_delivery_is_refused_before_socket_send() {
 }
 
 #[tokio::test]
+async fn rich_typed_relay_delivery_is_rejected_before_socket_send() {
+    let (manager, _, _server, host) = manager().await;
+    let mut socket = socket(false).await;
+    let id = manager.reserve().await.unwrap();
+    manager
+        .start(id.clone(), socket.config.clone())
+        .await
+        .unwrap();
+    socket.hello.recv().await.unwrap();
+
+    let mut typed = intent();
+    typed.payload = tinychannels::OutboundPayload::Parts {
+        parts: vec![tinychannels_bus::OutboundContentPart::Content {
+            part: tinychannels_bus::channel::ContentPart::Location {
+                latitude: 1.0,
+                longitude: 2.0,
+                label: None,
+                address: None,
+                accuracy_meters: None,
+                live_until_unix_ms: None,
+            },
+        }],
+    };
+    let error = manager.send(id.clone(), typed).await.unwrap_err();
+    assert!(
+        error
+            .wire_message()
+            .contains("relay does not support typed channel content")
+    );
+    assert_eq!(socket.outbound_count.load(Ordering::SeqCst), 0);
+
+    manager.stop(id).await.unwrap();
+    (&mut socket.task).await.unwrap();
+    manager.shutdown().await.unwrap();
+    host.shutdown().await.unwrap();
+}
+
+#[tokio::test]
 async fn stopped_reservations_never_reopen_and_sequential_cycles_reclaim_capacity() {
     let (manager, _, _server, host) = manager().await;
     let first = manager.reserve().await.unwrap();
