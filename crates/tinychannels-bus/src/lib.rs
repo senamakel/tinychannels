@@ -31,7 +31,9 @@ pub mod traits;
 pub mod version;
 pub use capabilities::{ChannelCapabilities, capabilities_for, provider_id};
 pub use channel::{
-    ChannelInboundEnvelope, ChannelOutboundIntent, DeliveryDurability, OutboundPayload,
+    ChannelInboundEnvelope, ChannelOutboundIntent, ChannelOutboundMessage, ChannelRef,
+    ConversationRef, DeliveryDurability, OutboundContentPart, OutboundPayload, OutboundVoice,
+    SenderRef,
 };
 pub use config::ChannelsConfig;
 pub use controllers::{ChannelAuthMode, ChannelDefinition};

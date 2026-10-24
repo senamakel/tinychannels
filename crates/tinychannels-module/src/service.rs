@@ -799,10 +799,7 @@ impl Channels {
                 })?
         };
         entry
-            .send(
-                intent_to_legacy_message(&intent)
-                    .map_err(|_| BusError::failed("could not encode channel intent"))?,
-            )
+            .send(intent_to_legacy_message(&intent).map_err(BusError::failed)?)
             .await
             .map_err(|error| BusError::MethodFailed {
                 name: SEND_FAILED_ERROR.to_owned(),
@@ -1255,13 +1252,33 @@ async fn setup_with_context(
     setup_with_storage_descriptor(context.connection().clone(), config.storage_descriptor()).await
 }
 
-fn intent_to_legacy_message(
-    intent: &ChannelOutboundIntent,
-) -> Result<SendMessage, serde_json::Error> {
+fn intent_to_legacy_message(intent: &ChannelOutboundIntent) -> Result<SendMessage, String> {
+    if let tinychannels::OutboundPayload::Parts { parts } = &intent.payload {
+        let message = tinychannels_bus::ChannelOutboundMessage {
+            channel_id: intent.channel_id.clone(),
+            conversation_id: intent.conversation_id.clone(),
+            channel_ref: intent.channel_ref.clone(),
+            conversation_ref: intent.conversation_ref.clone(),
+            reply_to_id: intent.reply_to_id.clone(),
+            thread_id: intent.thread_id.clone(),
+            turn_id: intent.turn_id.clone(),
+            idempotency_key: intent.idempotency_key.clone(),
+            parts: parts.clone(),
+        };
+        let legacy = message
+            .to_legacy_message()
+            .map_err(|error| error.to_string())?;
+        return Ok(SendMessage {
+            recipient: intent.conversation_id.clone(),
+            thread_ts: intent.thread_id.clone(),
+            idempotency_key: Some(intent.idempotency_key.clone()),
+            ..legacy
+        });
+    }
     let value = tinychannels::legacy_message_value_from_outbound_intent(intent);
     let content = match &intent.payload {
         tinychannels::OutboundPayload::Text { text } => text.clone(),
-        _ => serde_json::to_string(&value)?,
+        _ => serde_json::to_string(&value).map_err(|error| error.to_string())?,
     };
     Ok(SendMessage {
         content,

@@ -386,8 +386,17 @@ async fn run(slot: Arc<Slot>, config: RelayRuntimeConfig, host: HostChannels) {
                     ()=canceled(&mut cancel)=>break,
                     command=inbox.recv()=>match command {Some(command)=>command,None=>break},
                 };
-                let action =
-                    tinychannels::relay::relay_send_action_from_outbound_intent(&command.intent);
+                let action = match tinychannels::relay::relay_send_action_from_outbound_intent(
+                    &command.intent,
+                ) {
+                    Ok(action) => action,
+                    Err(_) => {
+                        let _ = command.reply.send(Err(Error::failed(
+                            "relay does not support typed channel content",
+                        )));
+                        continue;
+                    }
+                };
                 let result = tokio::select! { biased;
                     ()=canceled(&mut cancel)=>{let _=command.reply.send(Err(closed()));break},
                     result=native.send_outbound(action,Some(&command.intent.channel_id))=>result,

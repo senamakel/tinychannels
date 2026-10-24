@@ -17,11 +17,15 @@ pub use capabilities::{
     MarkdownDialect, channel_message_action_names, durable_final_delivery_capabilities,
 };
 pub use envelope::{
-    AccessContext, ChannelInboundEnvelope, GroupAccessPolicy, InboundMediaPayload, MediaKind,
-    MediaReference, MentionGate, SenderDmDecision,
+    AccessContext, ButtonAction, ButtonStyle, ChannelInboundEnvelope, ContactMethod, ContentPart,
+    GroupAccessPolicy, InboundMediaPayload, MediaKind, MediaReference, MentionGate,
+    SenderDmDecision, VoiceNote, VoiceTranscript, VoiceTranscriptSource, VoiceTranscriptState,
 };
 pub use error::{ChannelSendError, SendErrorKind};
-pub use intent::{ChannelOutboundIntent, DeliveryDurability, OutboundPayload};
+pub use intent::{
+    ChannelOutboundIntent, ChannelOutboundMessage, DeliveryDurability, OutboundContentPart,
+    OutboundPayload, OutboundVoice,
+};
 pub use receipt::{
     MessageReceipt, MessageReceiptPart, MessageReceiptPartKind, MessageReceiptSourceResult,
 };

@@ -12,7 +12,7 @@ WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@6ed83b04aab2d8977ec62e966cb914531e534fa4"
-TINYBUS_REV = "9e14f65666b11782ec1054aba576114026d180f8"
+TINYBUS_REV = "85345114f3066e94d5d70161ea8dc43252b83ae6"
 
 
 def workflow_run_block(step_name):
@@ -216,14 +216,14 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            f'tinybus = {{ version = "=0.3.11", git = '
-            f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
+            f'tinybus = {{ version = "=0.3.12", git = '
+            f'"https://github.com/senamakel/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
         self.assertIn(
-            f'tinybus-module = {{ version = "=0.3.11", git = '
-            f'"https://github.com/tinyhumansai/tinybus", rev = "{TINYBUS_REV}", '
+            f'tinybus-module = {{ version = "=0.3.12", git = '
+            f'"https://github.com/senamakel/tinybus", rev = "{TINYBUS_REV}", '
             'default-features = false }',
             workspace,
         )
@@ -242,11 +242,11 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             module,
         )
         self.assertIn(
-            'tinybus = { version = "0.3.11", path = "../../../vendor/tinybus/crates/tinybus"',
+            'tinybus = { version = "0.3.12", path = "../../../vendor/tinybus/crates/tinybus"',
             fixture,
         )
         self.assertIn(
-            'tinybus-module = { version = "0.3.11", path = "../../../vendor/tinybus/crates/tinybus-module"',
+            'tinybus-module = { version = "0.3.12", path = "../../../vendor/tinybus/crates/tinybus-module"',
             fixture,
         )
         self.assertEqual(gitlink_revision(ROOT, "vendor/tinybus"), TINYBUS_REV)

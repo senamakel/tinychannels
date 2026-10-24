@@ -35,8 +35,11 @@ pub fn stored_intent_from_channel(intent: &ChannelOutboundIntent) -> StoredInten
         idempotency_key: intent.idempotency_key.clone(),
         channel_id: intent.channel_id.clone(),
         conversation_id: intent.conversation_id.clone(),
+        channel_ref: intent.channel_ref.clone(),
+        conversation_ref: intent.conversation_ref.clone(),
         reply_to_id: intent.reply_to_id.clone(),
         thread_id: intent.thread_id.clone(),
+        turn_id: intent.turn_id.clone(),
         durability: intent.durability,
         payload: intent.payload.clone(),
     }
@@ -49,8 +52,11 @@ pub fn channel_from_stored_intent(stored: StoredIntent) -> ChannelOutboundIntent
         idempotency_key: stored.idempotency_key,
         channel_id: stored.channel_id,
         conversation_id: stored.conversation_id,
+        channel_ref: stored.channel_ref,
+        conversation_ref: stored.conversation_ref,
         reply_to_id: stored.reply_to_id,
         thread_id: stored.thread_id,
+        turn_id: stored.turn_id,
         durability: stored.durability,
         payload: stored.payload,
     }

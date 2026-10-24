@@ -27,13 +27,17 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 tinybus = { path = "vendor/tinybus/crates/tinybus" }
 tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 
+[patch."https://github.com/senamakel/tinybus"]
+tinybus = { path = "vendor/tinybus/crates/tinybus" }
+tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
+
 [workspace.package]
 # Releases update this sole workspace version before packaging every crate.
 version = "0.1.39"
 
 [workspace.dependencies]
-tinybus = { version = "=0.3.11", git = "https://github.com/tinyhumansai/tinybus", rev = "9e14f65666b11782ec1054aba576114026d180f8", default-features = false }
-tinybus-module = { version = "=0.3.11", git = "https://github.com/tinyhumansai/tinybus", rev = "9e14f65666b11782ec1054aba576114026d180f8", default-features = false }
+tinybus = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", rev = "85345114f3066e94d5d70161ea8dc43252b83ae6", default-features = false }
+tinybus-module = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", rev = "85345114f3066e94d5d70161ea8dc43252b83ae6", default-features = false }
 tinystoragedrivers-core = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b" }
 tinystoragedrivers-bus = { version = "1.9.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b", default-features = false }
 tinystoragedrivers-client = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b" }

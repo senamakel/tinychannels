@@ -581,8 +581,11 @@ fn outbound_intent_carries_idempotency_key() {
         idempotency_key: "idem-1".into(),
         channel_id: "telegram".into(),
         conversation_id: "-100123".into(),
+        channel_ref: None,
+        conversation_ref: None,
         reply_to_id: None,
         thread_id: Some("topic-99".into()),
+        turn_id: None,
         durability: DeliveryDurability::Required,
         payload: OutboundPayload::NativeChannelData {
             data: json!({"x": 1}),
@@ -876,7 +879,7 @@ fn outbound_payload_variants_keep_legacy_and_relay_content() {
             .insert("idempotencyKey".into(), json!("key"));
         assert_eq!(legacy_message_value_from_outbound_intent(&intent), legacy);
         assert_eq!(
-            crate::relay::relay_send_action_from_outbound_intent(&intent)["content"],
+            crate::relay::relay_send_action_from_outbound_intent(&intent).unwrap()["content"],
             content
         );
     }

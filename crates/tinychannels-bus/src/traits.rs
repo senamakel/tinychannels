@@ -108,6 +108,15 @@ pub trait Channel: Send + Sync {
     /// Deliver one message through the configured provider.
     async fn send(&self, message: &SendMessage) -> anyhow::Result<()>;
 
+    /// Deliver ordered typed content. The compatibility adapter accepts only
+    /// plain text and returns an error for content it cannot preserve.
+    async fn send_typed(
+        &self,
+        message: &crate::channel::ChannelOutboundMessage,
+    ) -> anyhow::Result<()> {
+        self.send(&message.to_legacy_message()?).await
+    }
+
     /// Legacy listener seam used by isolated test doubles.
     async fn listen(&self, tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()>;
 

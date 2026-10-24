@@ -74,7 +74,7 @@ pub async fn send_outbound_intent(
     let Some(transport) = current_relay_transport() else {
         return Ok(None);
     };
-    let action = relay_send_action_from_outbound_intent(intent);
+    let action = relay_send_action_from_outbound_intent(intent)?;
     let result = transport
         .send_outbound(action, Some(&intent.channel_id))
         .await

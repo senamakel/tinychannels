@@ -4,7 +4,10 @@ use crate::channel::{ChannelOutboundIntent, OutboundPayload};
 use serde_json::{Map, Value, json};
 
 /// Project a provider-neutral outbound intent to the Hermes relay `send` action.
-pub fn relay_send_action_from_outbound_intent(intent: &ChannelOutboundIntent) -> Value {
+pub fn relay_send_action_from_outbound_intent(
+    intent: &ChannelOutboundIntent,
+) -> anyhow::Result<Value> {
+    let content = relay_send_content(&intent.payload)?;
     let mut metadata = Map::new();
     metadata.insert(
         "idempotency_key".to_string(),
@@ -29,17 +32,17 @@ pub fn relay_send_action_from_outbound_intent(intent: &ChannelOutboundIntent) ->
         metadata.insert("payload".to_string(), json!(intent.payload));
     }
 
-    json!({
+    Ok(json!({
         "op": "send",
         "chat_id": intent.conversation_id,
-        "content": relay_send_content(&intent.payload),
+        "content": content,
         "reply_to": intent.reply_to_id,
         "metadata": metadata,
-    })
+    }))
 }
 
-fn relay_send_content(payload: &OutboundPayload) -> String {
-    match payload {
+fn relay_send_content(payload: &OutboundPayload) -> anyhow::Result<String> {
+    Ok(match payload {
         OutboundPayload::Text { text } => text.clone(),
         OutboundPayload::Media { text, .. } => text.clone().unwrap_or_default(),
         OutboundPayload::Voice { media_url } => media_url.clone(),
@@ -52,5 +55,19 @@ fn relay_send_content(payload: &OutboundPayload) -> String {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-    }
+        OutboundPayload::Parts { parts } => parts
+            .iter()
+            .map(|part| match part {
+                tinychannels_bus::OutboundContentPart::Content {
+                    part:
+                        tinychannels_bus::channel::ContentPart::Text {
+                            text,
+                            markdown_dialect: None,
+                        },
+                } => Ok(text.as_str()),
+                _ => anyhow::bail!("relay does not support typed channel content"),
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .join("\n"),
+    })
 }

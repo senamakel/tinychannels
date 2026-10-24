@@ -66,8 +66,11 @@ async fn local_adapter_delegates_outbound_delivery() {
             idempotency_key: "turn-1:text".into(),
             channel_id: "local".into(),
             conversation_id: "chat-1".into(),
+            channel_ref: None,
+            conversation_ref: None,
             reply_to_id: None,
             thread_id: None,
+            turn_id: None,
             durability: DeliveryDurability::BestEffort,
             payload: OutboundPayload::Text { text: "hi".into() },
         })

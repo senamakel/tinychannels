@@ -304,14 +304,17 @@ fn relay_send_action_projects_text_outbound_intent() {
         idempotency_key: "send-1".into(),
         channel_id: "discord".into(),
         conversation_id: "channel-123".into(),
+        channel_ref: None,
+        conversation_ref: None,
         reply_to_id: Some("message-1".into()),
         thread_id: Some("thread-2".into()),
+        turn_id: None,
         durability: DeliveryDurability::Required,
         payload: OutboundPayload::Text { text: "hi".into() },
     };
 
     assert_eq!(
-        relay_send_action_from_outbound_intent(&intent),
+        relay_send_action_from_outbound_intent(&intent).unwrap(),
         json!({
             "op": "send",
             "chat_id": "channel-123",
@@ -341,7 +344,7 @@ fn relay_send_action_preserves_legacy_native_payload_in_metadata() {
     );
 
     assert_eq!(
-        relay_send_action_from_outbound_intent(&intent),
+        relay_send_action_from_outbound_intent(&intent).unwrap(),
         json!({
             "op": "send",
             "chat_id": "chat-1",

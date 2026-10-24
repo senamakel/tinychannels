@@ -81,6 +81,49 @@ fn providers_with_a_real_listen_loop_are_unaffected() {
     }
 }
 
+#[test]
+fn legacy_provider_send_rejects_typed_content_it_cannot_deliver() {
+    let intent = ChannelOutboundIntent {
+        payload: tinychannels::OutboundPayload::Parts {
+            parts: vec![tinychannels_bus::channel::OutboundContentPart::Content {
+                part: tinychannels_bus::channel::ContentPart::Location {
+                    latitude: 1.0,
+                    longitude: 2.0,
+                    label: None,
+                    address: None,
+                    accuracy_meters: None,
+                    live_until_unix_ms: None,
+                },
+            }],
+        },
+        ..Default::default()
+    };
+    let error = intent_to_legacy_message(&intent).unwrap_err();
+    assert!(error.contains("does not support typed channel content"));
+}
+
+#[test]
+fn legacy_provider_send_preserves_ordered_text_parts() {
+    let intent = ChannelOutboundIntent {
+        payload: tinychannels::OutboundPayload::Parts {
+            parts: ["first", "second"]
+                .into_iter()
+                .map(
+                    |text| tinychannels_bus::channel::OutboundContentPart::Content {
+                        part: tinychannels_bus::channel::ContentPart::Text {
+                            text: text.into(),
+                            markdown_dialect: None,
+                        },
+                    },
+                )
+                .collect(),
+        },
+        ..Default::default()
+    };
+    let message = intent_to_legacy_message(&intent).unwrap();
+    assert_eq!(message.content, "first\nsecond");
+}
+
 struct CaptureChannel(tokio::sync::mpsc::Sender<SendMessage>);
 
 #[async_trait::async_trait]
@@ -133,8 +176,11 @@ async fn typed_intent_preserves_durable_key_and_thread_in_legacy_send() {
         idempotency_key: "delivery-42".to_owned(),
         channel_id: "fixture".to_owned(),
         conversation_id: "room-7".to_owned(),
+        channel_ref: None,
+        conversation_ref: None,
         reply_to_id: Some("message-3".to_owned()),
         thread_id: Some("thread-9".to_owned()),
+        turn_id: None,
         durability: tinychannels::DeliveryDurability::BestEffort,
         payload: tinychannels::OutboundPayload::Text {
             text: "hello".to_owned(),

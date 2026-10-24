@@ -35,8 +35,11 @@ pub fn outbound_intent_from_legacy_message(
         idempotency_key,
         channel_id,
         conversation_id,
+        channel_ref: None,
+        conversation_ref: None,
         reply_to_id,
         thread_id,
+        turn_id: None,
         durability: DeliveryDurability::BestEffort,
         payload: OutboundPayload::NativeChannelData { data: message },
     }
@@ -81,6 +84,7 @@ pub fn legacy_message_value_from_outbound_intent(intent: &ChannelOutboundIntent)
             serde_json::json!({ "blocks": blocks })
         }
         OutboundPayload::NativeChannelData { data } => data.clone(),
+        OutboundPayload::Parts { parts } => serde_json::json!({ "parts": parts }),
     };
     with_idempotency_key(payload, &intent.idempotency_key)
 }

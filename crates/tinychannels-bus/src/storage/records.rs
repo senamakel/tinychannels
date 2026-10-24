@@ -3,7 +3,7 @@
 //! These types describe the persisted document shapes. Conversion between
 //! channel messages and these records belongs to the `tinychannels` crate.
 
-use crate::channel::{DeliveryDurability, OutboundPayload};
+use crate::channel::{ChannelRef, ConversationRef, DeliveryDurability, OutboundPayload};
 use crate::module_delivery::DeliveryRecoveryState;
 use serde::{Deserialize, Serialize};
 
@@ -26,8 +26,14 @@ pub struct StoredIntent {
     pub idempotency_key: String,
     pub channel_id: String,
     pub conversation_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_ref: Option<ChannelRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation_ref: Option<ConversationRef>,
     pub reply_to_id: Option<String>,
     pub thread_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
     pub durability: DeliveryDurability,
     pub payload: OutboundPayload,
 }
