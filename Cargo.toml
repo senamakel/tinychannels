@@ -99,6 +99,9 @@ whatsapp-web = [
     "dep:wacore",
     "dep:bytes",
 ]
+# Keep compatibility with hosts that still select this feature. The iMessage
+# provider remains part of this crate's existing public surface.
+imessage = []
 
 [dependencies]
 # The transport-free vocabulary shared with every TinyChannels host. The
