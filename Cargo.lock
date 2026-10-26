@@ -2681,6 +2681,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinychannels-client"
+version = "0.1.39"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tinybus",
+ "tinychannels-bus",
+ "tokio",
+]
+
+[[package]]
 name = "tinychannels-module"
 version = "0.1.39"
 dependencies = [
