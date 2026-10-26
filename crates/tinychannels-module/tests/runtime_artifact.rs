@@ -84,7 +84,7 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
     );
     assert_eq!(loaded.manifest.provides.len(), 1);
     assert_eq!(
-        loaded.manifest.provides[0].bus_name.as_str(),
+        loaded.manifest.provides[0].version.interface.as_str(),
         BUS_NAME,
         "storage is supplied through the host callback instead of a migration service"
     );

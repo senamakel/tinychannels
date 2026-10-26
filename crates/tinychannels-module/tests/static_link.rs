@@ -31,5 +31,8 @@ async fn linked_module_is_admitted_and_becomes_ready() {
     .await
     .expect("linked module reaches Ready");
     assert_eq!(info.manifest.provides.len(), 1);
-    assert_eq!(info.manifest.provides[0].bus_name.as_str(), tinychannels_bus::BUS_NAME);
+    assert_eq!(
+        info.manifest.provides[0].version.interface.as_str(),
+        tinychannels_bus::BUS_NAME
+    );
 }
