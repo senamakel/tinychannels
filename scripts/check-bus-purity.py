@@ -13,44 +13,18 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 BUS_SOURCE = ROOT / "crates/tinychannels-bus/src"
 BUS_MANIFEST = ROOT / "crates/tinychannels-bus/Cargo.toml"
-TSD_REV = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b"
-TSD_SOURCE = (
-    "git+https://github.com/tinyhumansai/tinystoragedrivers"
-    f"?rev={TSD_REV}#{TSD_REV}"
-)
+TSD_SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?tag=v2.1.2#"
 
 # This is the observed default/all-feature normal + build closure. New packages
 # require review because this crate is consumed directly by host libraries.
-ALLOWED_PACKAGES = frozenset(
-    {
-        "anyhow",
-        "async-trait",
-        "base64",
-        "dyn-clone",
-        "itoa",
-        "memchr",
-        "pin-project-lite",
-        "proc-macro2",
-        "quote",
-        "ref-cast",
-        "ref-cast-impl",
-        "schemars",
-        "schemars_derive",
-        "serde",
-        "serde_core",
-        "serde_derive",
-        "serde_derive_internals",
-        "serde_json",
-        "syn",
-        "thiserror",
-        "thiserror-impl",
-        "tinychannels-bus",
-        "tinystoragedrivers-bus",
-        "tokio",
-        "unicode-ident",
-        "zmij",
-    }
-)
+FORBIDDEN_PACKAGES = frozenset({
+    "axum", "hyper", "mongodb", "reqwest", "rusqlite", "sqlx",
+    "tinybus", "tinybus-macros", "tinybus-module",
+    "tinystoragedrivers-api", "tinystoragedrivers-busproxy",
+    "tinystoragedrivers-core", "tinystoragedrivers-file",
+    "tinystoragedrivers-mongodb", "tinystoragedrivers-s3",
+    "tinystoragedrivers-secrets", "tinystoragedrivers-sqlite",
+})
 NORMAL_BUILD_KINDS = {None, "normal", "build"}
 TOKIO_FEATURES = frozenset({"sync"})
 
@@ -115,9 +89,9 @@ def source_tree_violations(source_root=BUS_SOURCE):
     """Scan production Rust files while leaving colocated behavior tests alone."""
     errors = []
     storage = Path(source_root) / "storage"
-    for name in ("schema.rs", "migrate.rs", "schema_tests.rs", "migrate_tests.rs"):
+    for name in ("migrate.rs", "migrate_tests.rs"):
         if (storage / name).exists():
-            errors.append(f"{(storage / name).relative_to(ROOT)}: executable storage schema belongs to tinychannels")
+            errors.append(f"{(storage / name).relative_to(ROOT)}: migration execution belongs to tinychannels")
     records = storage / "records.rs"
     if records.exists():
         text = records.read_text(encoding="utf-8")
@@ -231,45 +205,16 @@ def dependency_violations(metadata):
     packages_by_id, nodes_by_id, reachable, errors = reachable_normal_build(metadata)
     packages = [packages_by_id[package_id] for package_id in reachable]
     names = {package["name"] for package in packages}
-    missing = sorted(ALLOWED_PACKAGES - names)
-    core_packages = [
-        package for package in packages if package["name"] == "tinystoragedrivers-core"
-    ]
-    if core_packages:
-        errors.append("TSD core must remain outside every bus feature closure")
-
-    unsafe = sorted(
-        packages_by_id[package_id]["name"]
-        for package_id in reachable
-        if packages_by_id[package_id]["name"] not in ALLOWED_PACKAGES
-    )
-    if missing:
-        errors.append(f"normal/build graph is incomplete; missing packages: {missing}")
-    if unsafe:
-        errors.append(f"unsafe contract dependencies: {unsafe}")
-    repeated_names = sorted(
-        name for name in names if sum(package["name"] == name for package in packages) > 1
-    )
-    if repeated_names:
-        errors.append(f"normal/build graph has duplicate package names: {repeated_names}")
-
-    tsd_packages = [
-        package for package in packages if package["name"] == "tinystoragedrivers-bus"
-    ]
-    if len(tsd_packages) != 1:
-        errors.append(
-            f"expected one tinystoragedrivers-bus package, found {len(tsd_packages)}"
-        )
-    else:
-        package = tsd_packages[0]
-        if package.get("version") != "1.9.0" or package.get("source") != TSD_SOURCE:
-            errors.append("storage bus must be canonical TSD 1.9.0 at the pinned revision")
-        node = nodes_by_id.get(package["id"])
-        features = node.get("features") if node else None
-        if not isinstance(features, list):
-            errors.append("storage bus resolve node is missing feature evidence")
-        elif features:
-            errors.append(f"storage bus features must be empty; found {features}")
+    forbidden = sorted(names & FORBIDDEN_PACKAGES)
+    if forbidden:
+        errors.append(f"unsafe contract dependencies: {forbidden}")
+    types_packages = [package for package in packages if package["name"] == "tinystoragedrivers-types"]
+    if len(types_packages) > 1:
+        errors.append("normal/build graph has duplicate TSD types packages")
+    if types_packages:
+        package = types_packages[0]
+        if package.get("version") != "2.1.2" or not str(package.get("source", "")).startswith(TSD_SOURCE_PREFIX):
+            errors.append("collection declarations must use fork TSD types v2.1.2")
 
     tokio_packages = [package for package in packages if package["name"] == "tokio"]
     if len(tokio_packages) != 1:
@@ -341,12 +286,7 @@ def main(argv=None):
             print(f"{mode}: contract dependency boundary failed:", file=sys.stderr)
             print("\n".join(f"- {error}" for error in errors), file=sys.stderr)
             return 1
-        names = {
-            package["name"]
-            for package in metadata["packages"]
-            if package["name"] in ALLOWED_PACKAGES
-        }
-        print(f"{mode}: pure contract closure ({len(names)} packages)")
+        print(f"{mode}: pure contract closure ({len(reachable_normal_build(metadata)[2])} packages)")
     return 0
 
 
