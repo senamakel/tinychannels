@@ -48,7 +48,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use tinybus::{Connection, Error, Result};
+use tinybus::{BusName, Connection, Error, Result};
 use tinychannels_bus::ChannelEvent;
 use tinychannels_bus::names::{HOST_BUS_NAME, HOST_OBJECT_PATH, host_methods};
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult};
@@ -126,6 +126,8 @@ pub struct HostChannels {
     owner: Arc<Owner>,
     connection: Connection,
     object_path: Arc<str>,
+    /// Optional unique host callback destination supplied by the loader.
+    storage_callback: Option<BusName>,
     /// The host's storage objects, connected on first use and then shared by
     /// every clone.
     storage: Arc<Mutex<Option<tinystoragedrivers_api::Storage>>>,
@@ -143,7 +145,21 @@ impl HostChannels {
         object_path: String,
         max_in_flight: usize,
     ) -> Self {
-        Self::new_at_inner(connection, object_path, Some(max_in_flight))
+        Self::new_at_inner(connection, object_path, Some(max_in_flight), None)
+    }
+
+    pub(crate) fn new_at_with_dispatch_and_storage_callback(
+        connection: Connection,
+        object_path: String,
+        max_in_flight: usize,
+        storage_callback: Option<BusName>,
+    ) -> Self {
+        Self::new_at_inner(
+            connection,
+            object_path,
+            Some(max_in_flight),
+            storage_callback,
+        )
     }
 
     /// Start one owned callback consumer. Explicit shutdown drains and joins it.
@@ -152,15 +168,36 @@ impl HostChannels {
         Self::new_at(connection, HOST_OBJECT_PATH.to_owned())
     }
 
+    pub(crate) fn new_with_storage_callback(
+        connection: Connection,
+        storage_callback: Option<BusName>,
+    ) -> Self {
+        Self::new_at_inner(
+            connection,
+            HOST_OBJECT_PATH.to_owned(),
+            None,
+            storage_callback,
+        )
+    }
+
     /// Bind all callbacks to an immutable runtime-specific host object.
     pub(crate) fn new_at(connection: Connection, object_path: String) -> Self {
-        Self::new_at_inner(connection, object_path, None)
+        Self::new_at_inner(connection, object_path, None, None)
+    }
+
+    pub(crate) fn new_at_with_storage_callback(
+        connection: Connection,
+        object_path: String,
+        storage_callback: Option<BusName>,
+    ) -> Self {
+        Self::new_at_inner(connection, object_path, None, storage_callback)
     }
 
     fn new_at_inner(
         connection: Connection,
         object_path: String,
         dispatch_limit: Option<usize>,
+        storage_callback: Option<BusName>,
     ) -> Self {
         let object_path: Arc<str> = object_path.into();
         let callback_path = object_path.clone();
@@ -302,6 +339,7 @@ impl HostChannels {
             outbox,
             connection,
             object_path,
+            storage_callback,
             storage: Arc::new(Mutex::new(None)),
             owner: Arc::new(Owner {
                 worker: Mutex::new(Some(worker)),
@@ -331,7 +369,17 @@ impl HostChannels {
         if let Some(scoped) = slot.as_ref() {
             return Ok(scoped.clone());
         }
-        let storage = tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?;
+        let storage = match &self.storage_callback {
+            Some(destination) => {
+                tinystoragedrivers_busproxy::connect_storage_at(
+                    self.connection.clone(),
+                    destination.clone(),
+                )
+                .await?
+            }
+            None => tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?,
+        };
+        tinychannels::storage::prepare(storage.documents()).await?;
         *slot = Some(storage.clone());
         Ok(storage)
     }
