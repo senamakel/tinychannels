@@ -13,7 +13,7 @@ use tinystoragedrivers_types::{
 };
 
 use super::key;
-use super::records::{ChatBinding, StoredDelivery, StoredResult, to_stored_ms};
+use super::records::{ChatBinding, to_stored_ms};
 use super::schema::{
     DELIVERY_FAILED, DELIVERY_PENDING, DELIVERY_RESULTS, MIGRATIONS, REMOTE_BINDINGS, REMOTE_BUSY,
     REMOTE_META, SCHEMA_VERSION, WHATSAPP_DEVICE, WHATSAPP_IDENTITY, WHATSAPP_LID_MAPPING,

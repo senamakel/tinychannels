@@ -300,7 +300,6 @@ impl HostChannels {
                         }
                         Notification::PersistAllowedIdentity { .. } => unreachable!(),
                         Notification::PublishEvent { .. } => unreachable!(),
-                        Notification::DeliverEvent { .. } => unreachable!(),
                         Notification::Barrier { .. } => Ok(()),
                     }
                 }
