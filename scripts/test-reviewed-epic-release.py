@@ -218,14 +218,13 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         self.assertIn(
             'tinybus = { version = "=0.3.12", git = '
             '"https://github.com/senamakel/tinybus", tag = "v0.3.12", '
-            'default-features = false }',
-            workspace,
+            'default-features = false, features = ["macros", "modules"] }',
+            module,
         )
         self.assertIn(
             'tinybus-module = { version = "=0.3.12", git = '
-            '"https://github.com/senamakel/tinybus", tag = "v0.3.12", '
-            'default-features = false }',
-            workspace,
+            '"https://github.com/senamakel/tinybus", tag = "v0.3.12" }',
+            module,
         )
         self.assertIn(
             'tinybus = { path = "vendor/tinybus/crates/tinybus" }\n'
@@ -233,12 +232,9 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             workspace,
         )
         self.assertIn(
-            'tinybus = { workspace = true, features = ["macros", "modules"] }',
-            module,
-        )
-        self.assertIn("tinybus-module = { workspace = true }", module)
-        self.assertIn(
-            'tinybus = { workspace = true, features = ["test-support"] }',
+            'tinybus = { version = "=0.3.12", git = '
+            '"https://github.com/senamakel/tinybus", tag = "v0.3.12", '
+            'default-features = false, features = ["test-support"] }',
             module,
         )
         self.assertIn(
@@ -247,6 +243,10 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
         )
         self.assertIn(
             'tinybus-module = { version = "0.3.12", path = "../../../vendor/tinybus/crates/tinybus-module"',
+            fixture,
+        )
+        self.assertIn(
+            'tinychannels-bus = { path = "../../tinychannels-bus", features = ["storage"] }',
             fixture,
         )
         self.assertEqual(gitlink_revision(ROOT, "vendor/tinybus"), TINYBUS_REV)
