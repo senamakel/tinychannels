@@ -11,6 +11,10 @@ pub(crate) enum WaFailure {
     /// Refused before any provider call: bad scope, missing port, invalid input.
     Rejected(String),
     /// The input cannot be represented by this provider's address format.
+    ///
+    /// Only the Web adapter builds this class; the Cloud API adapter just
+    /// handles it.
+    #[cfg_attr(not(any(test, feature = "whatsapp-web")), allow(dead_code))]
     BadFormat(String),
     /// The adapter or protocol cannot carry this content or operation.
     Unsupported(String),
@@ -35,6 +39,7 @@ impl WaFailure {
         Self::Rejected(message.into())
     }
 
+    #[cfg(any(test, feature = "whatsapp-web"))]
     pub(crate) fn bad_format(message: impl Into<String>) -> Self {
         Self::BadFormat(message.into())
     }

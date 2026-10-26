@@ -76,8 +76,10 @@ impl BoundedMap {
 /// aborted. A listener that parks keeps its inbound sender in such a slot; if
 /// the slot outlived the listener the module's inbound forwarder would never
 /// see its channel close and provider shutdown would wait forever.
+#[cfg(any(test, feature = "whatsapp-web"))]
 pub(crate) struct ClearOnDrop<'a, T>(pub(crate) &'a parking_lot::Mutex<Option<T>>);
 
+#[cfg(any(test, feature = "whatsapp-web"))]
 impl<T> Drop for ClearOnDrop<'_, T> {
     fn drop(&mut self) {
         *self.0.lock() = None;
