@@ -759,7 +759,7 @@ async fn bound_storage_callback_connects_and_prepares_scoped_collections() {
         .collections("channels.")
         .await
         .unwrap();
-    assert!(collections.contains(&tinychannels::storage::migrations::COLLECTION.to_owned()));
+    assert!(collections.contains(&tinychannels::storage::schema::MIGRATIONS.to_owned()));
     // The connection is memoized across uses of the same HostChannels owner.
     host.storage().await.unwrap();
 
