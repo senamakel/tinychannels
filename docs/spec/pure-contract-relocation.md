@@ -49,14 +49,12 @@ it does not change the wire contract version or released module interface.
 The purity checker generates separate probe workspaces under `target/` and
 traverses the complete normal/build dependency closure without a platform
 filter, once for defaults and once for every declared bus feature. Dev edges
-are excluded and missing graph metadata fails closed. The reviewed 26-package
-closure includes serialization/schema/error packages and Base64, plus
-`anyhow`, `async-trait`, Tokio `sync`, and `tinystoragedrivers-bus` 1.5 with its
-client feature disabled. The bus owns async provider interfaces, Tokio channel
-types, in-memory context helpers, and static storage declarations; it does not
-own provider execution, sockets, tasks, database clients or drivers. The source
-guard checks those runtime seams independently of the dependency graph, and
-CI runs both the guard and its negative controls.
+are excluded and missing graph metadata fails closed. The bus owns async
+provider interfaces, Tokio channel types, in-memory context helpers, and static
+TSD2 collection declarations through `tinystoragedrivers-types`; it does not
+own provider execution, sockets, tasks, storage clients, database clients or
+drivers. The source guard checks those runtime seams independently of the
+dependency graph, and CI runs both the guard and its negative controls.
 
 The module follow-up adds a bounded relay lifecycle (`ReserveRelay`,
 confidential `StartRelay`, `StopRelay`, safe `RelayStatus`, and
