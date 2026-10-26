@@ -1,14 +1,9 @@
-use tinystoragedrivers_bus::StorageNeeds;
-use tinychannels_bus::STORAGE_NEEDS;
+use tinystoragedrivers_types::CollectionSpec;
+use tinychannels_bus::storage::collections;
 
 fn main() {
-    let needs: &StorageNeeds<'static> = &STORAGE_NEEDS;
-    let names: Vec<_> = needs
-        .collections
-        .iter()
-        .map(|collection| collection.name.as_str())
-        .collect();
-
+    let needs = collections();
+    let names: Vec<_> = needs.iter().map(|collection| collection.name.as_str()).collect();
     assert_eq!(
         names,
         [
@@ -18,6 +13,8 @@ fn main() {
             "channels.remote_bindings",
             "channels.remote_busy",
             "channels.remote_meta",
+            "channels.media_metadata",
+            "channels.migrations",
             "channels.whatsapp_device",
             "channels.whatsapp_identity",
             "channels.whatsapp_session",
@@ -28,13 +25,11 @@ fn main() {
             "channels.whatsapp_lid_mapping",
         ]
     );
-    assert_eq!(needs.collections.len(), 14);
-    assert!(needs.collections.iter().all(|collection| {
+    assert_eq!(needs.len(), 16);
+    let _: &CollectionSpec = &needs[0];
+    assert!(needs.iter().all(|collection| {
         collection.indexes.is_empty()
             && collection.ttl_field.is_none()
             && collection.search.is_none()
     }));
-    assert!(needs.blob_prefixes.is_empty());
-    assert!(needs.stream_prefixes.is_empty());
-    assert!(needs.secret_prefixes.is_empty());
 }
