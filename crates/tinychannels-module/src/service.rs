@@ -1207,9 +1207,9 @@ impl ModuleSetupConfig {
         match self {
             Self::Null(()) => Ok(None),
             Self::Options(options) => match options.storage_callback {
-                Some(destination) if !destination.is_unique() => {
-                    Err(BusError::failed("storage callback destination must be unique"))
-                }
+                Some(destination) if !destination.is_unique() => Err(BusError::failed(
+                    "storage callback destination must be unique",
+                )),
                 destination => Ok(destination),
             },
         }
@@ -1220,7 +1220,8 @@ async fn setup_with_storage_callback(
     connection: Connection,
     storage_callback: Option<BusName>,
 ) -> BusResult<()> {
-    let host = HostChannels::new_with_storage_callback(connection.clone(), storage_callback.clone());
+    let host =
+        HostChannels::new_with_storage_callback(connection.clone(), storage_callback.clone());
     if storage_callback.is_some() {
         host.storage()
             .await
@@ -1229,7 +1230,10 @@ async fn setup_with_storage_callback(
     let channels = Channels::new(
         host.clone(),
         Some(Arc::new(
-            crate::runtime::Runtimes::new_with_storage_callback(connection.clone(), storage_callback),
+            crate::runtime::Runtimes::new_with_storage_callback(
+                connection.clone(),
+                storage_callback,
+            ),
         )),
     );
     let result = async {

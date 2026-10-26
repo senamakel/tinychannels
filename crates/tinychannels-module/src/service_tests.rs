@@ -39,7 +39,10 @@ fn module_setup_config_accepts_only_a_unique_storage_callback() {
         "storage_callback": ":1.23"
     }))
     .unwrap();
-    assert_eq!(configured.storage_callback().unwrap().unwrap().as_str(), ":1.23");
+    assert_eq!(
+        configured.storage_callback().unwrap().unwrap().as_str(),
+        ":1.23"
+    );
     let well_known: ModuleSetupConfig = serde_json::from_value(serde_json::json!({
         "storage_callback": "ai.tinyhumans.openhuman.Storage"
     }))

@@ -260,7 +260,10 @@ async fn retry_accepts_an_exact_target_written_before_source_deletion() {
     docs.put_with(
         DELIVERY_PENDING,
         "op",
-        serde_json::to_value(crate::storage::records::stored_delivery_from_queued(&queued)).unwrap(),
+        serde_json::to_value(crate::storage::records::stored_delivery_from_queued(
+            &queued,
+        ))
+        .unwrap(),
         Precondition::Absent,
         WriteOptions::new().schema(SCHEMA_VERSION),
     )
@@ -620,7 +623,10 @@ async fn retry_refuses_a_matching_body_with_a_different_deadline() {
     docs.put_with(
         DELIVERY_PENDING,
         "op",
-        serde_json::to_value(crate::storage::records::stored_delivery_from_queued(&queued)).unwrap(),
+        serde_json::to_value(crate::storage::records::stored_delivery_from_queued(
+            &queued,
+        ))
+        .unwrap(),
         Precondition::Absent,
         WriteOptions::new()
             .schema(SCHEMA_VERSION)

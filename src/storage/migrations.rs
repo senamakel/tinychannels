@@ -341,7 +341,9 @@ fn transform(kind: Transform, record: Versioned<Value>) -> Result<Option<Target>
             };
             Some(Target {
                 id: key::of([legacy.result.id.as_str()])?.as_str().to_owned(),
-                body: serde_json::to_value(super::records::stored_result_from_terminal(&legacy.result))?,
+                body: serde_json::to_value(super::records::stored_result_from_terminal(
+                    &legacy.result,
+                ))?,
                 expires_ms: Some(to_stored_ms(legacy.expires_at_unix_ms)),
             })
         }

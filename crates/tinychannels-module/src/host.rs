@@ -135,6 +135,7 @@ impl std::fmt::Debug for HostChannels {
     }
 }
 impl HostChannels {
+    #[cfg(test)]
     pub(crate) fn new_at_with_dispatch(
         connection: Connection,
         object_path: String,
