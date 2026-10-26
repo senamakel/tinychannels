@@ -32,9 +32,9 @@ tinybus-module = { version = "=0.3.12", git = "https://github.com/senamakel/tiny
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 # Storage over the bus: the module reaches host storage through the same port
 # traits a linked library gets, never through per-module persistence callbacks.
-tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.2" }
-tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.2" }
-tinystoragedrivers-busproxy = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.2" }
+tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
+tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
+tinystoragedrivers-busproxy = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.11"
@@ -49,7 +49,7 @@ uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tinybus = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", tag = "v0.3.12", default-features = false, features = ["test-support"] }
-tinystoragedrivers-testkit = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.2" }
+tinystoragedrivers-testkit = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
 tempfile = "3"
 tokio = { version = "1", features = ["test-util"] }
 serde_json = "1"

@@ -14,7 +14,7 @@ SPEC.loader.exec_module(BOUNDARY)
 def fixture(*, extra=(), source=None, types_version="2.1.2"):
     source = source or (
         "git+https://github.com/senamakel/tinystoragedrivers"
-        "?tag=v2.1.2#400b71e5"
+        "?rev=c447da3#c447da3"
     )
     return {
         "packages": [
@@ -47,7 +47,7 @@ class StorageBoundaryTests(unittest.TestCase):
 
     def test_wrong_source_is_rejected(self):
         errors = BOUNDARY.violations(
-            fixture(source="git+https://github.com/tinyhumansai/tinystoragedrivers?tag=v2.1.2#400b71e5")
+            fixture(source="git+https://github.com/tinyhumansai/tinystoragedrivers?rev=c447da3#c447da3")
         )
         self.assertIn("collection declarations must use fork TSD types v2.1.2", errors)
 

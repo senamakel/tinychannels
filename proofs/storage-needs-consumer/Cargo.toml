@@ -10,4 +10,4 @@ publish = false
 
 [dependencies]
 tinychannels-bus = { path = "../../crates/tinychannels-bus", features = ["storage"] }
-tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", tag = "v2.1.2" }
+tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }

@@ -13,7 +13,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 BUS_SOURCE = ROOT / "crates/tinychannels-bus/src"
 BUS_MANIFEST = ROOT / "crates/tinychannels-bus/Cargo.toml"
-TSD_SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?tag=v2.1.2#"
+TSD_SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#"
 
 # This is the observed default/all-feature normal + build closure. New packages
 # require review because this crate is consumed directly by host libraries.

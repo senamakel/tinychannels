@@ -9,7 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "proofs/storage-needs-consumer/Cargo.toml"
-SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?tag=v2.1.2#"
+SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#"
 FORBIDDEN = {
     "axum",
     "hyper",
