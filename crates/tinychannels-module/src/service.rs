@@ -1309,7 +1309,6 @@ pub(crate) mod exports {
         worker_threads = 4,
         provides = [
             "ai.tinyhumans.tinychannels.Channels",
-            "org.tinystoragedrivers.Migration",
         ],
         methods = [
             "StartChannel",

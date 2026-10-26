@@ -29,26 +29,22 @@ fn whatsapp(cloud: bool) -> ChannelsConfig {
 fn module_setup_config_preserves_null_and_empty_legacy_defaults() {
     let null: ModuleSetupConfig = serde_json::from_str("null").unwrap();
     let empty: ModuleSetupConfig = serde_json::from_str("{}").unwrap();
-    assert!(null.storage_descriptor().is_none());
-    assert!(empty.storage_descriptor().is_none());
+    assert!(null.storage_callback().unwrap().is_none());
+    assert!(empty.storage_callback().unwrap().is_none());
 }
 
 #[test]
-fn module_setup_config_accepts_only_an_optional_storage_descriptor() {
+fn module_setup_config_accepts_only_a_unique_storage_callback() {
     let configured: ModuleSetupConfig = serde_json::from_value(serde_json::json!({
-        "storage_descriptor": {
-            "service_peer": ":1.23",
-            "registration_id": 4,
-            "object_root": "/org/tinystoragedrivers/Storage/Leases/4"
-        }
+        "storage_callback": ":1.23"
     }))
     .unwrap();
-    let descriptor = configured.storage_descriptor().unwrap();
-    assert_eq!(descriptor.service_peer(), ":1.23");
-    assert_eq!(
-        descriptor.object_root(),
-        "/org/tinystoragedrivers/Storage/Leases/4"
-    );
+    assert_eq!(configured.storage_callback().unwrap().unwrap().as_str(), ":1.23");
+    let well_known: ModuleSetupConfig = serde_json::from_value(serde_json::json!({
+        "storage_callback": "ai.tinyhumans.openhuman.Storage"
+    }))
+    .unwrap();
+    assert!(well_known.storage_callback().is_err());
     assert!(
         serde_json::from_value::<ModuleSetupConfig>(serde_json::json!({
             "unexpected": true
