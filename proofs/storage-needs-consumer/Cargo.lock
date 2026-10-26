@@ -223,7 +223,7 @@ dependencies = [
 [[package]]
 name = "tinystoragedrivers-types"
 version = "2.1.2"
-source = "git+https://github.com/senamakel/tinystoragedrivers?tag=v2.1.2#400b71e5c40fe964130c89e981c64ddeead5619f"
+source = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#c447da319e41dfe17bba4afb1831fe0cf0eef154"
 dependencies = [
  "serde",
  "serde_json",
