@@ -82,30 +82,11 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
             .unwrap()
             .is_some()
     );
-    let module_peer = connection
-        .name_owner(loaded.manifest.bus_name.as_str())
-        .await
-        .unwrap()
-        .unwrap();
-    let migration = connection
-        .proxy(
-            module_peer.as_str(),
-            tinystoragedrivers_tinybus::migration::MIGRATION_OBJECT_PATH,
-            tinystoragedrivers_tinybus::migration::MIGRATION_INTERFACE,
-        )
-        .unwrap();
-    let announcement: serde_json::Value = migration
-        .call_confidential(tinystoragedrivers_tinybus::migration::GET_SCHEMA_MEMBER, ())
-        .await
-        .unwrap();
-    assert_eq!(announcement["declaration"]["owner"], "channels");
+    assert_eq!(loaded.manifest.provides.len(), 1);
     assert_eq!(
-        announcement["declaration"]["steps"]
-            .as_array()
-            .unwrap()
-            .len(),
-        14,
-        "public ModuleRuntime must expose the compiled module's complete schema"
+        loaded.manifest.provides[0].bus_name.as_str(),
+        BUS_NAME,
+        "storage is supplied through the host callback instead of a migration service"
     );
     let provided = loaded.manifest.provides.first().unwrap();
     let actual: Vec<_> = provided
