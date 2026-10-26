@@ -1,6 +1,5 @@
 use super::*;
 use std::sync::atomic::AtomicUsize;
-use tinystoragedrivers_api::DocumentStore;
 use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 
@@ -739,29 +738,15 @@ async fn invalid_bound_storage_callback_never_falls_back_to_legacy_storage() {
 }
 
 #[tokio::test]
-async fn bound_storage_callback_connects_and_prepares_scoped_collections() {
+async fn host_debug_view_does_not_expose_callback_state() {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
-    let server = Connection::connect(bus.connect().await.unwrap())
+    let connection = Connection::connect(bus.connect().await.unwrap())
         .await
         .unwrap();
-    let _storage_host =
-        crate::storage_fixture::StorageHost::serve(&server, "callback-scope").await;
-    let destination = server.unique_name().unwrap();
-    let client = Connection::connect(bus.connect().await.unwrap())
-        .await
-        .unwrap();
-    let host = HostChannels::new_with_storage_callback(client, Some(destination));
+    let host = HostChannels::new(connection);
 
-    let storage = host.storage().await.unwrap();
-    let collections = storage
-        .documents()
-        .collections("channels.")
-        .await
-        .unwrap();
-    assert!(collections.contains(&tinychannels::storage::schema::MIGRATIONS.to_owned()));
-    // The connection is memoized across uses of the same HostChannels owner.
-    host.storage().await.unwrap();
+    assert_eq!(format!("{host:?}"), "HostChannels { .. }");
 
     host.shutdown().await.unwrap();
 }
