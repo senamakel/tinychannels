@@ -767,6 +767,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tinystoragedrivers-types",
  "tokio",
 ]
 
@@ -781,6 +782,16 @@ dependencies = [
  "tinybus-module",
  "tinychannels-bus",
  "tokio",
+]
+
+[[package]]
+name = "tinystoragedrivers-types"
+version = "2.1.2"
+source = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#c447da319e41dfe17bba4afb1831fe0cf0eef154"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
