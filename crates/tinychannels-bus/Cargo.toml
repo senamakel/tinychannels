@@ -32,8 +32,8 @@ tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedriv
 
 [features]
 default = []
-# `storage_schema()` and its migration steps. The default dependency closure of
-# this crate is unchanged without it.
+# TSD2 collection specs exposed to host composition roots. The default
+# dependency closure of this crate is unchanged without it.
 storage = ["dep:tinystoragedrivers-types"]
 
 [dev-dependencies]
