@@ -9,5 +9,5 @@ rust-version = "1.94"
 publish = false
 
 [dependencies]
-tinychannels-bus = { path = "../../crates/tinychannels-bus" }
-tinystoragedrivers-bus = { version = "1.9.0", git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "a04e3a174fa8f28d5229a816ca6b39c72a9efd7b", default-features = false }
+tinychannels-bus = { path = "../../crates/tinychannels-bus", features = ["storage"] }
+tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }

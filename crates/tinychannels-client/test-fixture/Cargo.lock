@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "async-trait",
  "flate2",
@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus-macros"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -746,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "tinybus-module"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "async-trait",
  "serde",
@@ -767,7 +767,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tinystoragedrivers-bus",
+ "tinystoragedrivers-types",
  "tokio",
 ]
 
@@ -785,12 +785,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinystoragedrivers-bus"
-version = "1.9.0"
-source = "git+https://github.com/tinyhumansai/tinystoragedrivers?rev=a04e3a174fa8f28d5229a816ca6b39c72a9efd7b#a04e3a174fa8f28d5229a816ca6b39c72a9efd7b"
+name = "tinystoragedrivers-types"
+version = "2.1.2"
+source = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#c447da319e41dfe17bba4afb1831fe0cf0eef154"
 dependencies = [
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

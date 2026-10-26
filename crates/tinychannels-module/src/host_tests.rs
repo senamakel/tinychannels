@@ -720,26 +720,33 @@ async fn host_without_a_storage_object_has_no_delivery_store_and_refuses_require
 }
 
 #[tokio::test]
-async fn invalid_bound_storage_descriptor_never_falls_back_to_legacy_storage() {
-    use tinystoragedrivers_busproxy::governed::StorageDescriptor;
-
+async fn invalid_bound_storage_callback_never_falls_back_to_legacy_storage() {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let connection = Connection::connect(bus.connect().await.unwrap())
         .await
         .unwrap();
     let _legacy = crate::storage_fixture::StorageHost::serve(&connection, "legacy-fallback").await;
-    let descriptor: StorageDescriptor = serde_json::from_value(serde_json::json!({
-        "service_peer": "org.tinystoragedrivers.Storage",
-        "registration_id": 1,
-        "object_root": "/org/tinystoragedrivers/Storage/Leases/1"
-    }))
-    .unwrap();
-    let host = HostChannels::new_with_storage_descriptor(connection, Some(descriptor));
+    let destination: tinybus::BusName = ":1.999".try_into().unwrap();
+    let host = HostChannels::new_with_storage_callback(connection, Some(destination));
 
     assert!(
         host.storage().await.is_err(),
-        "a configured but invalid lease route must fail even when legacy storage is available"
+        "a configured but invalid callback route must fail even when legacy storage is available"
     );
+    host.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn host_debug_view_does_not_expose_callback_state() {
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let connection = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let host = HostChannels::new(connection);
+
+    assert_eq!(format!("{host:?}"), "HostChannels { .. }");
+
     host.shutdown().await.unwrap();
 }

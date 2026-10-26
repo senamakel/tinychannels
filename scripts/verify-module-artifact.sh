@@ -21,16 +21,16 @@ if [[ ! -f "$artifact" ]]; then
   exit 1
 fi
 
-staging="$repo_root/target/tinychannels-module-artifact"
-mkdir -p "$staging"
-staged_artifact="$staging/$(basename "$artifact")"
+artifact_dir="$(mktemp -d "$target_directory/module-artifact-verification.XXXXXX")"
+trap 'rm -rf "$artifact_dir"' EXIT
+staged_artifact="$artifact_dir/$(basename "$artifact")"
 cp "$artifact" "$staged_artifact"
 if command -v sha256sum >/dev/null 2>&1; then
-  digest="$(sha256sum "$staged_artifact" | awk '{print $1}')"
+  artifact_hash="$(sha256sum "$staged_artifact" | awk '{print $1}')"
 else
-  digest="$(shasum -a 256 "$staged_artifact" | awk '{print $1}')"
+  artifact_hash="$(shasum -a 256 "$staged_artifact" | awk '{print $1}')"
 fi
-printf '"%s" = "%s"\n' "$(basename "$staged_artifact")" "$digest" > "$staging/modules.toml"
+printf '"%s" = "%s"\n' "$(basename "$staged_artifact")" "$artifact_hash" > "$artifact_dir/modules.toml"
 
 TINYCHANNELS_MODULE_ARTIFACT="$staged_artifact" \
   cargo test --locked -p tinychannels-module --test module_artifact --test runtime_artifact --test routing_artifact -- --ignored --nocapture

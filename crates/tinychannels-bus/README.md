@@ -4,22 +4,20 @@ Serialized channel vocabulary, configuration/schema declarations, interface
 names, relay frames and structured errors. It also declares the async provider
 trait and host-facing call shapes without implementing a provider or executing
 host callbacks. `context` contains shared DTOs and pure per-sender history
-helpers over an in-memory `Arc<Mutex<...>>`; `storage_needs::STORAGE_NEEDS` is
-static declaration data built with `LazyLock`.
+helpers over an in-memory `Arc<Mutex<...>>`. The optional `storage` feature
+exposes TSD2 collection specs through `storage::collections()`.
 
-The observed default/all-feature normal and build closure has 26 packages:
-Serde/JSON/schema/error derivation, Base64 for the existing
+The default normal/build closure contains Serde/JSON/schema/error derivation,
+Base64 for the existing
 `PassthroughForward.body` custom serializer (`bodyB64`), `anyhow`, `async-trait`,
-Tokio's `sync` channel type, and `tinystoragedrivers-bus` 1.5 with default
-features disabled for storage declaration types. It contains no TinyBus,
+and Tokio's `sync` channel type. The optional `storage` feature adds only
+`tinystoragedrivers-types` for collection declarations. It contains no TinyBus,
 storage client/runtime or backend driver, HTTP/socket transport, database,
 task executor, scheduler, crypto/entropy implementation, or concrete provider.
 
-Storage names, needs, and serialized record DTOs remain contract data here.
-The `tinychannels` implementation owns executable schema projection,
-migration steps, legacy decoding, and conversions between wire records and
-stored DTOs. The empty `storage` feature remains for feature-list compatibility
-and adds no storage implementation dependency.
+Storage collection declarations and serialized record DTOs remain contract
+data here. The `tinychannels` implementation owns owner-local migrations,
+legacy decoding, and conversions between wire records and stored DTOs.
 
 DTOs are defined once here. `tinychannels-runtime` and `tinychannels` re-export
 these same Rust types. Hosts should name wire values through this crate and
@@ -27,8 +25,8 @@ execute behavior through the compiled module. The root library compatibility
 facade is for existing implementation consumers, not a host dependency shortcut.
 
 `python3 scripts/check-bus-purity.py --offline` audits independent default and
-all-feature normal/build closures. It checks the exact package set, canonical
-TSD 1.5 source with no client feature, and Tokio's sync-only feature set. Its
+all-feature normal/build closures. It rejects storage clients, runtime buses,
+and engine drivers from this contract boundary. Its
 source guard allows async trait signatures, Tokio sync carriers, in-memory
 history locking, and static metadata while rejecting concrete I/O, task,
 database, and provider execution. The CI feature-test lane runs this gate and

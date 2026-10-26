@@ -66,45 +66,6 @@ fn http_proxy_policy_round_trips_without_changing_its_wire_fields() {
 }
 
 #[test]
-fn storage_needs_are_declared_by_the_bus_contract() {
-    // Keeping this inventory in the contract crate makes it available to
-    // hosts without linking the TinyChannels implementation.
-    let needs = &*super::STORAGE_NEEDS;
-    let names: Vec<_> = needs
-        .collections
-        .iter()
-        .map(|collection| collection.name.as_str())
-        .collect();
-    assert_eq!(
-        names,
-        [
-            "channels.delivery_pending",
-            "channels.delivery_failed",
-            "channels.delivery_results",
-            "channels.remote_bindings",
-            "channels.remote_busy",
-            "channels.remote_meta",
-            "channels.whatsapp_device",
-            "channels.whatsapp_identity",
-            "channels.whatsapp_session",
-            "channels.whatsapp_prekey",
-            "channels.whatsapp_signed_prekey",
-            "channels.whatsapp_sender_key",
-            "channels.whatsapp_sync_key",
-            "channels.whatsapp_lid_mapping",
-        ]
-    );
-    assert!(needs.collections.iter().all(|collection| {
-        collection.indexes.is_empty()
-            && collection.ttl_field.is_none()
-            && collection.search.is_none()
-    }));
-    assert!(needs.blob_prefixes.is_empty());
-    assert!(needs.stream_prefixes.is_empty());
-    assert!(needs.secret_prefixes.is_empty());
-}
-
-#[test]
 fn channel_controller_operations_have_closed_typed_wire_tags() {
     let request = ChannelControllerRequest::TestChannel {
         config: ChannelsConfig::default(),

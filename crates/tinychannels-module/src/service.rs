@@ -43,7 +43,7 @@ use crate::delivery::HostDeliveryStore;
 use crate::provider::{Hooks, Running, RunningSendError};
 use crate::relay::Relays;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tinybus::{Connection, Error as BusError, Result as BusResult};
+use tinybus::{BusName, Connection, Error as BusError, Result as BusResult};
 use tinychannels::delivery::{
     DeliveryAttemptFailure, DeliveryAttemptResult, DeliveryAttemptSuccess, DeliveryQueueError,
     DeliveryQueueHandler, DeliveryQueueStore, DeliveryResultStore, PendingDeliveryDrainDecision,
@@ -1192,7 +1192,7 @@ async fn finish_start_admission(
 #[derive(Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct StorageSetupOptions {
-    storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+    storage_callback: Option<BusName>,
 }
 
 #[derive(Deserialize)]
@@ -1203,33 +1203,36 @@ enum ModuleSetupConfig {
 }
 
 impl ModuleSetupConfig {
-    fn storage_descriptor(
-        self,
-    ) -> Option<tinystoragedrivers_busproxy::governed::StorageDescriptor> {
+    fn storage_callback(self) -> BusResult<Option<BusName>> {
         match self {
-            Self::Null(()) => None,
-            Self::Options(options) => options.storage_descriptor,
+            Self::Null(()) => Ok(None),
+            Self::Options(options) => match options.storage_callback {
+                Some(destination) if !destination.is_unique() => Err(BusError::failed(
+                    "storage callback destination must be unique",
+                )),
+                destination => Ok(destination),
+            },
         }
     }
 }
 
-async fn setup_with_storage_descriptor(
+async fn setup_with_storage_callback(
     connection: Connection,
-    storage_descriptor: Option<tinystoragedrivers_busproxy::governed::StorageDescriptor>,
+    storage_callback: Option<BusName>,
 ) -> BusResult<()> {
     let host =
-        HostChannels::new_with_storage_descriptor(connection.clone(), storage_descriptor.clone());
-    if storage_descriptor.is_some() {
+        HostChannels::new_with_storage_callback(connection.clone(), storage_callback.clone());
+    if storage_callback.is_some() {
         host.storage()
             .await
-            .map_err(|_| BusError::failed("configured storage descriptor unavailable"))?;
+            .map_err(|_| BusError::failed("configured storage callback unavailable"))?;
     }
     let channels = Channels::new(
         host.clone(),
         Some(Arc::new(
-            crate::runtime::Runtimes::new_with_storage_descriptor(
+            crate::runtime::Runtimes::new_with_storage_callback(
                 connection.clone(),
-                storage_descriptor,
+                storage_callback,
             ),
         )),
     );
@@ -1251,8 +1254,7 @@ async fn setup_with_context(
     context: tinybus_module::ModuleSetupContext,
     config: ModuleSetupConfig,
 ) -> BusResult<()> {
-    crate::migration::setup(&context).await?;
-    setup_with_storage_descriptor(context.connection().clone(), config.storage_descriptor()).await
+    setup_with_storage_callback(context.connection().clone(), config.storage_callback()?).await
 }
 
 fn intent_to_legacy_message(
@@ -1311,7 +1313,6 @@ pub(crate) mod exports {
         worker_threads = 4,
         provides = [
             "ai.tinyhumans.tinychannels.Channels",
-            "org.tinystoragedrivers.Migration",
         ],
         methods = [
             "StartChannel",
