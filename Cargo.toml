@@ -2,12 +2,14 @@
 members = [
     "crates/tinychannels-bus",
     "crates/tinychannels-module",
+    "crates/tinychannels-client",
     "crates/tinychannels-runtime",
 ]
 default-members = [
     ".",
     "crates/tinychannels-bus",
     "crates/tinychannels-module",
+    "crates/tinychannels-client",
     "crates/tinychannels-runtime",
 ]
 # The bus is a submodule with its own workspace; it is a path dependency of the
@@ -32,6 +34,10 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 [workspace.package]
 # Releases update this sole workspace version before packaging every crate.
 version = "0.1.39"
+
+[workspace.dependencies]
+tinybus = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", tag = "v0.3.12", default-features = false }
+tinybus-module = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", tag = "v0.3.12", default-features = false }
 
 [package]
 rust-version = "1.94"
