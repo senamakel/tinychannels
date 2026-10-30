@@ -397,6 +397,8 @@ fn legacy_inbound_envelope_preserves_telegram_topics_separately_from_threads() {
         reply_target: "-100123".into(),
         timestamp: 123,
         thread_ts: Some(" topic-99 ".into()),
+        topic_id: None,
+        reply_to_id: None,
         sender_name: None,
     };
 
@@ -438,6 +440,8 @@ fn legacy_inbound_envelope_projects_back_to_legacy_messages() {
         reply_target: "-100123".into(),
         timestamp: 123,
         thread_ts: Some("topic-99".into()),
+        topic_id: None,
+        reply_to_id: None,
         sender_name: None,
     };
     let envelope = inbound_envelope_from_legacy_message(&msg);
@@ -502,6 +506,8 @@ fn legacy_inbound_envelope_preserves_non_telegram_threads() {
         reply_target: "channel-123".into(),
         timestamp: 123,
         thread_ts: Some(" thread-99 ".into()),
+        topic_id: None,
+        reply_to_id: None,
         sender_name: None,
     };
 
@@ -546,6 +552,8 @@ fn legacy_session_key_candidates_match_openhuman_helpers() {
         reply_target: "-100123".into(),
         timestamp: 123,
         thread_ts: Some("topic-99".into()),
+        topic_id: None,
+        reply_to_id: None,
         sender_name: None,
     };
     let keys = conversation_history_key_candidates(&msg);
@@ -581,6 +589,9 @@ fn outbound_intent_carries_idempotency_key() {
         idempotency_key: "idem-1".into(),
         channel_id: "telegram".into(),
         conversation_id: "-100123".into(),
+        channel_ref: None,
+        conversation_ref: None,
+        turn_id: None,
         reply_to_id: None,
         thread_id: Some("topic-99".into()),
         durability: DeliveryDurability::Required,
