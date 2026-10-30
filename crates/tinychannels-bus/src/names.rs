@@ -122,7 +122,7 @@ pub mod host_methods {
 }
 
 /// All module method names in the declaration order used by the interface.
-pub const METHODS: [&str; 35] = [
+pub const METHODS: [&str; 38] = [
     methods::START_CHANNEL,
     methods::STOP_CHANNEL,
     methods::SEND_MESSAGE,
@@ -151,6 +151,9 @@ pub const METHODS: [&str; 35] = [
     methods::DESCRIBE_CONFIGURED_CHANNELS,
     methods::START_OUTBOUND_CHANNEL,
     methods::PREPARE_OUTBOUND_INTENT,
+    methods::BEGIN_WEB_TURN,
+    methods::PROJECT_WEB_OUTPUT,
+    methods::END_WEB_TURN,
     methods::PREPARE_CHANNEL_INBOUND,
     methods::PREPARE_CHANNEL_IDENTITY,
     methods::EXECUTE_PROGRESSIVE,
