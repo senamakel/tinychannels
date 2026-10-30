@@ -15,7 +15,7 @@ pub struct ChannelEvent {
 }
 
 /// Provider-neutral event payload.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelEventKind {
     ReadReceipt {
@@ -44,7 +44,7 @@ pub enum ChannelEventKind {
 }
 
 /// Normalized emoji or provider-native reaction identity.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelReaction {

@@ -7,6 +7,7 @@ fn content_parts_round_trip_typed_voice_and_media() {
         voice_note: VoiceNote {
             media: MediaReference {
                 opaque_id: Some("note-1".into()),
+                file_name: Some("note.ogg".into()),
                 kind: MediaKind::Audio,
                 ..Default::default()
             },
@@ -25,6 +26,7 @@ fn content_parts_round_trip_typed_voice_and_media() {
         part
     );
     assert_eq!(json["kind"], "voice_note");
+    assert_eq!(json["voiceNote"]["media"]["fileName"], "note.ogg");
 }
 
 #[test]
