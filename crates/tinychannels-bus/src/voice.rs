@@ -31,7 +31,7 @@ pub struct HostVoiceScope {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HostTranscriptionRequest {
     pub audio_base64: String,
     pub mime_type: Option<String>,
@@ -42,7 +42,7 @@ pub struct HostTranscriptionRequest {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 pub struct HostTranscriptionResult {
     pub text: String,
     pub language: Option<String>,
