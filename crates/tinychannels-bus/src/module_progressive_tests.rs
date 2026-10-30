@@ -10,5 +10,8 @@ fn subagent_output_keeps_display_label_and_detail() {
     let value = serde_json::to_value(&output).unwrap();
     assert_eq!(value["displayLabel"], "Review changes");
     assert_eq!(value["displayDetail"], "Inspecting the channel adapter");
-    assert_eq!(serde_json::from_value::<SubagentOutput>(value).unwrap(), output);
+    assert_eq!(
+        serde_json::from_value::<SubagentOutput>(value).unwrap(),
+        output
+    );
 }

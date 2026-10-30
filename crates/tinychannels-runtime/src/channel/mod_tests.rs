@@ -692,7 +692,15 @@ fn send_message_intent_preserves_legacy_typed_fields() {
     assert_eq!(payload["subject"], "subject");
     assert_eq!(payload["thread_ts"], "thread-1");
     assert_eq!(intent.reply_to_id.as_deref(), Some("message-3"));
-    assert_eq!(intent.conversation_ref.as_ref().unwrap().topic_id.as_deref(), Some("topic-2"));
+    assert_eq!(
+        intent
+            .conversation_ref
+            .as_ref()
+            .unwrap()
+            .topic_id
+            .as_deref(),
+        Some("topic-2")
+    );
     assert_eq!(payload["topic_id"], "topic-2");
     assert_eq!(payload["reply_to_id"], "message-3");
     assert_eq!(payload["idempotencyKey"], intent.idempotency_key);

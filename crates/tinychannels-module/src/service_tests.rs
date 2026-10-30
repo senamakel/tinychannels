@@ -34,6 +34,20 @@ fn module_setup_config_preserves_null_and_empty_legacy_defaults() {
 }
 
 #[test]
+fn outbound_intent_restores_topic_and_reply_metadata_for_provider_send() {
+    let mut message = tinychannels_bus::SendMessage::new("hello", "100");
+    message.thread_ts = Some("55".into());
+    message.topic_id = Some("7".into());
+    message.reply_to_id = Some("56".into());
+    let intent = tinychannels::outbound_intent_from_send_message("telegram", &message);
+
+    let restored = intent_to_legacy_message(&intent).unwrap();
+    assert_eq!(restored.thread_ts.as_deref(), Some("55"));
+    assert_eq!(restored.topic_id.as_deref(), Some("7"));
+    assert_eq!(restored.reply_to_id.as_deref(), Some("56"));
+}
+
+#[test]
 fn module_setup_config_accepts_only_a_unique_storage_callback() {
     let configured: ModuleSetupConfig = serde_json::from_value(serde_json::json!({
         "storage_callback": ":1.23"

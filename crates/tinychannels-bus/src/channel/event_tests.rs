@@ -49,7 +49,10 @@ fn read_receipt_identity_and_custom_emoji_survive_round_trip() {
     };
     let encoded = serde_json::to_value(&event).unwrap();
     assert_eq!(encoded["event"]["actorId"], "reader-1");
-    assert_eq!(serde_json::from_value::<ChannelEvent>(encoded).unwrap(), event);
+    assert_eq!(
+        serde_json::from_value::<ChannelEvent>(encoded).unwrap(),
+        event
+    );
 
     let reaction = ChannelReaction {
         value: "fire".into(),
@@ -58,5 +61,18 @@ fn read_receipt_identity_and_custom_emoji_survive_round_trip() {
     };
     let encoded = serde_json::to_value(&reaction).unwrap();
     assert_eq!(encoded["customEmojiId"], "provider-emoji-9");
-    assert_eq!(serde_json::from_value::<ChannelReaction>(encoded).unwrap(), reaction);
+    assert_eq!(
+        serde_json::from_value::<ChannelReaction>(encoded).unwrap(),
+        reaction
+    );
+
+    let legacy = serde_json::json!({"value":"👍","custom":false});
+    assert_eq!(
+        serde_json::from_value::<ChannelReaction>(legacy).unwrap(),
+        ChannelReaction {
+            value: "👍".into(),
+            custom: false,
+            custom_emoji_id: None,
+        }
+    );
 }
