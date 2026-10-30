@@ -85,6 +85,20 @@ pub struct ChannelAccountCapabilities {
     pub proactive_target: Option<String>,
 }
 
+impl From<ChannelInteractionInfo> for ChannelInteractionInfoV2 {
+    fn from(value: ChannelInteractionInfo) -> Self {
+        Self {
+            capabilities: ChannelInteractionCapabilitiesV2 {
+                account: ChannelAccountCapabilities {
+                    proactive_target: value.proactive_target,
+                },
+                reactions: value.supports_reactions,
+                progressive_edits: value.capabilities.progressive_edits,
+            },
+        }
+    }
+}
+
 /// Pre-v2 capability projection retained for older host interfaces.
 pub type LegacyChannelCapabilities = ChannelCapabilities;
 
