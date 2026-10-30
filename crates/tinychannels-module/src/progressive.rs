@@ -135,6 +135,7 @@ impl ProgressiveSender for Sender {
     async fn typing(&self, channel: &str) -> std::result::Result<(), ProgressiveSendError> {
         self.invoke(ProgressiveTransportRequest::Typing {
             channel: channel.into(),
+            channel_ref: None,
             conversation: None,
         })
         .await
