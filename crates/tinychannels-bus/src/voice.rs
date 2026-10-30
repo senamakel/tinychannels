@@ -37,6 +37,7 @@ pub struct HostTranscriptionRequest {
     pub mime_type: Option<String>,
     pub file_name: Option<String>,
     pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<HostVoiceScope>,
 }
 

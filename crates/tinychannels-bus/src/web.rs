@@ -197,3 +197,7 @@ impl WebChannelEvent {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "web_tests.rs"]
+mod tests;

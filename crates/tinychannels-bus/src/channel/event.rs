@@ -48,3 +48,7 @@ pub struct ChannelReaction {
     pub value: String,
     pub custom: bool,
 }
+
+#[cfg(test)]
+#[path = "event_tests.rs"]
+mod tests;

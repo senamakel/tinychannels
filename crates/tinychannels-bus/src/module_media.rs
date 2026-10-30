@@ -78,3 +78,7 @@ pub struct MediaReadChunkResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct MediaReadFinish(pub MediaReadHandle);
+
+#[cfg(test)]
+#[path = "module_media_tests.rs"]
+mod tests;

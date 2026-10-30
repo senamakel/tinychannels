@@ -74,7 +74,9 @@ pub enum MediaKind {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MediaReference {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub opaque_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
     pub path: Option<String>,
     pub url: Option<String>,
@@ -107,7 +109,9 @@ pub struct ChannelInboundEnvelope {
     pub conversation: ConversationRef,
     pub sender: SenderRef,
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_unix_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parts: Vec<super::content::ContentPart>,
     pub access: AccessContext,
     pub media: Vec<MediaReference>,

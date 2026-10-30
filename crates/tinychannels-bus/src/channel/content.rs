@@ -128,3 +128,7 @@ pub enum VoiceTranscriptSource {
     HostStt,
     User,
 }
+
+#[cfg(test)]
+#[path = "content_tests.rs"]
+mod tests;

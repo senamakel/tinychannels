@@ -12,6 +12,7 @@ fn inbound_vocabulary_preserves_optional_sender_and_existing_message_wire_shape(
         },
         namespace: "tenant".into(),
         session_policy: Default::default(),
+        preparation_mode: ChannelInboundPreparationMode::Typed,
     };
     let wire = serde_json::to_value(&request).unwrap();
     assert_eq!(wire["source"]["kind"], "legacy");

@@ -19,6 +19,7 @@ fn host_capability_payloads_keep_typed_snake_case_wire() {
         mime_type: Some("audio/wav".into()),
         file_name: Some("voice.wav".into()),
         language: Some("en".into()),
+        scope: None,
     };
     assert_eq!(
         serde_json::to_value(&request).unwrap(),
