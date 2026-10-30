@@ -275,12 +275,29 @@ pub enum WebChannelEvent {
     ChatInterim { context: WebEventContext, full_response: Option<String>, round: Option<u32> },
     ChatSuggestions { context: WebEventContext, suggestions: Vec<ChatSuggestion> },
     UserError { context: WebEventContext, message: Option<String>, error_type: Option<String>, error_source: Option<String>, error_retryable: Option<bool> },
-    ToolCall { context: WebEventContext, call_id: String, tool_name: String, arguments: Option<Value> },
-    ToolResult { context: WebEventContext, call_id: String, tool_name: String, success: bool, output: Option<String> },
+    ToolCall { context: WebEventContext, tool_name: Option<String>, tool_call_id: Option<String>, args: Option<Value> },
+    ToolResult { context: WebEventContext, tool_name: Option<String>, tool_call_id: Option<String>, success: Option<bool>, output: Option<String>, elapsed_ms: Option<u64>, output_chars: Option<usize>, structured: Option<Value> },
+    ToolProgress { context: WebEventContext, tool_call_id: Option<String>, message: Option<String> },
     ThinkingDelta { context: WebEventContext, delta: Option<String> },
     ProactiveMessage { context: WebEventContext, full_response: Option<String>, message: Option<String>, success: Option<bool>, persisted_message_id: Option<String>, parts: Option<Vec<crate::ContentPart>> },
     QueueItemRemoved { context: WebEventContext, queue_item: Option<QueueItemPayload> },
+    QueueItemQueued { context: WebEventContext, queue_item: Option<QueueItemPayload> },
+    QueueItemDelivered { context: WebEventContext, queue_item: Option<QueueItemPayload> },
     ChannelOutbound { context: WebEventContext, full_response: Option<String>, structured: Option<Value> },
+    ExternalTransferPending { context: WebEventContext, args: Option<Value> },
+    MemoryActivity { context: WebEventContext, args: Option<Value> },
+    ThreadGoalUpdated { context: WebEventContext, goal: Option<Value> },
+    ThreadGoalCleared { context: WebEventContext },
+    ThreadTodosChanged { context: WebEventContext, todos: Option<Value> },
+    RunModeChanged { context: WebEventContext, message: Option<String> },
+    ArtifactReady { context: WebEventContext, tool_call_id: Option<String>, args: Option<Value> },
+    ArtifactFailed { context: WebEventContext, tool_call_id: Option<String>, args: Option<Value> },
+    ArtifactPending { context: WebEventContext, tool_call_id: Option<String>, args: Option<Value> },
+    ApprovalRequest { context: WebEventContext, tool_name: Option<String>, message: Option<String>, args: Option<Value>, tool_call_id: Option<String>, expires_at: Option<String>, detached: Option<bool> },
+    PlanReviewRequest { context: WebEventContext, tool_name: Option<String>, message: Option<String>, args: Option<Value>, tool_call_id: Option<String>, expires_at: Option<String> },
+    ApprovalDecided { context: WebEventContext, tool_name: Option<String>, message: Option<String>, tool_call_id: Option<String>, cancel_reason: Option<String> },
+    PlanReviewDecided { context: WebEventContext, tool_name: Option<String>, message: Option<String>, tool_call_id: Option<String>, cancel_reason: Option<String> },
+    VoiceSpeak { context: WebEventContext, full_response: Option<String>, success: Option<bool> },
     ChannelEvent {
         context: WebEventContext,
         openhuman_message_id: Option<String>,
@@ -304,7 +321,24 @@ impl WebChannelEvent {
             | Self::ThinkingDelta { context, .. }
             | Self::ProactiveMessage { context, .. }
             | Self::QueueItemRemoved { context, .. }
-            | Self::ChannelOutbound { context, .. } => context,
+            | Self::ChannelOutbound { context, .. }
+            | Self::ToolProgress { context, .. }
+            | Self::QueueItemQueued { context, .. }
+            | Self::QueueItemDelivered { context, .. }
+            | Self::ExternalTransferPending { context, .. }
+            | Self::MemoryActivity { context, .. }
+            | Self::ThreadGoalUpdated { context, .. }
+            | Self::ThreadGoalCleared { context, .. }
+            | Self::ThreadTodosChanged { context, .. }
+            | Self::RunModeChanged { context, .. }
+            | Self::ArtifactReady { context, .. }
+            | Self::ArtifactFailed { context, .. }
+            | Self::ArtifactPending { context, .. }
+            | Self::ApprovalRequest { context, .. }
+            | Self::PlanReviewRequest { context, .. }
+            | Self::ApprovalDecided { context, .. }
+            | Self::PlanReviewDecided { context, .. }
+            | Self::VoiceSpeak { context, .. } => context,
         }
     }
     pub fn context_mut(&mut self) -> &mut WebEventContext {
@@ -316,6 +350,15 @@ impl WebChannelEvent {
             | Self::ToolCall { context, .. } | Self::ToolResult { context, .. }
             | Self::ThinkingDelta { context, .. } | Self::ProactiveMessage { context, .. }
             | Self::QueueItemRemoved { context, .. } | Self::ChannelOutbound { context, .. } => context,
+            Self::ToolProgress { context, .. } | Self::QueueItemQueued { context, .. }
+            | Self::QueueItemDelivered { context, .. } | Self::ExternalTransferPending { context, .. }
+            | Self::MemoryActivity { context, .. } | Self::ThreadGoalUpdated { context, .. }
+            | Self::ThreadGoalCleared { context, .. } | Self::ThreadTodosChanged { context, .. }
+            | Self::RunModeChanged { context, .. } | Self::ArtifactReady { context, .. }
+            | Self::ArtifactFailed { context, .. } | Self::ArtifactPending { context, .. }
+            | Self::ApprovalRequest { context, .. } | Self::PlanReviewRequest { context, .. }
+            | Self::ApprovalDecided { context, .. } | Self::PlanReviewDecided { context, .. }
+            | Self::VoiceSpeak { context, .. } => context,
         }
     }
     pub fn normalize_projected_wire_fields(&mut self) {}
@@ -335,6 +378,23 @@ impl WebChannelEvent {
             Self::ProactiveMessage { .. } => "proactive_message",
             Self::QueueItemRemoved { .. } => "queue_item_removed",
             Self::ChannelOutbound { .. } => "channel_outbound",
+            Self::ToolProgress { .. } => "tool_progress",
+            Self::QueueItemQueued { .. } => "queue_item_queued",
+            Self::QueueItemDelivered { .. } => "queue_item_delivered",
+            Self::ExternalTransferPending { .. } => "external_transfer_pending",
+            Self::MemoryActivity { .. } => "memory_activity",
+            Self::ThreadGoalUpdated { .. } => "thread_goal_updated",
+            Self::ThreadGoalCleared { .. } => "thread_goal_cleared",
+            Self::ThreadTodosChanged { .. } => "thread_todos_changed",
+            Self::RunModeChanged { .. } => "run_mode_changed",
+            Self::ArtifactReady { .. } => "artifact_ready",
+            Self::ArtifactFailed { .. } => "artifact_failed",
+            Self::ArtifactPending { .. } => "artifact_pending",
+            Self::ApprovalRequest { .. } => "approval_request",
+            Self::PlanReviewRequest { .. } => "plan_review_request",
+            Self::ApprovalDecided { .. } => "approval_decided",
+            Self::PlanReviewDecided { .. } => "plan_review_decided",
+            Self::VoiceSpeak { .. } => "voice_speak",
         }
     }
 }

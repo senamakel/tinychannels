@@ -69,3 +69,22 @@ fn typing_refresh_operations_are_additive_and_typed() {
         })
     );
 }
+
+#[test]
+fn configured_interaction_v2_retains_legacy_provider_facts() {
+    let info = ChannelInteractionInfo {
+        capabilities: ChannelCapabilities {
+            progressive_edits: true,
+            ..ChannelCapabilities::default()
+        },
+        proactive_target: Some("chat-7".into()),
+        supports_reactions: true,
+        supports_draft_updates: true,
+    };
+    let v2 = ChannelInteractionInfoV2::from(info);
+    assert_eq!(v2.capabilities.account.proactive_target.as_deref(), Some("chat-7"));
+    assert!(v2.capabilities.reactions);
+    assert!(v2.capabilities.progressive_edits);
+    let legacy = LegacyChannelCapabilities::from(&v2.capabilities);
+    assert!(legacy.progressive_edits);
+}
