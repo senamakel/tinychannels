@@ -89,7 +89,13 @@ impl ChannelOutboundMessage {
             conversation_id: message.recipient.clone(),
             channel_ref: None,
             thread_id: message.thread_ts.clone(),
-            conversation_ref: None,
+            conversation_ref: message.topic_id.as_ref().map(|topic_id| {
+                super::types::ConversationRef {
+                    id: message.recipient.clone(),
+                    topic_id: Some(topic_id.clone()),
+                    ..Default::default()
+                }
+            }),
             reply_to_id: message.reply_to_id.clone(),
             turn_id: None,
             idempotency_key: message.idempotency_key.clone().unwrap_or_default(),

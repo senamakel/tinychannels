@@ -1272,6 +1272,11 @@ fn intent_to_legacy_message(
         recipient: intent.conversation_id.clone(),
         subject: None,
         thread_ts: intent.thread_id.clone(),
+        topic_id: intent
+            .conversation_ref
+            .as_ref()
+            .and_then(|conversation| conversation.topic_id.clone()),
+        reply_to_id: intent.reply_to_id.clone(),
         idempotency_key: Some(intent.idempotency_key.clone()),
     })
 }
