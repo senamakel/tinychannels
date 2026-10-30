@@ -45,6 +45,12 @@ pub struct SendMessage {
     pub subject: Option<String>,
     /// Platform thread identifier for threaded replies (e.g. Slack `thread_ts`).
     pub thread_ts: Option<String>,
+    /// Provider topic identifier when it is distinct from the thread address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topic_id: Option<String>,
+    /// Provider message this send explicitly replies to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to_id: Option<String>,
     /// Caller-provided or generated idempotency key for retry-safe delivery.
     pub idempotency_key: Option<String>,
 }
@@ -57,6 +63,8 @@ impl SendMessage {
             recipient: recipient.into(),
             subject: None,
             thread_ts: None,
+            topic_id: None,
+            reply_to_id: None,
             idempotency_key: None,
         }
     }
@@ -72,6 +80,8 @@ impl SendMessage {
             recipient: recipient.into(),
             subject: Some(subject.into()),
             thread_ts: None,
+            topic_id: None,
+            reply_to_id: None,
             idempotency_key: None,
         }
     }

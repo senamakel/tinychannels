@@ -90,7 +90,7 @@ impl ChannelOutboundMessage {
             channel_ref: None,
             thread_id: message.thread_ts.clone(),
             conversation_ref: None,
-            reply_to_id: None,
+            reply_to_id: message.reply_to_id.clone(),
             turn_id: None,
             idempotency_key: message.idempotency_key.clone().unwrap_or_default(),
             parts: vec![super::content::OutboundContentPart::Content {
