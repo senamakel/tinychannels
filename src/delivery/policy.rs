@@ -94,6 +94,9 @@ pub fn required_durable_final_capabilities(
         OutboundPayload::PresentationBlocks { .. } | OutboundPayload::NativeChannelData { .. } => {
             requirements.insert(DurableFinalDeliveryCapability::Payload, true);
         }
+        OutboundPayload::Parts { .. } => {
+            requirements.insert(DurableFinalDeliveryCapability::Payload, true);
+        }
     }
     if intent.reply_to_id.is_some() {
         requirements.insert(DurableFinalDeliveryCapability::ReplyTo, true);
