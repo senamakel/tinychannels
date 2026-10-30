@@ -115,6 +115,8 @@ fn command(workspace: &std::path::Path, content: &str, channel: &str) -> RemoteO
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            topic_id: None,
+            reply_to_id: None,
         },
         route: RemoteRoute {
             provider: "fixture-provider".into(),

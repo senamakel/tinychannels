@@ -188,6 +188,7 @@ async fn shutdown_fences_new_transcription_and_joins_accepted_callback() {
                 mime_type: Some("audio/wav".into()),
                 file_name: None,
                 language: None,
+                scope: None,
             })
             .await
     });
@@ -208,6 +209,7 @@ async fn shutdown_fences_new_transcription_and_joins_accepted_callback() {
             mime_type: Some("audio/wav".into()),
             file_name: None,
             language: None,
+            scope: None,
         })
         .await
         .is_err(),
@@ -235,6 +237,7 @@ async fn shutdown_joins_owned_transcription_after_waiter_cancellation() {
                 mime_type: Some("audio/wav".into()),
                 file_name: None,
                 language: None,
+                scope: None,
             })
             .await
     });
@@ -280,6 +283,7 @@ async fn transcription_admission_refuses_when_its_owned_task_limit_is_reached() 
                 mime_type: Some("audio/wav".into()),
                 file_name: None,
                 language: None,
+                scope: None,
             })
             .await
         }));
@@ -304,6 +308,7 @@ async fn transcription_admission_refuses_when_its_owned_task_limit_is_reached() 
             mime_type: Some("audio/wav".into()),
             file_name: None,
             language: None,
+            scope: None,
         })
         .await;
     assert!(refused.is_err(), "the seventeenth held callback is refused");

@@ -138,6 +138,9 @@ async fn typed_intent_preserves_durable_key_and_thread_in_legacy_send() {
         payload: tinychannels::OutboundPayload::Text {
             text: "hello".to_owned(),
         },
+        channel_ref: None,
+        conversation_ref: None,
+        turn_id: None,
     };
     let result = channels
         .send_channel_intent("fixture".to_owned(), intent)
@@ -1243,6 +1246,8 @@ async fn inbound_preparation_preserves_escaped_persisted_keys_and_provider_threa
         timestamp: 42,
         thread_ts: Some("thread/c".into()),
         sender_name: Some("Display".into()),
+        topic_id: None,
+        reply_to_id: None,
     };
     let prepared = service
         .prepare_channel_inbound(PrepareChannelInboundRequest {
@@ -1252,6 +1257,7 @@ async fn inbound_preparation_preserves_escaped_persisted_keys_and_provider_threa
             },
             namespace: "openhuman".into(),
             session_policy: Default::default(),
+            preparation_mode: Default::default(),
         })
         .await
         .unwrap();
@@ -1447,6 +1453,7 @@ async fn prepared_envelope_preserves_media_account_and_group_isolation_policy() 
         },
         namespace: "tenant".into(),
         session_policy: Default::default(),
+        preparation_mode: Default::default(),
     };
     let prepared = service
         .prepare_channel_inbound(request.clone())
@@ -1494,6 +1501,7 @@ async fn inbound_preparation_refuses_mismatched_identity_oversized_payload_and_s
         },
         namespace: "tenant".into(),
         session_policy: Default::default(),
+        preparation_mode: Default::default(),
     };
     let error = service
         .prepare_channel_inbound(request)
@@ -1510,6 +1518,7 @@ async fn inbound_preparation_refuses_mismatched_identity_oversized_payload_and_s
         },
         namespace: "tenant".into(),
         session_policy: Default::default(),
+        preparation_mode: Default::default(),
     };
     assert!(
         service
