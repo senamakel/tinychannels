@@ -8,6 +8,7 @@ struct Callback {
     sends: Arc<Mutex<Vec<Value>>>,
     requests: Arc<Mutex<Vec<ProgressiveTransportRequest>>>,
     result: Arc<Mutex<Option<ProgressiveTransportResult>>>,
+    accepts_output: bool,
     block: bool,
     entered: Arc<Notify>,
     released: Arc<Notify>,
@@ -23,12 +24,36 @@ impl Callback {
             return Err(Error::failed("unexpected callback"));
         };
         self.requests.lock().await.push(request.clone());
-        if let ProgressiveTransportRequest::Send { message, .. } = request {
-            self.sends.lock().await.push(message);
-            if self.block {
-                self.entered.notify_one();
-                self.released.notified().await;
+        match request {
+            ProgressiveTransportRequest::Send { message, .. } => {
+                self.sends.lock().await.push(message);
+                if self.block {
+                    self.entered.notify_one();
+                    self.released.notified().await;
+                }
             }
+            ProgressiveTransportRequest::OutputEvent { .. } => {
+                let result = if self.accepts_output {
+                    ProgressiveTransportResult::Accepted
+                } else {
+                    ProgressiveTransportResult::Acknowledged
+                };
+                return Ok(ChannelBackendResult::ProgressiveTransport(result));
+            }
+            ProgressiveTransportRequest::SendTyped { .. } => {
+                return Ok(ChannelBackendResult::ProgressiveTransport(
+                    ProgressiveTransportResult::Outcome(Box::new(
+                        tinychannels_bus::channel::ChannelSendOutcome {
+                            receipt: tinychannels_bus::channel::MessageReceipt {
+                                primary_platform_message_id: Some("fixture-typed-message".into()),
+                                ..Default::default()
+                            },
+                            error: None,
+                        },
+                    )),
+                ));
+            }
+            _ => {}
         }
         Ok(ChannelBackendResult::ProgressiveTransport(
             self.result.lock().await.clone().unwrap_or_else(|| {
@@ -39,6 +64,10 @@ impl Callback {
 }
 
 async fn fixture(block: bool) -> (Replies, Callback) {
+    fixture_mode(block, false).await
+}
+
+async fn fixture_mode(block: bool, accepts_output: bool) -> (Replies, Callback) {
     let bus = MemoryBus::new();
     Broker::new().spawn(bus.clone());
     let connection = tinybus::Connection::connect(bus.connect().await.unwrap())
@@ -50,6 +79,7 @@ async fn fixture(block: bool) -> (Replies, Callback) {
         .unwrap();
     let callback = Callback {
         block,
+        accepts_output,
         ..Default::default()
     };
     connection
@@ -514,4 +544,188 @@ async fn typed_output_open_creates_a_scoped_module_handle() {
         })
         .await;
     assert!(matches!(result, Ok(ProgressiveResult::Opened { .. })));
+}
+
+#[tokio::test]
+async fn typed_output_feed_delivers_with_the_scope_captured_at_open() {
+    use tinychannels_bus::module_progressive::ChannelOutputEvent;
+    let (replies, callback) = fixture(false).await;
+    let channel = tinychannels_bus::ChannelRef {
+        id: "telegram".into(),
+        account_id: Some("telegram-account".into()),
+    };
+    let conversation = tinychannels_bus::ConversationRef {
+        kind: tinychannels_bus::ConversationKind::Dm,
+        id: "chat-42".into(),
+        ..Default::default()
+    };
+    let ProgressiveResult::Opened { handle } = replies
+        .execute(ProgressiveCommand::OpenOutput {
+            channel: channel.clone(),
+            conversation: conversation.clone(),
+            turn_id: "turn-7".into(),
+            lifetime_ms: 30_000,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("typed output should open");
+    };
+    let result = replies
+        .execute(ProgressiveCommand::FeedOutput {
+            handle: handle.clone(),
+            turn_id: None,
+            channel_ref: None,
+            conversation: None,
+            sequence: None,
+            events: vec![ChannelOutputEvent::FinalMessage {
+                text: "done".into(),
+                parts: vec![],
+                receipt: None,
+            }],
+        })
+        .await
+        .unwrap();
+    let ProgressiveResult::DeliveryOutcome { outcome } = result else {
+        panic!("expected one typed delivery outcome: {result:?}");
+    };
+    assert_eq!(
+        outcome.receipt.primary_platform_message_id.as_deref(),
+        Some("fixture-typed-message")
+    );
+    let requests = callback.requests.lock().await;
+    assert!(matches!(
+        &requests[0],
+        ProgressiveTransportRequest::OutputEvent {
+            channel: route,
+            channel_ref: Some(request_channel),
+            conversation: Some(request_conversation),
+            turn_id,
+            sequence: 0,
+            ..
+        } if route == "telegram"
+            && request_channel == &channel
+            && request_conversation == &conversation
+            && turn_id == "turn-7"
+    ));
+    assert!(matches!(
+        &requests[1],
+        ProgressiveTransportRequest::SendTyped {
+            channel: route,
+            turn_id: Some(turn_id),
+            channel_ref: Some(request_channel),
+            conversation: Some(request_conversation),
+            sequence: Some(0),
+            parts,
+            text,
+            ..
+        } if route == "telegram"
+            && turn_id == "turn-7"
+            && request_channel == &channel
+            && request_conversation == &conversation
+            && parts.len() == 1
+            && text == "done"
+    ));
+    replies
+        .execute(ProgressiveCommand::Close { handle })
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn hosted_typed_output_acceptance_prevents_a_second_provider_send() {
+    use tinychannels_bus::module_progressive::ChannelOutputEvent;
+    let (replies, callback) = fixture_mode(false, true).await;
+    let ProgressiveResult::Opened { handle } = replies
+        .execute(ProgressiveCommand::OpenHostedOutput {
+            channel: tinychannels_bus::ChannelRef {
+                id: "relay".into(),
+                account_id: Some("tenant-1".into()),
+            },
+            conversation: tinychannels_bus::ConversationRef {
+                kind: tinychannels_bus::ConversationKind::Channel,
+                id: "web-chat-42".into(),
+                ..Default::default()
+            },
+            turn_id: "hosted-turn".into(),
+            lifetime_ms: 30_000,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("hosted typed output should open");
+    };
+    let result = replies
+        .execute(ProgressiveCommand::FeedOutput {
+            handle: handle.clone(),
+            turn_id: None,
+            channel_ref: None,
+            conversation: None,
+            sequence: None,
+            events: vec![ChannelOutputEvent::FinalMessage {
+                text: "hosted".into(),
+                parts: vec![],
+                receipt: None,
+            }],
+        })
+        .await
+        .unwrap();
+    assert!(matches!(
+        result,
+        ProgressiveResult::DeliveryBatch {
+            outcomes,
+            hosted_accepted: true,
+            failure: None,
+            ..
+        } if outcomes.is_empty()
+    ));
+    assert_eq!(callback.requests.lock().await.len(), 1);
+    replies
+        .execute(ProgressiveCommand::Close { handle })
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn typed_output_scope_override_must_match_the_opened_turn() {
+    use tinychannels_bus::module_progressive::ChannelOutputEvent;
+    let (replies, callback) = fixture(false).await;
+    let ProgressiveResult::Opened { handle } = replies
+        .execute(ProgressiveCommand::OpenOutput {
+            channel: tinychannels_bus::ChannelRef {
+                id: "telegram".into(),
+                account_id: Some("telegram-account".into()),
+            },
+            conversation: tinychannels_bus::ConversationRef {
+                kind: tinychannels_bus::ConversationKind::Dm,
+                id: "chat-42".into(),
+                ..Default::default()
+            },
+            turn_id: "turn-7".into(),
+            lifetime_ms: 30_000,
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("typed output should open");
+    };
+    assert!(replies
+        .execute(ProgressiveCommand::FeedOutput {
+            handle: handle.clone(),
+            turn_id: Some("different-turn".into()),
+            channel_ref: None,
+            conversation: None,
+            sequence: None,
+            events: vec![ChannelOutputEvent::TextDelta {
+                text: "spoofed".into(),
+                iteration: None,
+            }],
+        })
+        .await
+        .is_err());
+    assert!(callback.requests.lock().await.is_empty());
+    replies
+        .execute(ProgressiveCommand::Close { handle })
+        .await
+        .unwrap();
 }

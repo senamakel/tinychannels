@@ -255,7 +255,10 @@ pub enum ProgressiveTransportRequest {
     },
     OutputEvent {
         channel: String,
+        channel_ref: Option<ChannelRef>,
+        conversation: Option<ConversationRef>,
         turn_id: String,
+        sequence: u64,
         event: Box<ChannelOutputEvent>,
     },
 }
@@ -264,6 +267,8 @@ pub enum ProgressiveTransportRequest {
 #[serde(tag = "result", content = "value", rename_all = "snake_case")]
 pub enum ProgressiveTransportResult {
     Acknowledged,
+    /// The hosted transport accepted responsibility for the event's delivery.
+    Accepted,
     Outcome(Box<crate::channel::ChannelSendOutcome>),
     Success(Value),
     Unavailable,
