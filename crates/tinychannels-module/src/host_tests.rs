@@ -3,6 +3,43 @@ use std::sync::atomic::AtomicUsize;
 use tinybus::broker::Broker;
 use tinybus::transport::memory::MemoryBus;
 
+#[tokio::test]
+async fn callback_storage_reuses_the_schema_owned_by_the_host() {
+    use tinystoragedrivers_api::StorageBackend;
+    use tinystoragedrivers_testkit::{Failing, FaultPlan, MemoryBackend};
+    use tinystoragedrivers_types::{ErrorKind, Scope};
+
+    let bus = MemoryBus::new();
+    Broker::new().spawn(bus.clone());
+    let connection = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let backend = MemoryBackend::new();
+    let storage = backend
+        .for_scope(&Scope::new("tenant:schema-owner").unwrap())
+        .unwrap();
+    let faults = FaultPlan::new();
+    faults.fail_operation_nth("documents.ensure_collection", 1, ErrorKind::Unavailable);
+    let documents: Arc<dyn tinystoragedrivers_api::DocumentStore> =
+        Arc::new(Failing::with_plan(Arc::clone(storage.documents()), faults));
+    let callback = HostChannels::new_with_storage_callback(
+        connection.clone(),
+        Some(":1.999".try_into().unwrap()),
+    );
+    callback
+        .prepare_storage_schema(&documents)
+        .await
+        .expect("callback clients must reuse the schema declared by the host");
+
+    let legacy = HostChannels::new(connection);
+    assert!(
+        legacy.prepare_storage_schema(&documents).await.is_err(),
+        "the standalone legacy client still prepares its own schema"
+    );
+    callback.shutdown().await.unwrap();
+    legacy.shutdown().await.unwrap();
+}
+
 fn consume_failure(counter: &AtomicUsize) -> bool {
     let mut remaining = counter.load(Ordering::SeqCst);
     loop {

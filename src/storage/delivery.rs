@@ -79,6 +79,16 @@ impl DocumentDeliveryStore {
         }
     }
 
+    /// Use an owner-bound handle whose schema and legacy import are already
+    /// prepared by the caller. Module callback ports cannot mutate schemas.
+    #[must_use]
+    pub fn from_prepared(docs: Arc<dyn DocumentStore>) -> Self {
+        Self {
+            docs,
+            ready: Arc::new(tokio::sync::OnceCell::new_with(Some(()))),
+        }
+    }
+
     async fn docs(&self) -> Result<&Arc<dyn DocumentStore>, DeliveryQueueError> {
         self.ready
             .get_or_try_init(|| async {

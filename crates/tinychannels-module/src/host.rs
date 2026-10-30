@@ -361,9 +361,23 @@ impl HostChannels {
             }
             None => tinystoragedrivers_busproxy::connect_storage(self.connection.clone()).await?,
         };
-        tinychannels::storage::prepare(storage.documents()).await?;
+        self.prepare_storage_schema(storage.documents()).await?;
         *slot = Some(storage.clone());
         Ok(storage)
+    }
+
+    async fn prepare_storage_schema(
+        &self,
+        documents: &Arc<dyn tinystoragedrivers_api::DocumentStore>,
+    ) -> tinystoragedrivers_types::Result<()> {
+        // A callback host installs the owner's declarations before granting
+        // access. Its module-facing port deliberately denies schema mutation.
+        // The legacy standalone storage route still owns its preparation.
+        if self.storage_callback.is_some() {
+            Ok(())
+        } else {
+            tinychannels::storage::prepare(documents).await
+        }
     }
 
     /// The scoped document store, for the delivery, remote-session and

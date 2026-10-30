@@ -26,6 +26,12 @@ pub struct StoredIntent {
     pub idempotency_key: String,
     pub channel_id: String,
     pub conversation_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_ref: Option<crate::ChannelRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation_ref: Option<crate::ConversationRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
     pub reply_to_id: Option<String>,
     pub thread_id: Option<String>,
     pub durability: DeliveryDurability,
