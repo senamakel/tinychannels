@@ -107,6 +107,8 @@ pub fn legacy_message_from_inbound_envelope(
             .topic_id
             .clone()
             .or_else(|| envelope.conversation.thread_id.clone()),
+        topic_id: envelope.conversation.topic_id.clone(),
+        reply_to_id: None,
         sender_name: envelope.sender.name.clone(),
     }
 }
