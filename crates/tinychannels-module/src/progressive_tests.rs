@@ -494,3 +494,24 @@ async fn transport_failures_preserve_recovery_classification() {
         }
     }
 }
+
+#[tokio::test]
+async fn typed_output_open_creates_a_scoped_module_handle() {
+    let (replies, _) = fixture(false).await;
+    let result = replies
+        .execute(ProgressiveCommand::OpenOutput {
+            channel: tinychannels_bus::ChannelRef {
+                id: "telegram".into(),
+                account_id: Some("telegram-account".into()),
+            },
+            conversation: tinychannels_bus::ConversationRef {
+                kind: tinychannels_bus::ConversationKind::Dm,
+                id: "chat-42".into(),
+                ..Default::default()
+            },
+            turn_id: "turn-7".into(),
+            lifetime_ms: 30_000,
+        })
+        .await;
+    assert!(matches!(result, Ok(ProgressiveResult::Opened { .. })));
+}
