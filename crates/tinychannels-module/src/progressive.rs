@@ -563,6 +563,60 @@ impl Replies {
     }
 }
 
+fn outbound_delivery(
+    event: &ChannelOutputEvent,
+) -> Option<(Vec<tinychannels_bus::OutboundContentPart>, String)> {
+    use tinychannels_bus::{ContentPart, OutboundContentPart, OutboundVoice};
+    let text_part = |text: &str| OutboundContentPart::Content {
+        part: ContentPart::Text {
+            text: text.to_owned(),
+            markdown_dialect: None,
+        },
+    };
+    match event {
+        ChannelOutputEvent::FinalMessage { text, parts, .. } => {
+            let parts = if parts.is_empty() {
+                vec![text_part(text)]
+            } else {
+                parts
+                    .iter()
+                    .cloned()
+                    .map(|part| OutboundContentPart::Content { part })
+                    .collect()
+            };
+            Some((parts, text.clone()))
+        }
+        ChannelOutputEvent::Media { text, parts } => {
+            let mut outbound: Vec<_> = text.iter().map(|text| text_part(text)).collect();
+            outbound.extend(
+                parts
+                    .iter()
+                    .cloned()
+                    .map(|part| OutboundContentPart::Content { part }),
+            );
+            Some((outbound, text.clone().unwrap_or_default()))
+        }
+        ChannelOutputEvent::VoiceNote { text, voice } => {
+            let text = text.clone().or_else(|| {
+                voice
+                    .transcript
+                    .as_ref()
+                    .map(|transcript| transcript.text.clone())
+            });
+            let mut outbound: Vec<_> = text.iter().map(|text| text_part(text)).collect();
+            outbound.push(OutboundContentPart::Voice {
+                voice: OutboundVoice::Media {
+                    media: voice.media.clone(),
+                    codec: voice.codec.clone(),
+                    duration_ms: voice.duration_ms,
+                },
+            });
+            Some((outbound, text.unwrap_or_default()))
+        }
+        _ => None,
+    }
+}
+
 async fn close_entry(entry: Arc<Entry>, text: String, retain_existing: bool) -> Result<()> {
     let fingerprint: [u8; 32] = Sha256::digest(text.as_bytes()).into();
     let mut closing = entry.closing.lock().await;
