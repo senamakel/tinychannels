@@ -54,6 +54,54 @@ pub struct ChatRequestMetadata {
     pub source: Option<String>,
     pub queue_mode: Option<QueueMode>,
     pub task_id: Option<String>,
+    pub speak_reply: Option<bool>,
+    pub session_id: Option<u64>,
+    pub run_mode: Option<String>,
+    pub reasoning_effort: Option<String>,
+    pub agent_id: Option<String>,
+    pub hold_text_stream: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSuggestion {
+    pub prompt: String,
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GuardrailReason {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GuardrailPayload {
+    pub verdict: String,
+    pub score: f64,
+    pub reasons: Vec<GuardrailReason>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct QueueItemPayload {
+    pub id: String,
+    pub lane: Option<String>,
+    pub text_preview: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SubagentProgressDetail {
+    pub task_id: String,
+    pub agent_id: String,
+    pub state: String,
+    pub message: Option<String>,
+    pub elapsed_ms: Option<u64>,
+    pub output_chars: Option<usize>,
+    pub usage: Option<SubagentUsagePayload>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -160,16 +208,36 @@ pub enum WebChannelEvent {
         full_response: Option<String>,
         usage: Option<TurnUsagePayload>,
         timing: Option<TurnTimingPayload>,
+        citations: Option<Vec<Value>>,
+        parts: Option<Vec<crate::ContentPart>>,
     },
     ChatError {
         context: WebEventContext,
         message: Option<String>,
         error_type: Option<String>,
+        error_source: Option<String>,
+        error_retryable: Option<bool>,
+        error_retry_after_ms: Option<u64>,
+        error_provider: Option<String>,
+        error_fallback_available: Option<bool>,
+        copy_key: Option<String>,
+        copy_params: Option<Value>,
+        guardrail: Option<GuardrailPayload>,
     },
     ChatCancelled {
         context: WebEventContext,
         cancel_reason: Option<String>,
+        superseded_by: Option<String>,
     },
+    ChatInterim { context: WebEventContext, full_response: Option<String>, round: Option<u32> },
+    ChatSuggestions { context: WebEventContext, suggestions: Vec<ChatSuggestion> },
+    UserError { context: WebEventContext, message: Option<String>, error_type: Option<String>, error_source: Option<String>, error_retryable: Option<bool> },
+    ToolCall { context: WebEventContext, call_id: String, tool_name: String, arguments: Option<Value> },
+    ToolResult { context: WebEventContext, call_id: String, tool_name: String, success: bool, output: Option<String> },
+    ThinkingDelta { context: WebEventContext, delta: Option<String> },
+    ProactiveMessage { context: WebEventContext, full_response: Option<String>, message: Option<String>, success: Option<bool>, persisted_message_id: Option<String>, parts: Option<Vec<crate::ContentPart>> },
+    QueueItemRemoved { context: WebEventContext, queue_item: Option<QueueItemPayload> },
+    ChannelOutbound { context: WebEventContext, full_response: Option<String>, structured: Option<Value> },
     ChannelEvent {
         context: WebEventContext,
         openhuman_message_id: Option<String>,
@@ -184,9 +252,30 @@ impl WebChannelEvent {
             | Self::ChatDone { context, .. }
             | Self::ChatError { context, .. }
             | Self::ChatCancelled { context, .. }
-            | Self::ChannelEvent { context, .. } => context,
+            | Self::ChannelEvent { context, .. }
+            | Self::ChatInterim { context, .. }
+            | Self::ChatSuggestions { context, .. }
+            | Self::UserError { context, .. }
+            | Self::ToolCall { context, .. }
+            | Self::ToolResult { context, .. }
+            | Self::ThinkingDelta { context, .. }
+            | Self::ProactiveMessage { context, .. }
+            | Self::QueueItemRemoved { context, .. }
+            | Self::ChannelOutbound { context, .. } => context,
         }
     }
+    pub fn context_mut(&mut self) -> &mut WebEventContext {
+        match self {
+            Self::TextDelta { context, .. } | Self::ChatDone { context, .. }
+            | Self::ChatError { context, .. } | Self::ChatCancelled { context, .. }
+            | Self::ChannelEvent { context, .. } | Self::ChatInterim { context, .. }
+            | Self::ChatSuggestions { context, .. } | Self::UserError { context, .. }
+            | Self::ToolCall { context, .. } | Self::ToolResult { context, .. }
+            | Self::ThinkingDelta { context, .. } | Self::ProactiveMessage { context, .. }
+            | Self::QueueItemRemoved { context, .. } | Self::ChannelOutbound { context, .. } => context,
+        }
+    }
+    pub fn normalize_projected_wire_fields(&mut self) {}
     pub fn event_name(&self) -> &'static str {
         match self {
             Self::TextDelta { .. } => "text_delta",
@@ -194,6 +283,15 @@ impl WebChannelEvent {
             Self::ChatError { .. } => "chat_error",
             Self::ChatCancelled { .. } => "chat_cancelled",
             Self::ChannelEvent { .. } => "channel_event",
+            Self::ChatInterim { .. } => "chat_interim",
+            Self::ChatSuggestions { .. } => "chat_suggestions",
+            Self::UserError { .. } => "user_error",
+            Self::ToolCall { .. } => "tool_call",
+            Self::ToolResult { .. } => "tool_result",
+            Self::ThinkingDelta { .. } => "thinking_delta",
+            Self::ProactiveMessage { .. } => "proactive_message",
+            Self::QueueItemRemoved { .. } => "queue_item_removed",
+            Self::ChannelOutbound { .. } => "channel_outbound",
         }
     }
 }
