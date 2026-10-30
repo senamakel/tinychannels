@@ -3,6 +3,7 @@
 //! implementation crate preserves legacy module paths through re-exports.
 pub mod capabilities;
 pub mod channel;
+pub mod approvals;
 pub mod config;
 pub mod context;
 pub mod controllers;
@@ -16,6 +17,7 @@ pub mod module_delivery;
 pub mod module_email;
 pub mod module_inbound;
 pub mod module_interaction;
+pub mod module_media;
 pub mod module_progressive;
 pub mod module_relay;
 pub mod module_remote;
@@ -28,15 +30,22 @@ pub mod storage;
 pub mod storage_names;
 pub mod traits;
 pub mod version;
+pub mod voice;
+pub mod web;
 pub use capabilities::{ChannelCapabilities, capabilities_for, provider_id};
 pub use channel::{
     ChannelInboundEnvelope, ChannelOutboundIntent, DeliveryDurability, OutboundPayload,
 };
+pub use channel::types::{ChannelRef, ConversationKind, ConversationRef, SenderRef};
+pub use channel::content::{ContentPart, OutboundContentPart, OutboundVoice, VoiceNote, VoiceTranscript, VoiceTranscriptSource, VoiceTranscriptState};
+pub use channel::event::{ChannelEvent, ChannelEventKind, ChannelReaction};
+pub use channel::envelope::{MediaKind, MediaReference};
 pub use config::ChannelsConfig;
 pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
 pub use health::{ChannelHealthReport, ChannelHealthState};
 pub use host::{HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult};
+pub use voice::{HostSpeechSynthesisRequest, HostSpeechSynthesisResult, HostVoiceMediaDirection, HostVoiceReplyMode, HostVoiceReplyPolicy, HostVoiceReplyPolicyRequest, HostVoiceScope, HostVoiceTranscriptionRequest};
 pub use http::HttpProxyPolicy;
 pub use module_controller::{
     ChannelBackendRequest, ChannelBackendResult, ChannelControllerRequest, ChannelControllerResult,
