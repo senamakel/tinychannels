@@ -19,6 +19,12 @@ pub struct ChannelMessage {
     /// Platform thread identifier (e.g. Slack `ts`, Discord thread ID).
     /// When set, replies should be posted as threaded responses.
     pub thread_ts: Option<String>,
+    /// Provider topic identifier when distinct from the conversation/thread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topic_id: Option<String>,
+    /// Message identifier this message replies to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to_id: Option<String>,
     /// The sender's display name as the platform gives it (WhatsApp push
     /// name, Telegram first and last name, Signal profile name, ...). Never
     /// a saved contact name: no channel exposes one. `None` when the

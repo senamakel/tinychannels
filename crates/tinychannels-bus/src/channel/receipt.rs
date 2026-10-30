@@ -64,6 +64,10 @@ impl Default for MessageReceiptPart {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MessageReceipt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel: Option<super::types::ChannelRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<super::types::ConversationRef>,
     pub primary_platform_message_id: Option<String>,
     pub platform_message_ids: Vec<String>,
     pub parts: Vec<MessageReceiptPart>,

@@ -50,6 +50,12 @@ pub struct ChannelOutboundIntent {
     pub idempotency_key: String,
     pub channel_id: String,
     pub conversation_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_ref: Option<super::types::ChannelRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation_ref: Option<super::types::ConversationRef>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
     pub reply_to_id: Option<String>,
     pub thread_id: Option<String>,
     pub durability: DeliveryDurability,
@@ -62,6 +68,9 @@ impl Default for ChannelOutboundIntent {
             idempotency_key: String::new(),
             channel_id: String::new(),
             conversation_id: String::new(),
+            channel_ref: None,
+            conversation_ref: None,
+            turn_id: None,
             reply_to_id: None,
             thread_id: None,
             durability: DeliveryDurability::BestEffort,

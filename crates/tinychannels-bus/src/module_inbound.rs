@@ -25,6 +25,17 @@ pub struct PrepareChannelInboundRequest {
     pub source: ChannelInboundSource,
     pub namespace: String,
     pub session_policy: SessionKeyPolicy,
+    #[serde(default)]
+    pub preparation_mode: ChannelInboundPreparationMode,
+}
+
+/// Selects the stable typed projection or the one-release legacy message projection.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelInboundPreparationMode {
+    #[default]
+    Typed,
+    Legacy,
 }
 
 /// Facts used by the host without repeating channel projection or key algorithms.

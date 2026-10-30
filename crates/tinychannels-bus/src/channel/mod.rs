@@ -2,6 +2,8 @@
 
 pub mod adapter;
 pub mod capabilities;
+pub mod content;
+pub mod event;
 pub mod envelope;
 pub mod error;
 pub mod intent;
@@ -11,6 +13,8 @@ pub mod types;
 
 pub use crate::traits::{ChannelMessage, SendMessage};
 pub use adapter::ChannelReceiveAckPolicy;
+pub use content::{ContentPart, OutboundContentPart, OutboundVoice, VoiceNote, VoiceTranscript, VoiceTranscriptSource, VoiceTranscriptState};
+pub use event::{ChannelEvent, ChannelEventKind, ChannelReaction};
 pub use capabilities::{
     CHANNEL_MESSAGE_ACTION_NAMES, ChannelPresentationCapabilities, ChannelStaticCapabilities,
     DurableFinalDeliveryCapability, DurableFinalDeliveryRequirementMap, LengthUnit,
