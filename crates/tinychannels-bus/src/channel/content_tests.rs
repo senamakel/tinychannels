@@ -26,7 +26,7 @@ fn content_parts_round_trip_typed_voice_and_media() {
         part
     );
     assert_eq!(json["kind"], "voice_note");
-    assert_eq!(json["voiceNote"]["media"]["fileName"], "note.ogg");
+    assert_eq!(json["voice_note"]["media"]["fileName"], "note.ogg");
 }
 
 #[test]

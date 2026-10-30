@@ -48,7 +48,7 @@ fn read_receipt_identity_and_custom_emoji_survive_round_trip() {
         timestamp_unix_ms: Some(43),
     };
     let encoded = serde_json::to_value(&event).unwrap();
-    assert_eq!(encoded["event"]["actorId"], "reader-1");
+    assert_eq!(encoded["event"]["actor_id"], "reader-1");
     assert_eq!(
         serde_json::from_value::<ChannelEvent>(encoded).unwrap(),
         event
