@@ -70,16 +70,15 @@ async fn default_trait_methods_return_success() {
 async fn default_draft_methods_return_success() {
     let channel = DummyChannel;
     assert!(!channel.supports_draft_updates());
-    assert!(channel
-        .send_draft(&SendMessage::new("d", "bob"))
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        channel
+            .send_draft(&SendMessage::new("d", "bob"))
+            .await
+            .unwrap()
+            .is_none()
+    );
     assert!(channel.update_draft("bob", "m", "t").await.is_ok());
-    assert!(channel
-        .finalize_draft("bob", "m", "t", None)
-        .await
-        .is_ok());
+    assert!(channel.finalize_draft("bob", "m", "t", None).await.is_ok());
 }
 
 #[tokio::test]
@@ -104,10 +103,12 @@ async fn send_with_outbound_intent_routes_through_send_idempotent() {
 #[tokio::test]
 async fn send_idempotent_defaults_to_send() {
     let dummy: Box<dyn Channel> = Box::new(DummyChannel);
-    assert!(dummy
-        .send_idempotent(&SendMessage::new("x", "b"))
-        .await
-        .is_ok());
+    assert!(
+        dummy
+            .send_idempotent(&SendMessage::new("x", "b"))
+            .await
+            .is_ok()
+    );
 }
 
 #[test]

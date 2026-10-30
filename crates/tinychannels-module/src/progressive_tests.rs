@@ -710,20 +710,22 @@ async fn typed_output_scope_override_must_match_the_opened_turn() {
     else {
         panic!("typed output should open");
     };
-    assert!(replies
-        .execute(ProgressiveCommand::FeedOutput {
-            handle: handle.clone(),
-            turn_id: Some("different-turn".into()),
-            channel_ref: None,
-            conversation: None,
-            sequence: None,
-            events: vec![ChannelOutputEvent::TextDelta {
-                text: "spoofed".into(),
-                iteration: None,
-            }],
-        })
-        .await
-        .is_err());
+    assert!(
+        replies
+            .execute(ProgressiveCommand::FeedOutput {
+                handle: handle.clone(),
+                turn_id: Some("different-turn".into()),
+                channel_ref: None,
+                conversation: None,
+                sequence: None,
+                events: vec![ChannelOutputEvent::TextDelta {
+                    text: "spoofed".into(),
+                    iteration: None,
+                }],
+            })
+            .await
+            .is_err()
+    );
     assert!(callback.requests.lock().await.is_empty());
     replies
         .execute(ProgressiveCommand::Close { handle })

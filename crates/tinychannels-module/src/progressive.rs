@@ -301,7 +301,9 @@ impl Replies {
             }
         }
         if lifetime_ms == 0 || Duration::from_millis(lifetime_ms) > MAX_TYPED_OUTPUT_LIFETIME {
-            return Err(Error::failed("progressive output lifetime is outside its limit"));
+            return Err(Error::failed(
+                "progressive output lifetime is outside its limit",
+            ));
         }
 
         let mut state = self.state.lock().await;
@@ -365,7 +367,9 @@ impl Replies {
         let request_bytes = serde_json::to_vec(&events)
             .map_err(|_| Error::failed("invalid progressive output events"))?;
         if request_bytes.len() > MAX_REQUEST {
-            return Err(Error::failed("progressive output events exceed their limit"));
+            return Err(Error::failed(
+                "progressive output events exceed their limit",
+            ));
         }
 
         let mut typed_state = entry.state.lock().await;

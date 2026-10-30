@@ -10,23 +10,62 @@ pub use tinychannels_bus::traits::{ChannelMessage, SendMessage};
 #[async_trait]
 pub trait Channel: Send + Sync {
     fn name(&self) -> &str;
-    fn proactive_target(&self) -> Option<String> { None }
+    fn proactive_target(&self) -> Option<String> {
+        None
+    }
     async fn send(&self, message: &SendMessage) -> anyhow::Result<()>;
     async fn listen(&self, tx: tokio::sync::mpsc::Sender<ChannelMessage>) -> anyhow::Result<()>;
-    async fn health_check(&self) -> bool { true }
-    async fn start_typing(&self, _recipient: &str) -> anyhow::Result<()> { Ok(()) }
-    async fn stop_typing(&self, _recipient: &str) -> anyhow::Result<()> { Ok(()) }
-    async fn begin_typing_refresh(&self, _recipient: &str, _interval_secs: u64) -> anyhow::Result<Option<String>> { Ok(None) }
-    async fn end_typing_refresh(&self, _handle: &str) -> anyhow::Result<()> { Ok(()) }
+    async fn health_check(&self) -> bool {
+        true
+    }
+    async fn start_typing(&self, _recipient: &str) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn stop_typing(&self, _recipient: &str) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn begin_typing_refresh(
+        &self,
+        _recipient: &str,
+        _interval_secs: u64,
+    ) -> anyhow::Result<Option<String>> {
+        Ok(None)
+    }
+    async fn end_typing_refresh(&self, _handle: &str) -> anyhow::Result<()> {
+        Ok(())
+    }
     fn capabilities(&self) -> tinychannels_bus::ChannelCapabilities {
         tinychannels_bus::capabilities::capabilities_for(self.name())
     }
-    fn supports_reactions(&self) -> bool { false }
-    fn supports_draft_updates(&self) -> bool { false }
-    async fn send_draft(&self, _message: &SendMessage) -> anyhow::Result<Option<String>> { Ok(None) }
-    async fn update_draft(&self, _recipient: &str, _message_id: &str, _text: &str) -> anyhow::Result<()> { Ok(()) }
-    async fn finalize_draft(&self, _recipient: &str, _message_id: &str, _text: &str, _thread_ts: Option<&str>) -> anyhow::Result<()> { Ok(()) }
-    async fn send_idempotent(&self, message: &SendMessage) -> anyhow::Result<()> { self.send(message).await }
+    fn supports_reactions(&self) -> bool {
+        false
+    }
+    fn supports_draft_updates(&self) -> bool {
+        false
+    }
+    async fn send_draft(&self, _message: &SendMessage) -> anyhow::Result<Option<String>> {
+        Ok(None)
+    }
+    async fn update_draft(
+        &self,
+        _recipient: &str,
+        _message_id: &str,
+        _text: &str,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn finalize_draft(
+        &self,
+        _recipient: &str,
+        _message_id: &str,
+        _text: &str,
+        _thread_ts: Option<&str>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn send_idempotent(&self, message: &SendMessage) -> anyhow::Result<()> {
+        self.send(message).await
+    }
 }
 
 #[async_trait]
