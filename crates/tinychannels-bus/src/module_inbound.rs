@@ -36,6 +36,9 @@ pub enum ChannelInboundPreparationMode {
     #[default]
     Typed,
     Legacy,
+    /// Compatibility spelling used by the host adapter for legacy text-only
+    /// channels. It has the same projection semantics as `Legacy`.
+    LegacyText,
 }
 
 /// Facts used by the host without repeating channel projection or key algorithms.

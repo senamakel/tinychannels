@@ -64,6 +64,45 @@ pub struct ChannelInteractionInfo {
     pub supports_draft_updates: bool,
 }
 
+/// Extended configured-provider facts consumed by newer host adapters.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ChannelInteractionInfoV2 {
+    pub capabilities: ChannelInteractionCapabilitiesV2,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ChannelInteractionCapabilitiesV2 {
+    pub account: ChannelAccountCapabilities,
+    pub reactions: bool,
+    pub progressive_edits: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ChannelAccountCapabilities {
+    pub proactive_target: Option<String>,
+}
+
+/// Pre-v2 capability projection retained for older host interfaces.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, JsonSchema)]
+pub struct LegacyChannelCapabilities {
+    pub remote_control: bool,
+    pub chat_approvals: bool,
+    pub progressive_edits: bool,
+    pub history_key_ignores_thread: bool,
+}
+
+impl From<&ChannelInteractionCapabilitiesV2> for LegacyChannelCapabilities {
+    fn from(value: &ChannelInteractionCapabilitiesV2) -> Self {
+        Self {
+            progressive_edits: value.progressive_edits,
+            ..Self::default()
+        }
+    }
+}
+
 /// Result of a provider interaction.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "result", content = "value", rename_all = "snake_case")]
