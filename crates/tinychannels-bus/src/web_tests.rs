@@ -93,3 +93,17 @@ fn timing_snapshot_tracks_first_tool_and_round_one_narration() {
     assert_eq!(payload.tokens_per_second, Some(40.0));
     assert_eq!(payload.first_tool_ms, Some(32));
 }
+
+#[test]
+fn projected_tool_call_omits_empty_name_and_null_arguments() {
+    let mut event = WebChannelEvent::ToolCall {
+        context: WebEventContext::default(),
+        tool_name: Some(String::new()),
+        tool_call_id: Some("call-1".into()),
+        args: Some(Value::Null),
+    };
+    event.normalize_projected_wire_fields();
+    let wire = serde_json::to_value(event).unwrap();
+    assert!(wire.get("tool_name").is_none());
+    assert!(wire.get("args").is_none());
+}

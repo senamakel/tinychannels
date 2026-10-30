@@ -265,7 +265,9 @@ pub enum WebChannelEvent {
         error_retry_after_ms: Option<u64>,
         error_provider: Option<String>,
         error_fallback_available: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         copy_key: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         copy_params: Option<Value>,
         guardrail: Option<GuardrailPayload>,
     },
@@ -492,7 +494,19 @@ impl WebChannelEvent {
             | Self::VoiceSpeak { context, .. } => context,
         }
     }
-    pub fn normalize_projected_wire_fields(&mut self) {}
+    pub fn normalize_projected_wire_fields(&mut self) {
+        if let Self::ToolCall {
+            tool_name, args, ..
+        } = self
+        {
+            if tool_name.as_deref().is_some_and(str::is_empty) {
+                *tool_name = None;
+            }
+            if args.as_ref().is_some_and(Value::is_null) {
+                *args = None;
+            }
+        }
+    }
     pub fn event_name(&self) -> &'static str {
         match self {
             Self::TextDelta { .. } => "text_delta",
