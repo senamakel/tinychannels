@@ -44,6 +44,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "arbitrary"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bc62ac97cc33321f50863d514c3bc38a453947a8f9e781137e47c7401020aed"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "assert-json-diff"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -642,6 +651,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 
 [[package]]
+name = "derive_arbitrary"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b034bd7d5f032402a2479444dcc6f74e36a03f31854d41680fb240ef682a1ac"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,7 +756,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1850,7 +1870,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2115,7 +2135,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2518,10 +2538,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2566,7 +2586,26 @@ dependencies = [
 
 [[package]]
 name = "tinybus"
+version = "0.1.2"
+dependencies = [
+ "async-trait",
+ "flate2",
+ "serde",
+ "serde_json",
+ "tar",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "toml",
+ "tracing",
+ "ureq",
+ "zip",
+]
+
+[[package]]
+name = "tinybus"
 version = "0.3.12"
+source = "git+https://github.com/senamakel/tinybus?tag=v0.3.12#34d3bd6dda099e54cee11a2f96f28a21da9e0759"
 dependencies = [
  "async-trait",
  "flate2",
@@ -2590,6 +2629,7 @@ dependencies = [
 [[package]]
 name = "tinybus-macros"
 version = "0.3.12"
+source = "git+https://github.com/senamakel/tinybus?tag=v0.3.12#34d3bd6dda099e54cee11a2f96f28a21da9e0759"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2599,11 +2639,12 @@ dependencies = [
 [[package]]
 name = "tinybus-module"
 version = "0.3.12"
+source = "git+https://github.com/senamakel/tinybus?tag=v0.3.12#34d3bd6dda099e54cee11a2f96f28a21da9e0759"
 dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.3.12",
  "tokio",
  "tracing",
 ]
@@ -2687,7 +2728,7 @@ dependencies = [
  "async-trait",
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.3.12",
  "tinychannels-bus",
  "tokio",
 ]
@@ -2706,7 +2747,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "tempfile",
- "tinybus",
+ "tinybus 0.3.12",
  "tinybus-module",
  "tinychannels",
  "tinychannels-bus",
@@ -2777,7 +2818,7 @@ source = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#c447da
 dependencies = [
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.2",
  "tinystoragedrivers-types",
 ]
 
@@ -2791,7 +2832,7 @@ dependencies = [
  "futures-core",
  "serde",
  "serde_json",
- "tinybus",
+ "tinybus 0.1.2",
  "tinystoragedrivers-api",
  "tinystoragedrivers-bus",
  "tinystoragedrivers-types",
@@ -3980,6 +4021,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "zip"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dcb24d0152526ae49b9b96c1dcf71850ca1e0b882e4e28ed898a93c41334744"
+dependencies = [
+ "arbitrary",
+ "crc32fast",
+ "crossbeam-utils",
+ "flate2",
+ "indexmap",
+ "memchr",
+ "zopfli",
+]
+
+[[package]]
 name = "zlib-rs"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3990,6 +4046,18 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zopfli"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf7fc5d30c28483d93805c4a5e12b05bbb52407fa67c5f8bd552374cd01fb11"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "log",
+ "simd-adler32",
+]
 
 [[package]]
 name = "zstd"
@@ -4018,3 +4086,15 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "tinybus-module"
+version = "0.1.2"
+
+[[patch.unused]]
+name = "tinybus-module"
+version = "0.1.2"
+
+[[patch.unused]]
+name = "tinybus-module"
+version = "0.1.2"
