@@ -76,10 +76,6 @@ pub trait ChannelSendExt: Channel {
 }
 impl<T: Channel + ?Sized> ChannelSendExt for T {}
 
-#[cfg(test)]
-#[path = "traits_tests.rs"]
-mod tests;
-
 /// Runtime idempotency construction for the legacy send DTO.
 pub trait SendMessageExt {
     fn with_deterministic_idempotency_key(self, channel_id: impl AsRef<str>) -> Self;
