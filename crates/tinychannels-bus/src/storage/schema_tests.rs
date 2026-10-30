@@ -12,3 +12,13 @@ fn collections_is_a_unique_complete_owner_inventory() {
     assert!(specs.iter().all(|spec| spec.indexes.is_empty()));
     assert_eq!(media_metadata_spec().name, MEDIA_METADATA);
 }
+
+#[test]
+fn storage_collection_contract_is_a_serde_only_data_shape() {
+    let spec = CollectionSpec::new("channels.media_metadata");
+    let value = serde_json::to_value(&spec).unwrap();
+    assert_eq!(value["name"], "channels.media_metadata");
+    assert_eq!(value["indexes"], serde_json::json!([]));
+    assert!(value["ttl_field"].is_null());
+    assert!(value["search"].is_null());
+}

@@ -24,18 +24,11 @@ schemars = { version = "1", features = ["derive"] }
 thiserror = "2"
 # Serialization only: preserves PassthroughForward.body's existing Base64 wire encoding.
 base64 = "0.23"
-async-trait = "0.1"
-anyhow = "1"
-tokio = { version = "1", default-features = false, features = ["sync"] }
-# Optional (feature `storage`, off by default): pure storage collection specs.
-tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3", optional = true }
 
 [features]
 default = []
-# TSD2 collection specs exposed to host composition roots. The default
-# dependency closure of this crate is unchanged without it.
-storage = ["dep:tinystoragedrivers-types"]
+# Retained for callers that previously enabled schema declarations by feature.
+storage = []
 
 [dev-dependencies]
 toml = "1"
-tokio = { version = "1", default-features = false, features = ["sync", "macros", "rt"] }
