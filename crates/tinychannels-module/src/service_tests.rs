@@ -152,6 +152,7 @@ async fn typed_intent_preserves_durable_key_and_thread_in_legacy_send() {
         Running::start(channel, hooks, host.clone()),
     );
     let channels = Channels {
+        web_turns: Mutex::new(crate::web_output::WebTurnRegistry::default()),
         progressive: Arc::new(crate::progressive::Replies::new(host.clone())),
         host: host.clone(),
         email: crate::email::EmailSender::new(),
@@ -209,6 +210,7 @@ async fn required_durability_is_refused_before_provider_send_without_host_queue(
         Running::start(channel, hooks, host.clone()),
     );
     let channels = Channels {
+        web_turns: Mutex::new(crate::web_output::WebTurnRegistry::default()),
         progressive: Arc::new(crate::progressive::Replies::new(host.clone())),
         host: host.clone(),
         email: crate::email::EmailSender::new(),
@@ -354,6 +356,7 @@ async fn channels_with_store(
     )]);
     let relays = Arc::new(Relays::new(host.clone()));
     let channels = Channels {
+        web_turns: Mutex::new(crate::web_output::WebTurnRegistry::default()),
         progressive: Arc::new(crate::progressive::Replies::new(host.clone())),
         host,
         email: crate::email::EmailSender::new(),
@@ -2297,11 +2300,52 @@ async fn declared_web_projection_methods_require_confidential_delivery() {
     use tinybus::Interface;
     let bus = tinybus::transport::memory::MemoryBus::new();
     tinybus::broker::Broker::new().spawn(bus.clone());
-    let connection = Connection::connect(bus.connect().await.unwrap()).await.unwrap();
+    let connection = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
     let service = Channels::new(HostChannels::new(connection), None);
-    for name in [tinychannels_bus::methods::BEGIN_WEB_TURN, tinychannels_bus::methods::PROJECT_WEB_OUTPUT, tinychannels_bus::methods::END_WEB_TURN] {
+    for name in [
+        tinychannels_bus::methods::BEGIN_WEB_TURN,
+        tinychannels_bus::methods::PROJECT_WEB_OUTPUT,
+        tinychannels_bus::methods::END_WEB_TURN,
+    ] {
         let member: tinybus::MemberName = name.try_into().unwrap();
-        assert!(service.members().contains(&member), "declared method {name} must be dispatched");
-        assert!(service.requires_confidential(&member), "web output is confidential");
+        assert!(
+            service.members().contains(&member),
+            "declared method {name} must be dispatched"
+        );
+        assert!(
+            service.requires_confidential(&member),
+            "web output is confidential"
+        );
     }
+}
+
+#[tokio::test]
+async fn web_turn_admission_rechecks_shutdown_after_waiting_for_registry() {
+    let bus = tinybus::transport::memory::MemoryBus::new();
+    tinybus::broker::Broker::new().spawn(bus.clone());
+    let connection = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    let channels = Channels::new(HostChannels::new(connection), None);
+    let held = channels.web_turns.lock().await;
+    let mut begin = Box::pin(channels.begin_web_turn(
+        tinychannels_bus::module_web_output::BeginWebTurn {
+            scope_key: "web:shutdown".into(),
+            context: tinychannels_bus::web::WebEventContext {
+                client_id: "client".into(),
+                thread_id: "thread".into(),
+                request_id: "request".into(),
+                ..Default::default()
+            },
+        },
+    ));
+    assert!(futures_util::poll!(&mut begin).is_pending());
+    channels.terminal.store(true, Ordering::SeqCst);
+    drop(held);
+    assert!(
+        begin.await.is_err(),
+        "shutdown closes queued web turn admission"
+    );
 }

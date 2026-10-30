@@ -97,6 +97,10 @@ fn timing_snapshot_tracks_first_tool_and_round_one_narration() {
 #[test]
 fn projected_tool_call_omits_empty_name_and_null_arguments() {
     let mut event = WebChannelEvent::ToolCall {
+        round: None,
+        skill_id: None,
+        tool_display_label: None,
+        tool_display_detail: None,
         context: WebEventContext::default(),
         tool_name: Some(String::new()),
         tool_call_id: Some("call-1".into()),

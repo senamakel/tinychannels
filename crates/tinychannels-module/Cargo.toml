@@ -24,6 +24,7 @@ crate-type = ["rlib", "cdylib"]
 tinychannels = { path = "../..", features = ["email", "lark", "relay-websocket"] }
 # The transport-free vocabulary shared with the host.
 tinychannels-bus = { path = "../tinychannels-bus" }
+tinychannels-runtime = { path = "../tinychannels-runtime" }
 # TinyBus provides the typed service interface and dynamic module host ABI.
 tinybus = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", tag = "v0.3.12", default-features = false, features = ["macros", "modules"] }
 # The module-side SDK owns its runtime and exports the stable C entrypoints.

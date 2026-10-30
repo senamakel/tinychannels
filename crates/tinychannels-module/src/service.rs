@@ -92,6 +92,7 @@ fn is_webhook_backed(name: &str, config: &ChannelsConfig) -> bool {
 pub(crate) struct Channels {
     pub(crate) host: HostChannels,
     email: EmailSender,
+    web_turns: Mutex<crate::web_output::WebTurnRegistry>,
     progressive: Arc<crate::progressive::Replies>,
     /// Shared with each listener task so it can retire its own entry.
     pub(crate) running: Arc<Mutex<HashMap<String, Arc<Running>>>>,
@@ -114,6 +115,7 @@ impl Channels {
             relays: Arc::new(Relays::new(host.clone())),
             host,
             email: EmailSender::new(),
+            web_turns: Mutex::new(crate::web_output::WebTurnRegistry::default()),
             running: Arc::new(Mutex::new(HashMap::new())),
             terminal: AtomicBool::new(false),
             runtimes,
@@ -273,6 +275,38 @@ impl DeliveryQueueHandler for ModuleDeliveryHandler {
 )]
 #[tinybus::interface(name = "ai.tinyhumans.tinychannels.Channels")]
 impl Channels {
+    #[tinybus(confidential)]
+    async fn begin_web_turn(
+        &self,
+        request: tinychannels_bus::module_web_output::BeginWebTurn,
+    ) -> BusResult<tinychannels_bus::module_web_output::WebTurnHandle> {
+        let mut web_turns = self.web_turns.lock().await;
+        if self.terminal.load(Ordering::Acquire) {
+            return Err(BusError::failed("channel module is shutting down"));
+        }
+        web_turns.begin(request)
+    }
+
+    #[tinybus(confidential)]
+    async fn project_web_output(
+        &self,
+        request: tinychannels_bus::module_web_output::ProjectWebOutput,
+    ) -> BusResult<tinychannels_bus::module_web_output::WebOutputEvents> {
+        let mut web_turns = self.web_turns.lock().await;
+        if self.terminal.load(Ordering::Acquire) {
+            return Err(BusError::failed("channel module is shutting down"));
+        }
+        web_turns.project(request)
+    }
+
+    #[tinybus(confidential)]
+    async fn end_web_turn(
+        &self,
+        request: tinychannels_bus::module_web_output::EndWebTurn,
+    ) -> BusResult<()> {
+        self.web_turns.lock().await.end(request)
+    }
+
     /// Reserve an inert identity-scoped runtime and immutable callback paths.
     #[tinybus(confidential)]
     async fn reserve_runtime(&self) -> BusResult<tinychannels_bus::ChannelRuntimeReservation> {
@@ -1038,6 +1072,7 @@ impl Channels {
     /// Freeze operations and join all native providers, relay and callbacks.
     pub(crate) async fn shutdown(&self) -> BusResult<()> {
         self.terminal.store(true, Ordering::SeqCst);
+        self.web_turns.lock().await.clear();
         self.relays.freeze();
         // Fence and stop identity-scoped children before draining the legacy
         // service resources, but do not let one failed child skip cleanup of
@@ -1335,6 +1370,7 @@ pub(crate) mod exports {
             "StartChannelSupervised",
             "ReserveRuntime", "StartRuntime", "StopRuntime",
             "DescribeConfiguredChannels", "StartOutboundChannel", "PrepareOutboundIntent",
+            "BeginWebTurn", "ProjectWebOutput", "EndWebTurn",
             "PrepareChannelInbound", "PrepareChannelIdentity", "ExecuteProgressive", "ExecuteRemote", "PrepareChannelControl", "StartRuntimeWithDispatch", "PrepareRuntimeCommand",
         ],
         signals = [],

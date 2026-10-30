@@ -2706,6 +2706,7 @@ dependencies = [
  "tinybus-module",
  "tinychannels",
  "tinychannels-bus",
+ "tinychannels-runtime",
  "tinystoragedrivers-api",
  "tinystoragedrivers-busproxy",
  "tinystoragedrivers-testkit",
