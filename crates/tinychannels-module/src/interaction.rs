@@ -45,6 +45,16 @@ pub(crate) async fn dispatch(
                 .finalize_draft(&recipient, &message_id, &text, thread_ts.as_deref())
                 .await
         }
+        Op::EditMessage { .. } => {
+            return Err(tinybus::Error::failed(
+                "provider message editing is not supported by this channel",
+            ));
+        }
+        Op::DeleteMessage { .. } => {
+            return Err(tinybus::Error::failed(
+                "provider message deletion is not supported by this channel",
+            ));
+        }
     };
     result
         .map(|()| ChannelInteractionResult::Completed)

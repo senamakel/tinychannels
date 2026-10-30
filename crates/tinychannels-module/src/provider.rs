@@ -209,6 +209,7 @@ impl tinychannels::host::Transcriber for ModuleTranscriber {
                 mime_type: request.mime_type,
                 file_name: request.file_name,
                 language: request.language,
+                scope: None,
             })
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;

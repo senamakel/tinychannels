@@ -202,6 +202,11 @@ impl Replies {
                 }
                 Ok(ProgressiveResult::Closed)
             }
+            ProgressiveCommand::OpenOutput { .. }
+            | ProgressiveCommand::OpenHostedOutput { .. }
+            | ProgressiveCommand::FeedOutput { .. } => Err(Error::failed(
+                "typed progressive output is not supported by this runtime",
+            )),
         }
     }
 
