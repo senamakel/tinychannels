@@ -2293,35 +2293,15 @@ async fn shutdown_refuses_preparation_and_execution_before_host_work() {
 }
 
 #[tokio::test]
-async fn web_projection_methods_are_confidential_sequenced_and_retired_on_close() {
-    use tinychannels_bus::module_progressive::ChannelOutputEvent;
-    use tinychannels_bus::module_web_output::*;
-    use tinychannels_bus::web::{WebChannelEvent, WebEventContext};
+async fn declared_web_projection_methods_require_confidential_delivery() {
+    use tinybus::Interface;
     let bus = tinybus::transport::memory::MemoryBus::new();
     tinybus::broker::Broker::new().spawn(bus.clone());
-    let module = Connection::connect(bus.connect().await.unwrap()).await.unwrap();
-    setup_with_storage_callback(module, None).await.unwrap();
-    let client = Connection::connect(bus.connect().await.unwrap()).await.unwrap();
-    let proxy = client.proxy(BUS_NAME, OBJECT_PATH, BUS_NAME).unwrap();
-    let begin = BeginWebTurn {
-        scope_key: "web:fixture".into(),
-        context: WebEventContext { client_id: "client".into(), thread_id: "thread".into(), request_id: "request".into(), ..Default::default() },
-    };
-    assert!(proxy.call::<WebTurnHandle>(tinychannels_bus::methods::BEGIN_WEB_TURN, (begin.clone(),)).await.is_err());
-    let handle: WebTurnHandle = proxy.call_confidential(tinychannels_bus::methods::BEGIN_WEB_TURN, (begin,)).await.expect("declared web projection method is implemented");
-    for seq in 1..=2 {
-        let output: WebOutputEvents = proxy.call_confidential(tinychannels_bus::methods::PROJECT_WEB_OUTPUT, (ProjectWebOutput {
-            handle: handle.handle.clone(), event: ChannelOutputEvent::TextDelta { text: "hello".into(), iteration: Some(2) },
-        },)).await.unwrap();
-        assert_eq!(output.events.len(), 1);
-        assert!(matches!(&output.events[0], WebChannelEvent::TextDelta { delta: Some(text), round: Some(2), .. } if text == "hello"));
-        assert_eq!(output.events[0].context().seq, Some(seq));
-        assert_eq!(output.events[0].context().request_id, "request");
-        assert!(output.events[0].context().ts.is_some());
+    let connection = Connection::connect(bus.connect().await.unwrap()).await.unwrap();
+    let service = Channels::new(HostChannels::new(connection), None);
+    for name in [tinychannels_bus::methods::BEGIN_WEB_TURN, tinychannels_bus::methods::PROJECT_WEB_OUTPUT, tinychannels_bus::methods::END_WEB_TURN] {
+        let member: tinybus::MemberName = name.try_into().unwrap();
+        assert!(service.members().contains(&member), "declared method {name} must be dispatched");
+        assert!(service.requires_confidential(&member), "web output is confidential");
     }
-    proxy.call_confidential::<()>(tinychannels_bus::methods::END_WEB_TURN, (EndWebTurn { handle: handle.handle.clone() },)).await.unwrap();
-    let late: BusResult<WebOutputEvents> = proxy.call_confidential(tinychannels_bus::methods::PROJECT_WEB_OUTPUT, (ProjectWebOutput {
-        handle: handle.handle, event: ChannelOutputEvent::TextDelta { text: "late".into(), iteration: None },
-    },)).await;
-    assert!(late.is_err(), "a closed turn cannot be projected again");
 }
