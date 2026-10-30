@@ -5,7 +5,9 @@ names, relay frames and structured errors. It also declares the async provider
 trait and host-facing call shapes without implementing a provider or executing
 host callbacks. `context` contains shared DTOs and pure per-sender history
 helpers over an in-memory `Arc<Mutex<...>>`. The optional `storage` feature
-exposes TSD2 collection specs through `storage::collections()`.
+exposes serde-only collection declarations through `storage::collections()`.
+The storage implementation adapts these DTOs to TinyStorageDrivers types at
+the point where it provisions collections.
 
 The default normal/build closure contains Serde/JSON/schema/error derivation,
 Base64 for the existing
