@@ -68,3 +68,22 @@ fn compatibility_web_contract_round_trips_request_metadata_and_error_details() {
     assert_eq!(json["guardrail"]["reasons"][0]["code"], "prompt_injection");
     assert_eq!(serde_json::from_value::<WebChannelEvent>(json).unwrap(), event);
 }
+
+#[test]
+fn timing_snapshot_tracks_first_tool_and_round_one_narration() {
+    let mut state = TurnTimingState::default();
+    state.text_delta(12, "hello", 1);
+    state.text_delta(20, " again", 2);
+    state.tool_call(32);
+    state.tool_call(44);
+    let snapshot = state.snapshot(1_000);
+    assert_eq!(snapshot.first_token_ms, Some(12));
+    assert_eq!(snapshot.first_tool_ms, Some(32));
+    assert_eq!(snapshot.round_one_narration_chars, 5);
+    assert_eq!(snapshot.tool_calls, 2);
+
+    let payload = snapshot.into_payload(Some(40));
+    assert_eq!(payload.elapsed_ms, 1_000);
+    assert_eq!(payload.tokens_per_second, Some(40.0));
+    assert_eq!(payload.first_tool_ms, Some(32));
+}

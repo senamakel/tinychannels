@@ -154,6 +154,9 @@ pub struct TurnTimingPayload {
     pub elapsed_ms: u64,
     pub output_tokens: Option<u64>,
     pub tokens_per_second: Option<f64>,
+    pub first_token_ms: Option<u64>,
+    pub first_tool_ms: Option<u64>,
+    pub round_one_narration_chars: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -161,23 +164,49 @@ pub struct TurnTimingPayload {
 pub struct TurnTimingSnapshot {
     pub total_ms: Option<u64>,
     pub first_token_ms: Option<u64>,
+    pub first_tool_ms: Option<u64>,
+    pub round_one_narration_chars: usize,
     pub tool_calls: u32,
+}
+
+impl TurnTimingSnapshot {
+    /// Convert the captured turn timings to the stable terminal-event payload.
+    pub fn into_payload(self, output_tokens: Option<u64>) -> TurnTimingPayload {
+        let elapsed_ms = self.total_ms.unwrap_or_default();
+        let tokens_per_second = output_tokens.and_then(|tokens| {
+            (elapsed_ms > 0).then(|| tokens as f64 * 1_000.0 / elapsed_ms as f64)
+        });
+        TurnTimingPayload {
+            elapsed_ms,
+            output_tokens,
+            tokens_per_second,
+            first_token_ms: self.first_token_ms,
+            first_tool_ms: self.first_tool_ms,
+            round_one_narration_chars: self.round_one_narration_chars,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct TurnTimingState {
     pub first_token_ms: Option<u64>,
+    pub first_tool_ms: Option<u64>,
+    pub round_one_narration_chars: usize,
     pub tool_calls: u32,
 }
 
 impl TurnTimingState {
-    pub fn text_delta(&mut self, elapsed_ms: u64, _text: &str, _iteration: u32) -> bool {
+    pub fn text_delta(&mut self, elapsed_ms: u64, text: &str, iteration: u32) -> bool {
         if self.first_token_ms.is_none() {
             self.first_token_ms = Some(elapsed_ms);
         }
+        if iteration == 1 {
+            self.round_one_narration_chars = self.round_one_narration_chars.saturating_add(text.chars().count());
+        }
         true
     }
-    pub fn tool_call(&mut self, _elapsed_ms: u64) -> bool {
+    pub fn tool_call(&mut self, elapsed_ms: u64) -> bool {
+        self.first_tool_ms.get_or_insert(elapsed_ms);
         self.tool_calls = self.tool_calls.saturating_add(1);
         true
     }
@@ -185,6 +214,8 @@ impl TurnTimingState {
         TurnTimingSnapshot {
             total_ms: Some(elapsed_ms),
             first_token_ms: self.first_token_ms,
+            first_tool_ms: self.first_tool_ms,
+            round_one_narration_chars: self.round_one_narration_chars,
             tool_calls: self.tool_calls,
         }
     }
