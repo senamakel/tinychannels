@@ -3,21 +3,19 @@ use tinychannels_bus::ChannelsConfig;
 use tinychannels_bus::config::WhatsAppConfig;
 
 #[tokio::test]
-async fn storage_initialization_presents_the_channels_bus_identity() {
+async fn storage_callback_is_deferred_until_the_host_runtime_is_ready() {
     let bus = tinybus::transport::memory::MemoryBus::new();
     tinybus::broker::Broker::new().spawn(bus.clone());
     let module = Connection::connect(bus.connect().await.unwrap())
         .await
         .unwrap();
-    // A failing callback stops setup before its service registration. Even on
-    // this failure path, the host must be able to identify the initializing
-    // module by its bus name before handling its storage request.
+    // Host storage is scoped to a runtime that is created after module boot.
+    // A configured callback must therefore be resolved lazily, without any
+    // legacy fallback when an operation later needs storage.
     let absent_storage = ":1.999".try_into().unwrap();
-    assert!(
-        setup_with_storage_callback(module.clone(), Some(absent_storage))
-            .await
-            .is_err()
-    );
+    setup_with_storage_callback(module.clone(), Some(absent_storage))
+        .await
+        .expect("module registration does not require a runtime storage scope");
     assert_eq!(
         module.name_owner(BUS_NAME).await.unwrap(),
         module.unique_name()

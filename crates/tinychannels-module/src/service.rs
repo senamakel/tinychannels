@@ -1222,16 +1222,13 @@ async fn setup_with_storage_callback(
     connection: Connection,
     storage_callback: Option<BusName>,
 ) -> BusResult<()> {
-    // Storage callbacks identify the module by its well-known name. Claim it
-    // before the first callback, including schema preparation during setup.
+    // Storage callbacks identify the module by its well-known name.
     connection.request_name(BUS_NAME).await?;
     let host =
         HostChannels::new_with_storage_callback(connection.clone(), storage_callback.clone());
-    if storage_callback.is_some() {
-        host.storage()
-            .await
-            .map_err(|_| BusError::failed("configured storage callback unavailable"))?;
-    }
+    // Storage belongs to the host's invocation scope, which may not exist at
+    // module boot. HostChannels resolves this exact callback lazily and still
+    // refuses storage operations if it is unavailable, without a fallback.
     let channels = Channels::new(
         host.clone(),
         Some(Arc::new(
