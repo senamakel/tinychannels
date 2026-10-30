@@ -377,7 +377,6 @@ impl Replies {
         }
         let sender = Sender(self.host.clone());
         let mut outcomes = Vec::new();
-        let mut unsupported = Vec::new();
         let mut hosted_accepted = false;
         let mut failure = None;
         for event in events {
@@ -448,10 +447,10 @@ impl Replies {
                 }
             }
         }
-        if hosted_accepted || failure.is_some() || !unsupported.is_empty() {
+        if hosted_accepted || failure.is_some() {
             return Ok(ProgressiveResult::DeliveryBatch {
                 outcomes,
-                unsupported,
+                unsupported: Vec::new(),
                 failure,
                 hosted_accepted,
             });
@@ -537,6 +536,7 @@ impl Replies {
         let entries = {
             let mut state = self.state.lock().await;
             state.terminal = true;
+            state.typed_entries.clear();
             state.entries.values().cloned().collect::<Vec<_>>()
         };
         // Start every terminal task before awaiting any one provider. A blocked
@@ -558,7 +558,9 @@ impl Replies {
             // the next Shutdown awaits them without sending a second reply.
             return Err(error);
         }
-        self.state.lock().await.entries.clear();
+        let mut state = self.state.lock().await;
+        state.entries.clear();
+        state.typed_entries.clear();
         Ok(())
     }
 }
