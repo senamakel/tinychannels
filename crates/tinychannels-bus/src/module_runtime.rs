@@ -2,6 +2,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub const CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 180;
+pub const MIN_CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 1;
+pub const CHANNEL_TYPING_REFRESH_INTERVAL_SECS: u64 = 4;
+pub const DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS: u64 = 1;
+pub const DEFAULT_CHANNEL_MAX_BACKOFF_SECS: u64 = 60;
+pub const MAX_CHANNEL_HISTORY: usize = 100;
+
 /// Inert reservation returned before any provider, callback worker or relay starts.
 ///
 /// The host installs the same immutable identity adapter at `host_object_path`

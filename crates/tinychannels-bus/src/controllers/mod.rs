@@ -2,6 +2,7 @@
 
 pub mod definitions;
 pub mod discord;
+pub mod requests;
 pub mod schemas;
 pub mod types;
 
@@ -23,3 +24,4 @@ pub use types::{
 };
 
 pub use discord::{BotPermissionCheck, DiscordGuild, DiscordTextChannel};
+pub use requests::*;

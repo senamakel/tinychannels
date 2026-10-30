@@ -11,6 +11,13 @@ pub struct ProviderDescriptor {
     pub aliases: Vec<String>,
 }
 
+/// One configured channel instance available to a module command.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ConfiguredControlChannel {
+    pub name: String,
+    pub capabilities: ChannelCapabilities,
+}
+
 /// Bounded facts: execution, parsing and formatting remain in the module.
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "operation", content = "request", rename_all = "snake_case")]

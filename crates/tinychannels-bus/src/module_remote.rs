@@ -2,6 +2,14 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Stable host-owned identity for operations scoped to a remote channel session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct RemoteSessionScope {
+    pub channel: crate::ChannelRef,
+    pub conversation: crate::ConversationRef,
+    pub session_key: String,
+}
+
 /// A remote-control slash command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
