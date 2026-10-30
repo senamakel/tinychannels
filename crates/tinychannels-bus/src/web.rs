@@ -48,6 +48,18 @@ pub enum QueueMode {
     Parallel,
 }
 
+impl std::fmt::Display for QueueMode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Interrupt => "interrupt",
+            Self::Steer => "steer",
+            Self::Followup => "followup",
+            Self::Collect => "collect",
+            Self::Parallel => "parallel",
+        })
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChatRequestMetadata {

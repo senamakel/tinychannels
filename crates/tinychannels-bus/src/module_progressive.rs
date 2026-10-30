@@ -254,6 +254,7 @@ pub enum ProgressiveTransportRequest {
     },
     Typing {
         channel: String,
+        channel_ref: Option<ChannelRef>,
         conversation: Option<ConversationRef>,
     },
     OutputEvent {

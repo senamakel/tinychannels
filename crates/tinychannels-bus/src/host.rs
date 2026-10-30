@@ -20,10 +20,10 @@ pub struct HostEventPublication {
 #[serde(rename_all = "camelCase")]
 pub struct HostStoreVoiceMediaRequest {
     pub scope: crate::HostVoiceScope,
-    pub content_type: String,
-    pub bytes: Vec<u8>,
-    pub codec: Option<String>,
-    pub duration_ms: Option<u64>,
+    pub direction: crate::HostVoiceMediaDirection,
+    pub audio_base64: String,
+    pub mime_type: String,
+    pub file_name: Option<String>,
 }
 
 /// Resulting durable media reference returned to the channel module.
