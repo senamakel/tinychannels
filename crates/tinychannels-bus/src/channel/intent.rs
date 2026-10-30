@@ -21,6 +21,11 @@ pub enum OutboundPayload {
     Text {
         text: String,
     },
+    /// Ordered typed content parts for provider-neutral delivery.
+    Parts {
+        text: Option<String>,
+        parts: Vec<super::content::OutboundContentPart>,
+    },
     Media {
         text: Option<String>,
         media_urls: Vec<String>,

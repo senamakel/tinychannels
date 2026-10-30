@@ -145,6 +145,9 @@ pub enum ChannelOutputEvent {
         text: Option<String>,
         voice: crate::VoiceNote,
     },
+    Clarification {
+        prompt: String,
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
