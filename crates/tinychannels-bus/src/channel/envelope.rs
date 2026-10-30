@@ -76,6 +76,9 @@ pub enum MediaKind {
 pub struct MediaReference {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opaque_id: Option<String>,
+    /// Original provider filename, when the source message exposed one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
     pub path: Option<String>,

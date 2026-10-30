@@ -56,6 +56,8 @@ pub struct SubagentOutput {
     pub prompt_chars: Option<usize>,
     pub message: Option<String>,
     pub display_name: Option<String>,
+    pub display_label: Option<String>,
+    pub display_detail: Option<String>,
     pub tool_name: Option<String>,
     pub success: Option<bool>,
     pub elapsed_ms: Option<u64>,

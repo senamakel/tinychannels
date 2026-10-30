@@ -4,7 +4,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A normalized event emitted by a provider after message delivery.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelEvent {
     pub event_id: String,
@@ -20,6 +20,8 @@ pub struct ChannelEvent {
 pub enum ChannelEventKind {
     ReadReceipt {
         message_id: String,
+        #[serde(default)]
+        actor_id: Option<String>,
         read_at_unix_ms: Option<u64>,
     },
     ReactionAdded {
@@ -43,10 +45,13 @@ pub enum ChannelEventKind {
 
 /// Normalized emoji or provider-native reaction identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelReaction {
     pub value: String,
     pub custom: bool,
+    /// Provider-native identifier for a custom emoji, when available.
+    pub custom_emoji_id: Option<String>,
 }
 
 #[cfg(test)]
