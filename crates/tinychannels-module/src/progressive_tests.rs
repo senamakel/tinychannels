@@ -519,6 +519,7 @@ async fn transport_failures_preserve_recovery_classification() {
                 assert_eq!(error.to_string(), "progressive transport failed");
             }
             ProgressiveTransportResult::Acknowledged
+            | ProgressiveTransportResult::Accepted
             | ProgressiveTransportResult::Outcome(_) => unreachable!(),
             ProgressiveTransportResult::Success(_) => unreachable!(),
         }
