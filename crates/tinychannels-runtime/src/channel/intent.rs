@@ -72,7 +72,9 @@ pub fn outbound_intent_from_send_message(
 pub fn legacy_message_value_from_outbound_intent(intent: &ChannelOutboundIntent) -> Value {
     let payload = match &intent.payload {
         OutboundPayload::Text { text } => serde_json::json!({ "text": text }),
-        OutboundPayload::Parts { text, parts } => serde_json::json!({ "text": text, "parts": parts }),
+        OutboundPayload::Parts { text, parts } => {
+            serde_json::json!({ "text": text, "parts": parts })
+        }
         OutboundPayload::Media { text, media_urls } => {
             serde_json::json!({ "text": text, "mediaUrls": media_urls })
         }

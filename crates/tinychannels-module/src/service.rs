@@ -383,12 +383,14 @@ impl Channels {
                 } else {
                     ChannelIngressKind::Listener
                 },
-                interaction: tinychannels_bus::ChannelInteractionInfoV2::from(tinychannels_bus::ChannelInteractionInfo {
-                    capabilities: channel.capabilities(),
-                    proactive_target: channel.proactive_target(),
-                    supports_reactions: channel.supports_reactions(),
-                    supports_draft_updates: channel.supports_draft_updates(),
-                }),
+                interaction: tinychannels_bus::ChannelInteractionInfoV2::from(
+                    tinychannels_bus::ChannelInteractionInfo {
+                        capabilities: channel.capabilities(),
+                        proactive_target: channel.proactive_target(),
+                        supports_reactions: channel.supports_reactions(),
+                        supports_draft_updates: channel.supports_draft_updates(),
+                    },
+                ),
             })
             .collect())
     }

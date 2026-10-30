@@ -82,7 +82,10 @@ fn configured_interaction_v2_retains_legacy_provider_facts() {
         supports_draft_updates: true,
     };
     let v2 = ChannelInteractionInfoV2::from(info);
-    assert_eq!(v2.capabilities.account.proactive_target.as_deref(), Some("chat-7"));
+    assert_eq!(
+        v2.capabilities.account.proactive_target.as_deref(),
+        Some("chat-7")
+    );
     assert!(v2.capabilities.reactions);
     assert!(v2.capabilities.progressive_edits);
     let legacy = LegacyChannelCapabilities::from(&v2.capabilities);

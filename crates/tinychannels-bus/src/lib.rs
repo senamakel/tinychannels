@@ -48,7 +48,10 @@ pub use config::ChannelsConfig;
 pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
 pub use health::{ChannelHealthReport, ChannelHealthState};
-pub use host::{HostEventPublication, HostStoreVoiceMediaRequest, HostStoreVoiceMediaResult, HostTranscriptionRequest, HostTranscriptionResult};
+pub use host::{
+    HostEventPublication, HostStoreVoiceMediaRequest, HostStoreVoiceMediaResult,
+    HostTranscriptionRequest, HostTranscriptionResult,
+};
 pub use http::HttpProxyPolicy;
 pub use module_controller::{
     ChannelBackendRequest, ChannelBackendResult, ChannelControllerRequest, ChannelControllerResult,
@@ -76,7 +79,8 @@ pub use voice::{
 mod tests;
 
 pub use module_interaction::{
-    ChannelInteraction, ChannelInteractionInfo, ChannelInteractionInfoV2, ChannelInteractionRequest, ChannelInteractionResult, LegacyChannelCapabilities,
+    ChannelInteraction, ChannelInteractionInfo, ChannelInteractionInfoV2,
+    ChannelInteractionRequest, ChannelInteractionResult, LegacyChannelCapabilities,
 };
 
 pub use module_supervision::ChannelSupervisionPolicy;

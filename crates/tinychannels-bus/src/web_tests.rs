@@ -41,7 +41,10 @@ fn compatibility_web_contract_round_trips_request_metadata_and_error_details() {
     let encoded = serde_json::to_value(&metadata).unwrap();
     assert_eq!(encoded["speakReply"], true);
     assert_eq!(encoded["sessionId"], 93);
-    assert_eq!(serde_json::from_value::<ChatRequestMetadata>(encoded).unwrap(), metadata);
+    assert_eq!(
+        serde_json::from_value::<ChatRequestMetadata>(encoded).unwrap(),
+        metadata
+    );
 
     let event = WebChannelEvent::ChatError {
         context: WebEventContext::default(),
@@ -66,7 +69,10 @@ fn compatibility_web_contract_round_trips_request_metadata_and_error_details() {
     let json = serde_json::to_value(&event).unwrap();
     assert_eq!(json["error_source"], "prompt_guard");
     assert_eq!(json["guardrail"]["reasons"][0]["code"], "prompt_injection");
-    assert_eq!(serde_json::from_value::<WebChannelEvent>(json).unwrap(), event);
+    assert_eq!(
+        serde_json::from_value::<WebChannelEvent>(json).unwrap(),
+        event
+    );
 }
 
 #[test]
