@@ -239,6 +239,8 @@ impl InboundState {
             content: text,
             timestamp: chrono::Utc::now().timestamp_millis() as u64,
             thread_ts: None,
+            topic_id: None,
+            reply_to_id: None,
             sender_name,
         };
         if let Err(e) = self.tx.send(message).await {

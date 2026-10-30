@@ -46,8 +46,13 @@ pub enum ChannelInteraction {
         text: String,
         thread_ts: Option<String>,
     },
-    EditMessage { receipt: crate::channel::MessageReceipt, intent: crate::channel::ChannelOutboundMessage },
-    DeleteMessage { receipt: crate::channel::MessageReceipt },
+    EditMessage {
+        receipt: crate::channel::MessageReceipt,
+        intent: crate::channel::ChannelOutboundMessage,
+    },
+    DeleteMessage {
+        receipt: crate::channel::MessageReceipt,
+    },
 }
 
 /// Instance-specific facts supplied by the provider, rather than guessed by hosts.

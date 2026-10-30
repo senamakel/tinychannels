@@ -470,6 +470,8 @@ impl EmailChannel {
                 channel: "email".to_string(),
                 timestamp: email.timestamp,
                 thread_ts: None,
+                topic_id: None,
+                reply_to_id: None,
                 sender_name: None,
             };
 
