@@ -86,19 +86,15 @@ pub struct ChannelAccountCapabilities {
 }
 
 /// Pre-v2 capability projection retained for older host interfaces.
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, JsonSchema)]
-pub struct LegacyChannelCapabilities {
-    pub remote_control: bool,
-    pub chat_approvals: bool,
-    pub progressive_edits: bool,
-    pub history_key_ignores_thread: bool,
-}
+pub type LegacyChannelCapabilities = ChannelCapabilities;
 
-impl From<&ChannelInteractionCapabilitiesV2> for LegacyChannelCapabilities {
+impl From<&ChannelInteractionCapabilitiesV2> for ChannelCapabilities {
     fn from(value: &ChannelInteractionCapabilitiesV2) -> Self {
         Self {
+            remote_control: false,
+            chat_approvals: false,
             progressive_edits: value.progressive_edits,
-            ..Self::default()
+            history_key_ignores_thread: false,
         }
     }
 }
