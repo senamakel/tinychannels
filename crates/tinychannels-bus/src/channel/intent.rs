@@ -89,7 +89,10 @@ impl ChannelOutboundMessage {
             turn_id: None,
             idempotency_key: message.idempotency_key.clone().unwrap_or_default(),
             parts: vec![super::content::OutboundContentPart::Content {
-                part: super::content::ContentPart::Text { text: message.content.clone(), markdown_dialect: None },
+                part: super::content::ContentPart::Text {
+                    text: message.content.clone(),
+                    markdown_dialect: None,
+                },
             }],
         }
     }

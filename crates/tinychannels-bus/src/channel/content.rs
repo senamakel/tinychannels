@@ -1,6 +1,6 @@
 //! Portable typed content and voice-note payloads.
-use super::envelope::MediaReference;
 use super::capabilities::MarkdownDialect;
+use super::envelope::MediaReference;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,26 +9,79 @@ use serde_json::Value;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ContentPart {
-    Text { text: String, markdown_dialect: Option<MarkdownDialect> },
-    Image { media: MediaReference, caption: Option<String>, alt_text: Option<String> },
-    Video { media: MediaReference, caption: Option<String>, duration_ms: Option<u64>, thumbnail: Option<MediaReference> },
-    Audio { media: MediaReference, codec: Option<String>, duration_ms: Option<u64>, title: Option<String>, transcript: Option<String> },
-    File { media: MediaReference, file_name: Option<String>, caption: Option<String> },
-    VoiceNote { voice_note: VoiceNote },
-    Sticker { media: MediaReference, pack_id: Option<String>, sticker_id: Option<String>, emoji: Option<String>, alt_text: Option<String> },
-    Location { latitude: f64, longitude: f64, name: Option<String>, address: Option<String> },
-    Contact { name: String, phone_numbers: Vec<String>, emails: Vec<String> },
-    Buttons { text: String, buttons: Vec<Value> },
-    Poll { question: String, options: Vec<String> },
-    Presentation { data: Value },
-    Native { data: Value },
+    Text {
+        text: String,
+        markdown_dialect: Option<MarkdownDialect>,
+    },
+    Image {
+        media: MediaReference,
+        caption: Option<String>,
+        alt_text: Option<String>,
+    },
+    Video {
+        media: MediaReference,
+        caption: Option<String>,
+        duration_ms: Option<u64>,
+        thumbnail: Option<MediaReference>,
+    },
+    Audio {
+        media: MediaReference,
+        codec: Option<String>,
+        duration_ms: Option<u64>,
+        title: Option<String>,
+        transcript: Option<String>,
+    },
+    File {
+        media: MediaReference,
+        file_name: Option<String>,
+        caption: Option<String>,
+    },
+    VoiceNote {
+        voice_note: VoiceNote,
+    },
+    Sticker {
+        media: MediaReference,
+        pack_id: Option<String>,
+        sticker_id: Option<String>,
+        emoji: Option<String>,
+        alt_text: Option<String>,
+    },
+    Location {
+        latitude: f64,
+        longitude: f64,
+        name: Option<String>,
+        address: Option<String>,
+    },
+    Contact {
+        name: String,
+        phone_numbers: Vec<String>,
+        emails: Vec<String>,
+    },
+    Buttons {
+        text: String,
+        buttons: Vec<Value>,
+    },
+    Poll {
+        question: String,
+        options: Vec<String>,
+    },
+    Presentation {
+        data: Value,
+    },
+    Native {
+        data: Value,
+    },
 }
 
 /// Voice media sent as a typed channel output.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum OutboundVoice {
-    Media { media: MediaReference, codec: Option<String>, duration_ms: Option<u64> },
+    Media {
+        media: MediaReference,
+        codec: Option<String>,
+        duration_ms: Option<u64>,
+    },
 }
 
 /// Ordered content part sent to a channel provider.
@@ -62,8 +115,16 @@ pub struct VoiceTranscript {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum VoiceTranscriptState { Pending, Complete, Failed }
+pub enum VoiceTranscriptState {
+    Pending,
+    Complete,
+    Failed,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum VoiceTranscriptSource { Provider, HostStt, User }
+pub enum VoiceTranscriptSource {
+    Provider,
+    HostStt,
+    User,
+}

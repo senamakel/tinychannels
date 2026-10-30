@@ -31,7 +31,11 @@ pub struct MediaUploadBegin {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MediaUploadChunk { pub handle: MediaUploadHandle, pub sequence: u32, pub bytes: Vec<u8> }
+pub struct MediaUploadChunk {
+    pub handle: MediaUploadHandle,
+    pub sequence: u32,
+    pub bytes: Vec<u8>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
@@ -39,7 +43,12 @@ pub struct MediaUploadFinish(pub MediaUploadHandle);
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MediaReadBegin { pub instance: String, pub scope: HostVoiceScope, pub media: MediaReference, pub max_bytes: u64 }
+pub struct MediaReadBegin {
+    pub instance: String,
+    pub scope: HostVoiceScope,
+    pub media: MediaReference,
+    pub max_bytes: u64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -53,11 +62,18 @@ pub struct MediaReadInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MediaReadChunk { pub handle: MediaReadHandle, pub sequence: u32 }
+pub struct MediaReadChunk {
+    pub handle: MediaReadHandle,
+    pub sequence: u32,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct MediaReadChunkResult { pub sequence: u32, pub bytes: Vec<u8>, pub done: bool }
+pub struct MediaReadChunkResult {
+    pub sequence: u32,
+    pub bytes: Vec<u8>,
+    pub done: bool,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]

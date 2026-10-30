@@ -7,11 +7,19 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HostVoiceReplyMode { Mirror, Always, Never, SpeakReply }
+pub enum HostVoiceReplyMode {
+    Mirror,
+    Always,
+    Never,
+    SpeakReply,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HostVoiceMediaDirection { Inbound, Outbound }
+pub enum HostVoiceMediaDirection {
+    Inbound,
+    Outbound,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
@@ -78,4 +86,6 @@ pub struct HostVoiceReplyPolicyRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct HostVoiceReplyPolicy { pub mode: HostVoiceReplyMode }
+pub struct HostVoiceReplyPolicy {
+    pub mode: HostVoiceReplyMode,
+}
