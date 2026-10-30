@@ -31,17 +31,18 @@ pub fn outbound_intent_from_legacy_message(
     );
     let thread_id = first_string_field(&message, &["threadId", "thread_id", "thread_ts"]);
     let topic_id = first_string_field(&message, &["topicId", "topic_id"]);
+    let conversation_ref = topic_id.map(|topic_id| tinychannels_bus::ConversationRef {
+        id: conversation_id.clone(),
+        topic_id: Some(topic_id),
+        ..Default::default()
+    });
 
     ChannelOutboundIntent {
         idempotency_key,
         channel_id,
         conversation_id,
         channel_ref: None,
-        conversation_ref: topic_id.map(|topic_id| tinychannels_bus::ConversationRef {
-            id: conversation_id.clone(),
-            topic_id: Some(topic_id),
-            ..Default::default()
-        }),
+        conversation_ref,
         turn_id: None,
         reply_to_id,
         thread_id,

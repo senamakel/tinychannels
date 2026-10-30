@@ -69,8 +69,17 @@ impl Channel for TelegramChannel {
             return Ok(None);
         }
 
-        let (chat_id, thread_id) = Self::parse_reply_target(&message.recipient);
-        let parent_message_id = Self::parse_message_id(message.thread_ts.as_deref());
+        let (chat_id, recipient_thread_id) = Self::parse_reply_target(&message.recipient);
+        let thread_id = message
+            .topic_id
+            .as_deref()
+            .or(recipient_thread_id.as_deref());
+        let parent_message_id = Self::parse_message_id(
+            message
+                .reply_to_id
+                .as_deref()
+                .or(message.thread_ts.as_deref()),
+        );
         let initial_text = if message.content.is_empty() {
             "...".to_string()
         } else {
@@ -281,13 +290,19 @@ impl Channel for TelegramChannel {
     async fn send(&self, message: &SendMessage) -> anyhow::Result<()> {
         // Strip tool_call tags before processing to prevent Markdown parsing failures
         let content = strip_tool_call_tags(&message.content);
-        let parent_message_id = Self::parse_message_id(message.thread_ts.as_deref());
+        let parent_message_id = Self::parse_message_id(
+            message
+                .reply_to_id
+                .as_deref()
+                .or(message.thread_ts.as_deref()),
+        );
 
         // Parse recipient: "chat_id" or "chat_id:thread_id" format
         let (chat_id, thread_id) = match message.recipient.split_once(':') {
             Some((chat, thread)) => (chat, Some(thread)),
             None => (message.recipient.as_str(), None),
         };
+        let thread_id = message.topic_id.as_deref().or(thread_id);
 
         let (reactionless_content, reaction_marker) = Self::parse_reaction_marker(&content);
         if let Some(reaction_marker) = reaction_marker.as_deref() {
