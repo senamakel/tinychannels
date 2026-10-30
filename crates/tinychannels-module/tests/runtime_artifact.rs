@@ -20,7 +20,7 @@ impl Callback {
         let tinychannels_bus::ChannelBackendRequest::ProgressiveTransport(request) = request else {
             return Err(tinybus::Error::failed("unexpected backend callback"));
         };
-        if matches!(request, ProgressiveTransportRequest::Send { .. }) {
+        if matches!(*request, ProgressiveTransportRequest::Send { .. }) {
             self.sends.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
         Ok(
@@ -239,7 +239,7 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
 
     let request = RemoteOperation::Execute {
         workspace_dir: remote_workspace.path().to_str().unwrap().into(),
-        message: tinychannels_bus::ChannelMessage {
+        message: Box::new(tinychannels_bus::ChannelMessage {
             id: "fixture".into(),
             sender: "sender".into(),
             reply_target: "chat".into(),
@@ -250,7 +250,7 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
             sender_name: None,
             topic_id: None,
             reply_to_id: None,
-        },
+        }),
         route: RemoteRoute {
             provider: "fixture".into(),
             model: "fixture".into(),
@@ -301,14 +301,14 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
     assert_eq!(prepared.client_id, "inbound");
     let inbound = PrepareChannelInboundRequest {
         source: ChannelInboundSource::Legacy {
-            message: tinychannels_bus::ChannelMessage {
+            message: Box::new(tinychannels_bus::ChannelMessage {
                 id: "msg".into(),
                 channel: "discord".into(),
                 sender: "user".into(),
                 reply_target: "room".into(),
                 content: "fixture".into(),
                 ..Default::default()
-            },
+            }),
             envelope: None,
         },
         namespace: "tenant".into(),
@@ -426,7 +426,10 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
     let rendered: PreparedChannelIntent = first_client
         .call_confidential(
             methods::PREPARE_OUTBOUND_INTENT,
-            ("linq", ChannelMessagePreparation::Intent(prepared.intent)),
+            (
+                "linq",
+                ChannelMessagePreparation::Intent(Box::new(prepared.intent)),
+            ),
         )
         .await
         .unwrap();

@@ -58,7 +58,7 @@ pub(crate) async fn prepare(host: &HostChannels, request: Request) -> Result<Res
                 host,
                 RemoteOperation::Execute {
                     workspace_dir: workspace_dir.clone(),
-                    message: (*message).clone(),
+                    message: Box::new((*message).clone()),
                     route: route.clone(),
                     history_len,
                 },

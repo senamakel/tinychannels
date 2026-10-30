@@ -98,7 +98,7 @@ pub enum ChannelMessagePreparation {
     /// Preserve the existing typed channel send and its idempotency algorithm.
     Typed(crate::SendMessage),
     /// Render an already prepared intent without changing its key or durability.
-    Intent(crate::ChannelOutboundIntent),
+    Intent(Box<crate::ChannelOutboundIntent>),
 }
 
 /// An intent and the corresponding legacy backend JSON prepared inside the module.

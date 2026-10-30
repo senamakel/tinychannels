@@ -37,7 +37,9 @@ impl Sender {
     ) -> std::result::Result<ProgressiveTransportResult, ProgressiveSendError> {
         let result = self
             .0
-            .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(request))
+            .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
+                request,
+            )))
             .await
             .map_err(|_| ProgressiveSendError::Unavailable)?;
         match result {
@@ -54,7 +56,9 @@ impl Sender {
     ) -> std::result::Result<Value, ProgressiveSendError> {
         let result = self
             .0
-            .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(request))
+            .dispatch_controller_backend(ChannelBackendRequest::ProgressiveTransport(Box::new(
+                request,
+            )))
             .await
             .map_err(|_| ProgressiveSendError::Unavailable)?;
         match result {
@@ -296,10 +300,10 @@ impl Replies {
         {
             return Err(Error::failed("invalid progressive output scope"));
         }
-        if let Some(account) = &channel.account_id {
-            if account.trim().is_empty() || account.len() > 256 {
-                return Err(Error::failed("invalid progressive output channel account"));
-            }
+        if let Some(account) = &channel.account_id
+            && (account.trim().is_empty() || account.len() > 256)
+        {
+            return Err(Error::failed("invalid progressive output channel account"));
         }
         if lifetime_ms == 0 || Duration::from_millis(lifetime_ms) > MAX_TYPED_OUTPUT_LIFETIME {
             return Err(Error::failed(

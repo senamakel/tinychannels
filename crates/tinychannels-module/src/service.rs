@@ -263,7 +263,7 @@ impl DeliveryQueueHandler for ModuleDeliveryHandler {
             ));
         }
         Ok(Some(UnknownSendReconciliation::Sent {
-            receipt: tinychannels::channel::MessageReceipt::default(),
+            receipt: Box::new(tinychannels::channel::MessageReceipt::default()),
             message_id: None,
         }))
     }
@@ -562,7 +562,7 @@ impl Channels {
                         "inbound envelope identity does not match message",
                     ));
                 }
-                (message, envelope)
+                (*message, envelope)
             }
             ChannelInboundSource::Envelope {
                 envelope,
@@ -667,7 +667,7 @@ impl Channels {
                         "intent destination does not match channel",
                     ));
                 }
-                intent
+                *intent
             }
         };
         Ok(PreparedChannelIntent {

@@ -47,7 +47,7 @@ pub enum ChannelInteraction {
         thread_ts: Option<String>,
     },
     EditMessage {
-        receipt: crate::channel::MessageReceipt,
+        receipt: Box<crate::channel::MessageReceipt>,
         intent: crate::channel::ChannelOutboundMessage,
     },
     DeleteMessage {

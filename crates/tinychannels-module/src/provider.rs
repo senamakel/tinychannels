@@ -20,7 +20,7 @@ impl<T> Drop for AbortOnDrop<T> {
 
 enum ProviderOperation {
     Send(SendMessage),
-    Interaction(tinychannels_bus::ChannelInteraction),
+    Interaction(Box<tinychannels_bus::ChannelInteraction>),
 }
 
 struct TypingRefreshTask {
@@ -358,7 +358,7 @@ impl Running {
                             .map(|()| tinychannels_bus::ChannelInteractionResult::Completed)
                             .map_err(|error| Error::failed(error.to_string())),
                         ProviderOperation::Interaction(interaction) => {
-                            dispatch_interaction(send_channel.clone(), interaction, &mut typing)
+                            dispatch_interaction(send_channel.clone(), *interaction, &mut typing)
                                 .await
                         }
                     };
@@ -416,7 +416,7 @@ impl Running {
         &self,
         interaction: tinychannels_bus::ChannelInteraction,
     ) -> std::result::Result<tinychannels_bus::ChannelInteractionResult, RunningSendError> {
-        self.submit(ProviderOperation::Interaction(interaction))
+        self.submit(ProviderOperation::Interaction(Box::new(interaction)))
             .await
     }
 

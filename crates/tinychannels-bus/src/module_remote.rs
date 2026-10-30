@@ -48,7 +48,7 @@ pub struct NewRemoteThread {
 pub enum RemoteOperation {
     Execute {
         workspace_dir: String,
-        message: crate::ChannelMessage,
+        message: Box<crate::ChannelMessage>,
         route: RemoteRoute,
         history_len: usize,
     },

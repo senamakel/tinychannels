@@ -9,7 +9,7 @@ pub const MAX_WEB_TOOL_PAYLOAD_BYTES: usize = 64 * 1024;
 /// Cap serialized tool arguments before they cross the web event bus.
 pub fn cap_web_args(value: Option<Value>) -> Option<Value> {
     value.filter(|value| {
-        serde_json::to_vec(value).map_or(false, |bytes| bytes.len() <= MAX_WEB_TOOL_PAYLOAD_BYTES)
+        serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= MAX_WEB_TOOL_PAYLOAD_BYTES)
     })
 }
 

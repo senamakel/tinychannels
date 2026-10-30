@@ -23,6 +23,7 @@ impl Callback {
         let ChannelBackendRequest::ProgressiveTransport(request) = request else {
             return Err(Error::failed("unexpected callback"));
         };
+        let request = *request;
         self.requests.lock().await.push(request.clone());
         match request {
             ProgressiveTransportRequest::Send { message, .. } => {

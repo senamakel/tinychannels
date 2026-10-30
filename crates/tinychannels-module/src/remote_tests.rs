@@ -106,7 +106,7 @@ async fn fixture(
 fn command(workspace: &std::path::Path, content: &str, channel: &str) -> RemoteOperation {
     RemoteOperation::Execute {
         workspace_dir: workspace.to_str().unwrap().into(),
-        message: tinychannels_bus::ChannelMessage {
+        message: Box::new(tinychannels_bus::ChannelMessage {
             id: "fixture".into(),
             sender: "sender".into(),
             reply_target: "chat".into(),
@@ -117,7 +117,7 @@ fn command(workspace: &std::path::Path, content: &str, channel: &str) -> RemoteO
             sender_name: None,
             topic_id: None,
             reply_to_id: None,
-        },
+        }),
         route: RemoteRoute {
             provider: "fixture-provider".into(),
             model: "fixture-model".into(),

@@ -1191,7 +1191,7 @@ async fn preparation_preserves_explicit_keys_and_typed_thread_before_provider_io
     let rendered = channels
         .prepare_outbound_intent(
             "telegram".into(),
-            ChannelMessagePreparation::Intent(original.clone()),
+            ChannelMessagePreparation::Intent(Box::new(original.clone())),
         )
         .await
         .unwrap();
@@ -1206,7 +1206,7 @@ async fn preparation_preserves_explicit_keys_and_typed_thread_before_provider_io
         channels
             .prepare_outbound_intent(
                 "discord".into(),
-                ChannelMessagePreparation::Intent(original)
+                ChannelMessagePreparation::Intent(Box::new(original))
             )
             .await
             .is_err()
@@ -1289,7 +1289,7 @@ async fn inbound_preparation_preserves_escaped_persisted_keys_and_provider_threa
     let prepared = service
         .prepare_channel_inbound(PrepareChannelInboundRequest {
             source: ChannelInboundSource::Legacy {
-                message: message.clone(),
+                message: Box::new(message.clone()),
                 envelope: None,
             },
             namespace: "openhuman".into(),
@@ -1533,7 +1533,7 @@ async fn inbound_preparation_refuses_mismatched_identity_oversized_payload_and_s
     envelope.sender.id = "other".into();
     let request = PrepareChannelInboundRequest {
         source: ChannelInboundSource::Legacy {
-            message: message.clone(),
+            message: Box::new(message.clone()),
             envelope: Some(envelope),
         },
         namespace: "tenant".into(),
@@ -1550,7 +1550,7 @@ async fn inbound_preparation_refuses_mismatched_identity_oversized_payload_and_s
     huge.content = "x".repeat(tinychannels_bus::module_runtime::PREPARATION_MESSAGE_BYTES);
     let request = PrepareChannelInboundRequest {
         source: ChannelInboundSource::Legacy {
-            message: huge,
+            message: Box::new(huge),
             envelope: None,
         },
         namespace: "tenant".into(),
