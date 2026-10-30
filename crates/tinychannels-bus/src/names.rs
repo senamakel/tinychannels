@@ -74,6 +74,12 @@ pub mod methods {
     pub const SEND_EMAIL_UPLOAD: &str = "SendEmailUpload";
     /// Abort an upload that has not entered SMTP delivery.
     pub const ABORT_EMAIL_UPLOAD: &str = "AbortEmailUpload";
+    pub const BEGIN_MEDIA_UPLOAD: &str = "BeginMediaUpload";
+    pub const APPEND_MEDIA_UPLOAD_CHUNK: &str = "AppendMediaUploadChunk";
+    pub const FINISH_MEDIA_UPLOAD: &str = "FinishMediaUpload";
+    pub const BEGIN_MEDIA_READ: &str = "BeginMediaRead";
+    pub const READ_MEDIA_CHUNK: &str = "ReadMediaChunk";
+    pub const ABORT_MEDIA_READ: &str = "AbortMediaRead";
     /// `StartChannel` — connect and begin receiving on one configured provider.
     pub const START_CHANNEL: &str = "StartChannel";
     /// `StopChannel` — disconnect one running provider.
