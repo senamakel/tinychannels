@@ -75,6 +75,7 @@ pub enum MediaKind {
 #[serde(default, rename_all = "camelCase")]
 pub struct MediaReference {
     pub opaque_id: Option<String>,
+    pub size_bytes: Option<u64>,
     pub path: Option<String>,
     pub url: Option<String>,
     pub content_type: Option<String>,

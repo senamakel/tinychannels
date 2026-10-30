@@ -45,6 +45,7 @@ pub use controllers::{ChannelAuthMode, ChannelDefinition};
 pub use error::{Result, TinyChannelsError};
 pub use health::{ChannelHealthReport, ChannelHealthState};
 pub use host::{HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult};
+pub use module_media::{MediaReadChunkResult, MediaReadInfo, MediaReadHandle, MediaUploadHandle, MediaUploadBegin, MediaUploadChunk, MediaUploadFinish};
 pub use voice::{HostSpeechSynthesisRequest, HostSpeechSynthesisResult, HostVoiceMediaDirection, HostVoiceReplyMode, HostVoiceReplyPolicy, HostVoiceReplyPolicyRequest, HostVoiceScope, HostVoiceTranscriptionRequest};
 pub use http::HttpProxyPolicy;
 pub use module_controller::{

@@ -23,6 +23,8 @@ pub enum SendErrorKind {
 #[serde(default, rename_all = "camelCase")]
 pub struct ChannelSendError {
     pub kind: SendErrorKind,
+    #[serde(default)]
+    pub sent_before_error: bool,
     pub message: String,
     pub retryable: bool,
     pub retry_after: Option<f64>,
@@ -35,6 +37,7 @@ impl Default for ChannelSendError {
     fn default() -> Self {
         Self {
             kind: SendErrorKind::Unknown,
+            sent_before_error: false,
             message: String::new(),
             retryable: false,
             retry_after: None,

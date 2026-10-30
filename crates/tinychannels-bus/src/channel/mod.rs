@@ -14,6 +14,7 @@ pub mod types;
 pub use crate::traits::{ChannelMessage, SendMessage};
 pub use adapter::ChannelReceiveAckPolicy;
 pub use content::{ContentPart, OutboundContentPart, OutboundVoice, VoiceNote, VoiceTranscript, VoiceTranscriptSource, VoiceTranscriptState};
+pub use intent::{ChannelOutboundMessage, ChannelSendOutcome};
 pub use event::{ChannelEvent, ChannelEventKind, ChannelReaction};
 pub use capabilities::{
     CHANNEL_MESSAGE_ACTION_NAMES, ChannelPresentationCapabilities, ChannelStaticCapabilities,
