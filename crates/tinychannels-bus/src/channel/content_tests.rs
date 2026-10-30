@@ -1,3 +1,4 @@
+use super::super::envelope::MediaKind;
 use super::*;
 
 #[test]
