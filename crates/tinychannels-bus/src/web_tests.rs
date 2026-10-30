@@ -27,3 +27,44 @@ fn web_event_round_trip_preserves_addressing_context() {
         event
     );
 }
+
+#[test]
+fn compatibility_web_contract_round_trips_request_metadata_and_error_details() {
+    let metadata = ChatRequestMetadata {
+        source: Some("ptt".into()),
+        speak_reply: Some(true),
+        session_id: Some(93),
+        agent_id: Some("agent-a".into()),
+        hold_text_stream: true,
+        ..Default::default()
+    };
+    let encoded = serde_json::to_value(&metadata).unwrap();
+    assert_eq!(encoded["speakReply"], true);
+    assert_eq!(encoded["sessionId"], 93);
+    assert_eq!(serde_json::from_value::<ChatRequestMetadata>(encoded).unwrap(), metadata);
+
+    let event = WebChannelEvent::ChatError {
+        context: WebEventContext::default(),
+        message: Some("blocked".into()),
+        error_type: Some("guardrail".into()),
+        error_source: Some("prompt_guard".into()),
+        error_retryable: Some(false),
+        error_retry_after_ms: None,
+        error_provider: None,
+        error_fallback_available: Some(false),
+        copy_key: Some("chat.error.blocked".into()),
+        copy_params: None,
+        guardrail: Some(GuardrailPayload {
+            verdict: "block".into(),
+            score: 0.9,
+            reasons: vec![GuardrailReason {
+                code: "prompt_injection".into(),
+                message: "blocked".into(),
+            }],
+        }),
+    };
+    let json = serde_json::to_value(&event).unwrap();
+    assert_eq!(json["errorSource"], "prompt_guard");
+    assert_eq!(json["guardrail"]["reasons"][0]["code"], "prompt_injection");
+    assert_eq!(serde_json::from_value::<WebChannelEvent>(json).unwrap(), event);
+}
