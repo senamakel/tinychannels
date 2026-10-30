@@ -294,8 +294,11 @@ pub enum WebChannelEvent {
     },
     ToolCall {
         context: WebEventContext,
+        #[serde(skip_serializing_if = "Option::is_none")]
         tool_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         tool_call_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         args: Option<Value>,
     },
     ToolResult {

@@ -107,10 +107,10 @@ fn configured_catalog_and_message_preparation_keep_wire_vocabulary() {
         "name": "linq", "ingress": "external_webhook",
         "interaction": {
             "capabilities": {
-                "remote_control": true, "chat_approvals": true,
-                "progressive_edits": false, "history_key_ignores_thread": false
-            },
-            "proactive_target": null, "supports_reactions": false, "supports_draft_updates": false
+                "account": { "proactiveTarget": null },
+                "progressiveEdits": false,
+                "reactions": false
+            }
         }
     });
     let typed: ConfiguredChannelInfo = serde_json::from_value(catalog.clone()).unwrap();
