@@ -292,6 +292,8 @@ impl Channel for DingTalkChannel {
                             .unwrap_or_default()
                             .as_secs(),
                         thread_ts: None,
+                        topic_id: None,
+                        reply_to_id: None,
                         sender_name: None,
                     };
 

@@ -911,6 +911,8 @@ impl TelegramChannel {
                 .unwrap_or_default()
                 .as_secs(),
             thread_ts: Some(ctx.message_id.to_string()),
+            topic_id: None,
+            reply_to_id: None,
             sender_name: ctx.sender_name,
         }
     }
