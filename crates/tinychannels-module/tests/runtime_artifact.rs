@@ -248,6 +248,8 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
             timestamp: 1,
             thread_ts: None,
             sender_name: None,
+            topic_id: None,
+            reply_to_id: None,
         },
         route: RemoteRoute {
             provider: "fixture".into(),
@@ -311,6 +313,7 @@ async fn runtime_only_host_closes_scoped_resources_without_a_legacy_callback_obj
         },
         namespace: "tenant".into(),
         session_policy: Default::default(),
+        preparation_mode: Default::default(),
     };
     let ordinary = first_client
         .call::<PreparedChannelInbound>(methods::PREPARE_CHANNEL_INBOUND, inbound.clone())
