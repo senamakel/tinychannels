@@ -2,6 +2,28 @@ use super::*;
 use tinychannels_bus::ChannelsConfig;
 use tinychannels_bus::config::WhatsAppConfig;
 
+#[tokio::test]
+async fn storage_initialization_presents_the_channels_bus_identity() {
+    let bus = tinybus::transport::memory::MemoryBus::new();
+    tinybus::broker::Broker::new().spawn(bus.clone());
+    let module = Connection::connect(bus.connect().await.unwrap())
+        .await
+        .unwrap();
+    // A failing callback stops setup before its service registration. Even on
+    // this failure path, the host must be able to identify the initializing
+    // module by its bus name before handling its storage request.
+    let absent_storage = ":1.999".try_into().unwrap();
+    assert!(
+        setup_with_storage_callback(module.clone(), Some(absent_storage))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        module.name_owner(BUS_NAME).await.unwrap(),
+        module.unique_name()
+    );
+}
+
 /// Mirrors the predicate in `start_channel`.
 ///
 /// Extracted rather than duplicated in the test so the two cannot disagree:

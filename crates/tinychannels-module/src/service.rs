@@ -1222,6 +1222,9 @@ async fn setup_with_storage_callback(
     connection: Connection,
     storage_callback: Option<BusName>,
 ) -> BusResult<()> {
+    // Storage callbacks identify the module by its well-known name. Claim it
+    // before the first callback, including schema preparation during setup.
+    connection.request_name(BUS_NAME).await?;
     let host =
         HostChannels::new_with_storage_callback(connection.clone(), storage_callback.clone());
     if storage_callback.is_some() {
@@ -1242,7 +1245,6 @@ async fn setup_with_storage_callback(
         connection
             .serve_at(OBJECT_PATH.try_into()?, channels)
             .await?;
-        connection.request_name(BUS_NAME).await?;
         Ok(())
     }
     .await;
