@@ -73,6 +73,10 @@ impl ProgressiveSender for Sender {
         let message = tinychannels::legacy_message_value_from_outbound_intent(&intent);
         self.invoke(ProgressiveTransportRequest::Send {
             channel: channel.into(),
+            turn_id: None,
+            channel_ref: None,
+            conversation: None,
+            idempotency_key: None,
             message,
         })
         .await
@@ -85,7 +89,11 @@ impl ProgressiveSender for Sender {
     ) -> std::result::Result<(), ProgressiveSendError> {
         self.invoke(ProgressiveTransportRequest::Edit {
             channel: channel.into(),
+            turn_id: None,
+            channel_ref: None,
+            conversation: None,
             message_id: message_id.into(),
+            receipt: None,
             text: text.into(),
         })
         .await
@@ -98,6 +106,9 @@ impl ProgressiveSender for Sender {
     ) -> std::result::Result<(), ProgressiveSendError> {
         self.invoke(ProgressiveTransportRequest::Delete {
             channel: channel.into(),
+            channel_ref: None,
+            conversation: None,
+            receipt: None,
             message_id: message_id.into(),
         })
         .await
@@ -106,6 +117,7 @@ impl ProgressiveSender for Sender {
     async fn typing(&self, channel: &str) -> std::result::Result<(), ProgressiveSendError> {
         self.invoke(ProgressiveTransportRequest::Typing {
             channel: channel.into(),
+            conversation: None,
         })
         .await
         .map(drop)

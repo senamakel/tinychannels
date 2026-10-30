@@ -46,6 +46,8 @@ pub enum ChannelInteraction {
         text: String,
         thread_ts: Option<String>,
     },
+    EditMessage { receipt: crate::channel::MessageReceipt, intent: crate::channel::ChannelOutboundMessage },
+    DeleteMessage { receipt: crate::channel::MessageReceipt },
 }
 
 /// Instance-specific facts supplied by the provider, rather than guessed by hosts.
@@ -62,6 +64,7 @@ pub struct ChannelInteractionInfo {
 #[serde(tag = "result", content = "value", rename_all = "snake_case")]
 pub enum ChannelInteractionResult {
     Completed,
+    Sent(Box<crate::channel::ChannelSendOutcome>),
     Draft(Option<String>),
     Info(ChannelInteractionInfo),
     TypingRefresh { handle: String },
