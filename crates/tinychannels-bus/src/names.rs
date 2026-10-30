@@ -96,6 +96,9 @@ pub mod methods {
     pub const CHANNEL_CONTROLLER: &str = "ChannelController";
     /// Run typing, draft and capability operations on one running provider.
     pub const CHANNEL_INTERACTION: &str = "ChannelInteraction";
+    pub const BEGIN_WEB_TURN: &str = "BeginWebTurn";
+    pub const END_WEB_TURN: &str = "EndWebTurn";
+    pub const PROJECT_WEB_OUTPUT: &str = "ProjectWebOutput";
 }
 
 /// One constant per method name on [`HOST_BUS_NAME`].

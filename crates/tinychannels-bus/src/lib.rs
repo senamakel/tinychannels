@@ -18,6 +18,7 @@ pub mod module_email;
 pub mod module_inbound;
 pub mod module_interaction;
 pub mod module_media;
+pub mod module_web_output;
 pub mod module_progressive;
 pub mod module_relay;
 pub mod module_remote;
