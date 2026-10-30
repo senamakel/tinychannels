@@ -64,7 +64,7 @@ fn compatibility_web_contract_round_trips_request_metadata_and_error_details() {
         }),
     };
     let json = serde_json::to_value(&event).unwrap();
-    assert_eq!(json["errorSource"], "prompt_guard");
+    assert_eq!(json["error_source"], "prompt_guard");
     assert_eq!(json["guardrail"]["reasons"][0]["code"], "prompt_injection");
     assert_eq!(serde_json::from_value::<WebChannelEvent>(json).unwrap(), event);
 }
