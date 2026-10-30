@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::json;
+use tinychannels_bus::{ContentPart, OutboundContentPart};
 
 #[test]
 fn durable_final_delivery_capabilities_match_openclaw_order() {
@@ -829,6 +830,19 @@ fn outbound_payload_variants_keep_legacy_and_relay_content() {
             },
             json!({"text":"hello"}),
             "hello",
+        ),
+        (
+            OutboundPayload::Parts {
+                text: Some("typed parts".into()),
+                parts: vec![OutboundContentPart::Content {
+                    part: ContentPart::Text {
+                        text: "typed parts".into(),
+                        markdown_dialect: None,
+                    },
+                }],
+            },
+            json!({"text":"typed parts","parts":[{"kind":"content","part":{"kind":"text","text":"typed parts","markdown_dialect":null}}]}),
+            "typed parts",
         ),
         (
             OutboundPayload::Media {

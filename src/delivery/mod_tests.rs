@@ -655,6 +655,13 @@ fn payload_shape_maps_to_expected_durable_capability() {
             },
             Payload,
         ),
+        (
+            OutboundPayload::Parts {
+                text: Some("text".into()),
+                parts: vec![],
+            },
+            Payload,
+        ),
     ];
 
     for (payload, expected) in cases {
