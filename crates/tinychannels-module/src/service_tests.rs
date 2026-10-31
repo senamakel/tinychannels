@@ -2381,3 +2381,27 @@ fn text_only_typed_intent_reaches_provider_as_text_with_delivery_identity() {
         assert_eq!(message.idempotency_key.as_deref(), Some("typed-key"));
     }
 }
+
+#[test]
+fn rich_typed_intent_keeps_its_parts_in_the_legacy_provider_envelope() {
+    let parts = vec![tinychannels_bus::OutboundContentPart::Content {
+        part: tinychannels_bus::ContentPart::Native {
+            data: serde_json::json!({"kind":"provider-payload"}),
+        },
+    }];
+    for parts in [parts, Vec::new()] {
+        let intent = ChannelOutboundIntent {
+            idempotency_key: "rich-key".into(),
+            payload: tinychannels::OutboundPayload::Parts {
+                text: Some("caption".into()),
+                parts: parts.clone(),
+            },
+            ..Default::default()
+        };
+        let message = intent_to_legacy_message(&intent).unwrap();
+        let body: serde_json::Value = serde_json::from_str(&message.content).unwrap();
+        assert_eq!(body["parts"], serde_json::to_value(parts).unwrap());
+        assert_eq!(body["text"], "caption");
+        assert_eq!(body["idempotencyKey"], "rich-key");
+    }
+}
