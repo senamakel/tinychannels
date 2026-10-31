@@ -2361,13 +2361,15 @@ fn text_only_typed_intent_reaches_provider_as_text_with_delivery_identity() {
             reply_to_id: Some("reply".into()),
             payload: tinychannels::OutboundPayload::Parts {
                 text: explicit,
-                parts: ["first", "second"].into_iter().map(|text| {
-                    tinychannels_bus::OutboundContentPart::Content {
+                parts: ["first", "second"]
+                    .into_iter()
+                    .map(|text| tinychannels_bus::OutboundContentPart::Content {
                         part: tinychannels_bus::ContentPart::Text {
-                            text: text.into(), markdown_dialect: None,
+                            text: text.into(),
+                            markdown_dialect: None,
                         },
-                    }
-                }).collect(),
+                    })
+                    .collect(),
             },
             ..Default::default()
         };

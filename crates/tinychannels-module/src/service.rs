@@ -1299,6 +1299,19 @@ fn intent_to_legacy_message(
     let value = tinychannels::legacy_message_value_from_outbound_intent(intent);
     let content = match &intent.payload {
         tinychannels::OutboundPayload::Text { text } => text.clone(),
+        tinychannels::OutboundPayload::Parts { parts, .. }
+            if !parts.is_empty()
+                && parts.iter().all(|part| {
+                    matches!(
+                        part,
+                        tinychannels_bus::OutboundContentPart::Content {
+                            part: tinychannels_bus::ContentPart::Text { .. }
+                        }
+                    )
+                }) =>
+        {
+            value["text"].as_str().unwrap_or_default().to_owned()
+        }
         _ => serde_json::to_string(&value)?,
     };
     Ok(SendMessage {
