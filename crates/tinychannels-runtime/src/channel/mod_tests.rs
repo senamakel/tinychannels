@@ -955,3 +955,32 @@ fn nested_receipt_ids_recover_parts_and_delivery_time() {
     assert_eq!(empty.sent_at, 0);
     assert!(empty.parts.is_empty());
 }
+
+#[test]
+fn typed_text_parts_supply_legacy_text_without_losing_the_typed_payload() {
+    let parts = vec![
+        OutboundContentPart::Content {
+            part: ContentPart::Text {
+                text: "first".into(),
+                markdown_dialect: None,
+            },
+        },
+        OutboundContentPart::Content {
+            part: ContentPart::Text {
+                text: "second".into(),
+                markdown_dialect: None,
+            },
+        },
+    ];
+    for (text, expected) in [(None, "first\nsecond"), (Some("explicit".into()), "explicit")] {
+        let intent = ChannelOutboundIntent {
+            idempotency_key: "stable-key".into(),
+            payload: OutboundPayload::Parts { text, parts: parts.clone() },
+            ..Default::default()
+        };
+        let legacy = legacy_message_value_from_outbound_intent(&intent);
+        assert_eq!(legacy["text"], expected);
+        assert_eq!(legacy["parts"], serde_json::to_value(&parts).unwrap());
+        assert_eq!(legacy["idempotencyKey"], "stable-key");
+    }
+}
