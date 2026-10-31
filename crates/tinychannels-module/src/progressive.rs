@@ -26,7 +26,8 @@ const MAX_CONTENT: usize = 384 * 1024;
 // escaping expands a byte to at most six bytes; retain bounded envelope space.
 const MAX_REQUEST: usize = MAX_CONTENT * 12 + 64 * 1024;
 const TURN_LIFETIME: Duration = Duration::from_secs(180);
-const MAX_TYPED_OUTPUT_LIFETIME: Duration = Duration::from_secs(30 * 60);
+// Match canonical TinyChannels: a one-hour host turn lease plus bounded grace.
+const MAX_TYPED_OUTPUT_LIFETIME: Duration = Duration::from_secs(3_700);
 
 struct Sender(HostChannels);
 
