@@ -48,3 +48,7 @@ fn to_driver_spec(spec: CollectionSchema) -> DriverCollectionSpec {
     }
     driver
 }
+
+#[cfg(test)]
+#[path = "schema_tests.rs"]
+mod tests;
