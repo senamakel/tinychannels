@@ -114,16 +114,35 @@ fn projected_tool_call_omits_empty_name_and_null_arguments() {
 
 #[test]
 fn absent_web_event_fields_are_omitted_and_present_false_values_survive() {
-    for name in ["chat_error", "artifact_pending", "artifact_ready", "artifact_failed", "approval_request", "plan_review_decided"] {
+    for name in [
+        "chat_error",
+        "artifact_pending",
+        "artifact_ready",
+        "artifact_failed",
+        "approval_request",
+        "plan_review_decided",
+    ] {
         let input = serde_json::json!({
             "event": name, "client_id": "client", "thread_id": "thread", "request_id": "request"
         });
         let event: WebChannelEvent = serde_json::from_value(input).unwrap();
         let wire = serde_json::to_value(&event).unwrap();
-        assert!(wire.as_object().unwrap().values().all(|value| !value.is_null()), "{name} must omit absent optional fields: {wire}");
-        assert_eq!(serde_json::from_value::<WebChannelEvent>(wire).unwrap(), event);
+        assert!(
+            wire.as_object()
+                .unwrap()
+                .values()
+                .all(|value| !value.is_null()),
+            "{name} must omit absent optional fields: {wire}"
+        );
+        assert_eq!(
+            serde_json::from_value::<WebChannelEvent>(wire).unwrap(),
+            event
+        );
     }
-    for (name, field) in [("approval_request", "detached"), ("chat_error", "error_fallback_available")] {
+    for (name, field) in [
+        ("approval_request", "detached"),
+        ("chat_error", "error_fallback_available"),
+    ] {
         let input = serde_json::json!({
             "event": name, "client_id": "client", "thread_id": "thread", "request_id": "request",
             field: false, "seq": 0, "ts": 0
@@ -133,6 +152,9 @@ fn absent_web_event_fields_are_omitted_and_present_false_values_survive() {
         assert_eq!(wire[field], false);
         assert_eq!(wire["seq"], 0);
         assert_eq!(wire["ts"], 0);
-        assert_eq!(serde_json::from_value::<WebChannelEvent>(wire).unwrap(), event);
+        assert_eq!(
+            serde_json::from_value::<WebChannelEvent>(wire).unwrap(),
+            event
+        );
     }
 }
