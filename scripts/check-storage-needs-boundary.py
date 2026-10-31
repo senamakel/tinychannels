@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Guard the standalone TSD2 collection-declaration boundary."""
+"""Guard the standalone consumer of pure bus collection declarations."""
 
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -9,55 +10,33 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "proofs/storage-needs-consumer/Cargo.toml"
-SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#"
-FORBIDDEN = {
-    "axum",
-    "hyper",
-    "mongodb",
-    "reqwest",
-    "rusqlite",
-    "sqlx",
-    "tinybus",
-    "tinybus-macros",
-    "tinybus-module",
-    "tinychannels",
-    "tinychannels-module",
-    "tinychannels-runtime",
-    "tinystoragedrivers-busproxy",
-    "tinystoragedrivers-core",
-    "tinystoragedrivers-file",
-    "tinystoragedrivers-mongodb",
-    "tinystoragedrivers-s3",
-    "tinystoragedrivers-sqlite",
-    "tokio-tungstenite",
-    "tokio-rustls",
-}
+PROOF_PACKAGE = "tinychannels-storage-needs-consumer"
+
+# Share the contract gate's reviewed serde/schema dependency allowlist and its
+# fail-closed normal/build graph traversal. The proof adds only its root crate;
+# it must never need a storage driver, module runtime, or transport dependency.
+SPEC = importlib.util.spec_from_file_location("bus_purity", ROOT / "scripts/check-bus-purity.py")
+BUS_PURITY = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(BUS_PURITY)
 
 
 def violations(metadata):
-    """Check the resolved proof crate graph and exact declaration dependency."""
-    packages = metadata.get("packages")
-    if not isinstance(packages, list):
-        return ["Cargo metadata has no package list"]
-    errors = []
-    by_name = {}
-    for package in packages:
-        by_name.setdefault(package.get("name"), []).append(package)
-    required = {
-        "tinychannels-storage-needs-consumer",
-        "tinychannels-bus",
-        "tinystoragedrivers-types",
-    }
-    for name in sorted(required):
-        if len(by_name.get(name, [])) != 1:
-            errors.append(f"expected one {name} package, found {len(by_name.get(name, []))}")
-    for name in sorted(FORBIDDEN & by_name.keys()):
+    """Require a reachable bus contract and a complete, pure consumer closure."""
+    if not isinstance(metadata, dict):
+        return ["Cargo metadata is not an object"]
+    packages, _, reachable, errors = BUS_PURITY.reachable_normal_build(
+        metadata, root_package=PROOF_PACKAGE
+    )
+    for name in (PROOF_PACKAGE, "tinychannels-bus"):
+        package_ids = [package_id for package_id, package in packages.items() if package["name"] == name]
+        if len(package_ids) != 1:
+            errors.append(f"expected one {name} package, found {len(package_ids)}")
+        elif package_ids[0] not in reachable:
+            errors.append(f"{name} is missing from the resolved consumer closure")
+    allowed = BUS_PURITY.ALLOWED | {PROOF_PACKAGE}
+    unsafe = sorted({packages[package_id]["name"] for package_id in reachable} - allowed)
+    for name in unsafe:
         errors.append(f"forbidden package in collection declaration graph: {name}")
-    types = by_name.get("tinystoragedrivers-types", [])
-    if len(types) == 1:
-        package = types[0]
-        if package.get("version") != "2.1.2" or not str(package.get("source", "")).startswith(SOURCE_PREFIX):
-            errors.append("collection declarations must use fork TSD types v2.1.2")
     return errors
 
 
@@ -76,7 +55,7 @@ def main():
         print("storage collection boundary failed:", file=sys.stderr)
         print("\n".join(f"- {error}" for error in errors), file=sys.stderr)
         return 1
-    print("storage collection declarations use the standalone TSD2 types contract")
+    print("storage collection declarations use the standalone pure bus contract")
     return 0
 
 
