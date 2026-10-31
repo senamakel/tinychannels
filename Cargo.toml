@@ -111,8 +111,8 @@ tinychannels-bus = { path = "crates/tinychannels-bus", features = ["storage"] }
 tinychannels-runtime = { path = "crates/tinychannels-runtime" }
 # Storage ports only: no driver crate and no database client. The host (or the
 # bus client in the module crate) supplies the backend.
-tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
-tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "2d23a6a6009fa52d1e7aa18de589bdd109a54b6a" }
+tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "2d23a6a6009fa52d1e7aa18de589bdd109a54b6a" }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.23"
@@ -174,5 +174,5 @@ tempfile = "3"
 toml = "1"
 wiremock = "0.6"
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "test-util"] }
-tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
-tinystoragedrivers-document = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "2d23a6a6009fa52d1e7aa18de589bdd109a54b6a" }
+tinystoragedrivers-document = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "2d23a6a6009fa52d1e7aa18de589bdd109a54b6a" }
