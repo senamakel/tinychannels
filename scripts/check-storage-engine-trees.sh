@@ -74,6 +74,12 @@ if [[ "${1:-}" == "--self-test" ]]; then
     printf 'self-test failed: the SQLite exception accepted an unrelated offender\n' >&2
     exit 1
   fi
+  for engine in core file mongodb s3 sqlite; do
+    if check_tree tinychannels "$(printf 'tinychannels\ntinystoragedrivers-%s\n' "$engine")"; then
+      printf 'self-test failed: TSD implementation %s was accepted\n' "$engine" >&2
+      exit 1
+    fi
+  done
   metadata='{"workspace_members":["lib-id","rlib-id","dylib-id","cdylib-id","staticlib-id","proc-macro-id","binary-id"],"packages":[{"id":"lib-id","name":"lib-only","targets":[{"kind":["lib"]}]},{"id":"rlib-id","name":"rlib-only","targets":[{"kind":["rlib"]}]},{"id":"dylib-id","name":"dylib-only","targets":[{"kind":["dylib"]}]},{"id":"cdylib-id","name":"cdylib-only","targets":[{"kind":["cdylib"]}]},{"id":"staticlib-id","name":"staticlib-only","targets":[{"kind":["staticlib"]}]},{"id":"proc-macro-id","name":"proc-macro-only","targets":[{"kind":["proc-macro"]}]},{"id":"binary-id","name":"binary-only","targets":[{"kind":["bin"]}]},{"id":"external-id","name":"external-dylib","targets":[{"kind":["dylib"]}]}]}'
   selected="$(printf '%s' "$metadata" | library_packages)"
   expected=$'lib-only\nrlib-only\ndylib-only\ncdylib-only\nstaticlib-only\nproc-macro-only'

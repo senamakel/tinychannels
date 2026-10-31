@@ -2349,3 +2349,33 @@ async fn web_turn_admission_rechecks_shutdown_after_waiting_for_registry() {
         "shutdown closes queued web turn admission"
     );
 }
+
+#[test]
+fn text_only_typed_intent_reaches_provider_as_text_with_delivery_identity() {
+    for explicit in [None, Some("explicit rendering".to_owned())] {
+        let expected = explicit.clone().unwrap_or_else(|| "first\nsecond".into());
+        let intent = ChannelOutboundIntent {
+            idempotency_key: "typed-key".into(),
+            conversation_id: "42".into(),
+            thread_id: Some("thread".into()),
+            reply_to_id: Some("reply".into()),
+            payload: tinychannels::OutboundPayload::Parts {
+                text: explicit,
+                parts: ["first", "second"].into_iter().map(|text| {
+                    tinychannels_bus::OutboundContentPart::Content {
+                        part: tinychannels_bus::ContentPart::Text {
+                            text: text.into(), markdown_dialect: None,
+                        },
+                    }
+                }).collect(),
+            },
+            ..Default::default()
+        };
+        let message = intent_to_legacy_message(&intent).unwrap();
+        assert_eq!(message.content, expected);
+        assert_eq!(message.recipient, "42");
+        assert_eq!(message.thread_ts.as_deref(), Some("thread"));
+        assert_eq!(message.reply_to_id.as_deref(), Some("reply"));
+        assert_eq!(message.idempotency_key.as_deref(), Some("typed-key"));
+    }
+}
