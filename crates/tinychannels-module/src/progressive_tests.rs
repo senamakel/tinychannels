@@ -733,3 +733,48 @@ async fn typed_output_scope_override_must_match_the_opened_turn() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn typed_output_lifetime_matches_the_canonical_one_hour_turn_window() {
+    let (replies, _) = fixture(false).await;
+    for lifetime_ms in [3_660_000, 3_700_000] {
+        let result = replies
+            .execute(ProgressiveCommand::OpenOutput {
+                channel: tinychannels_bus::ChannelRef {
+                    id: "telegram".into(),
+                    account_id: Some("telegram-account".into()),
+                },
+                conversation: tinychannels_bus::ConversationRef {
+                    kind: tinychannels_bus::ConversationKind::Dm,
+                    id: "chat-42".into(),
+                    ..Default::default()
+                },
+                turn_id: format!("bounded-turn-{lifetime_ms}"),
+                lifetime_ms,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(result, ProgressiveResult::Opened { .. }));
+    }
+    for lifetime_ms in [0, 3_700_001, u64::MAX] {
+        let result = replies
+            .execute(ProgressiveCommand::OpenOutput {
+                channel: tinychannels_bus::ChannelRef {
+                    id: "telegram".into(),
+                    account_id: Some("telegram-account".into()),
+                },
+                conversation: tinychannels_bus::ConversationRef {
+                    kind: tinychannels_bus::ConversationKind::Dm,
+                    id: "chat-42".into(),
+                    ..Default::default()
+                },
+                turn_id: "outside-lifetime-bound".into(),
+                lifetime_ms,
+            })
+            .await;
+        assert!(
+            result.is_err(),
+            "the module must reject lifetime {lifetime_ms}"
+        );
+    }
+}
