@@ -41,7 +41,9 @@ pub fn relay_send_action_from_outbound_intent(intent: &ChannelOutboundIntent) ->
 fn relay_send_content(payload: &OutboundPayload) -> String {
     match payload {
         OutboundPayload::Text { text } => text.clone(),
-        OutboundPayload::Parts { text, .. } => text.clone().unwrap_or_default(),
+        OutboundPayload::Parts { text, parts } => {
+            crate::channel::intent::legacy_parts_text(text.as_deref(), parts).unwrap_or_default()
+        }
         OutboundPayload::Media { text, .. } => text.clone().unwrap_or_default(),
         OutboundPayload::Voice { media_url } => media_url.clone(),
         OutboundPayload::Files { file_urls } => file_urls.join("\n"),

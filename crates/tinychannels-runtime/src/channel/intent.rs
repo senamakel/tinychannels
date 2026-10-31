@@ -3,6 +3,7 @@ use crate::traits::SendMessage;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 pub use tinychannels_bus::channel::intent::*;
+use tinychannels_bus::{ContentPart, OutboundContentPart};
 
 /// Build a provider-neutral outbound intent from the legacy rich-message JSON
 /// accepted by the `channels.send_message` controller.
@@ -75,13 +76,15 @@ pub fn outbound_intent_from_send_message(
 /// Render an outbound intent back to the legacy backend message payload.
 ///
 /// This keeps the old JSON shape for native channel data and inserts
-/// `idempotencyKey` when the payload did not already carry either camelCase or
+/// Typed parts without explicit text use their ordered text parts as the legacy
+/// text fallback. Rich parts are retained unchanged. Inserts `idempotencyKey`
+/// when the payload did not already carry either camelCase or
 /// snake_case idempotency.
 pub fn legacy_message_value_from_outbound_intent(intent: &ChannelOutboundIntent) -> Value {
     let payload = match &intent.payload {
         OutboundPayload::Text { text } => serde_json::json!({ "text": text }),
         OutboundPayload::Parts { text, parts } => {
-            serde_json::json!({ "text": text, "parts": parts })
+            serde_json::json!({ "text": legacy_parts_text(text.as_deref(), parts), "parts": parts })
         }
         OutboundPayload::Media { text, media_urls } => {
             serde_json::json!({ "text": text, "mediaUrls": media_urls })
@@ -97,6 +100,26 @@ pub fn legacy_message_value_from_outbound_intent(intent: &ChannelOutboundIntent)
         OutboundPayload::NativeChannelData { data } => data.clone(),
     };
     with_idempotency_key(payload, &intent.idempotency_key)
+}
+
+// Preserve an explicit legacy rendering; otherwise project only portable text
+// parts. Rich content stays in `parts` for providers that support it.
+pub(crate) fn legacy_parts_text(
+    text: Option<&str>,
+    parts: &[OutboundContentPart],
+) -> Option<String> {
+    text.map(str::to_owned).or_else(|| {
+        let text_parts: Vec<&str> = parts
+            .iter()
+            .filter_map(|part| match part {
+                OutboundContentPart::Content {
+                    part: ContentPart::Text { text, .. },
+                } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        (!text_parts.is_empty()).then(|| text_parts.join("\n"))
+    })
 }
 
 fn explicit_idempotency_key(message: &Value) -> Option<String> {

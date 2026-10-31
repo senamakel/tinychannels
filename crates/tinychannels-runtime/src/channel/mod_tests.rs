@@ -972,15 +972,48 @@ fn typed_text_parts_supply_legacy_text_without_losing_the_typed_payload() {
             },
         },
     ];
-    for (text, expected) in [(None, "first\nsecond"), (Some("explicit".into()), "explicit")] {
+    for (text, expected) in [
+        (None, "first\nsecond"),
+        (Some("explicit".into()), "explicit"),
+    ] {
         let intent = ChannelOutboundIntent {
             idempotency_key: "stable-key".into(),
-            payload: OutboundPayload::Parts { text, parts: parts.clone() },
+            payload: OutboundPayload::Parts {
+                text,
+                parts: parts.clone(),
+            },
             ..Default::default()
         };
         let legacy = legacy_message_value_from_outbound_intent(&intent);
         assert_eq!(legacy["text"], expected);
+        assert_eq!(
+            crate::relay::relay_send_action_from_outbound_intent(&intent)["content"],
+            expected
+        );
         assert_eq!(legacy["parts"], serde_json::to_value(&parts).unwrap());
         assert_eq!(legacy["idempotencyKey"], "stable-key");
     }
+}
+
+#[test]
+fn legacy_text_fallback_leaves_non_text_parts_intact() {
+    let parts = vec![OutboundContentPart::Content {
+        part: ContentPart::Native {
+            data: json!({"text":"not portable text"}),
+        },
+    }];
+    let intent = ChannelOutboundIntent {
+        payload: OutboundPayload::Parts {
+            text: None,
+            parts: parts.clone(),
+        },
+        ..Default::default()
+    };
+    let legacy = legacy_message_value_from_outbound_intent(&intent);
+    assert!(legacy["text"].is_null());
+    assert_eq!(legacy["parts"], serde_json::to_value(parts).unwrap());
+    assert_eq!(
+        crate::relay::relay_send_action_from_outbound_intent(&intent)["content"],
+        ""
+    );
 }
