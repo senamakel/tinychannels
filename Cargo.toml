@@ -33,7 +33,7 @@ tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }
 
 [workspace.package]
 # Releases update this sole workspace version before packaging every crate.
-version = "0.1.39"
+version = "0.2.0"
 
 [workspace.dependencies]
 tinybus = { version = "=0.3.12", git = "https://github.com/senamakel/tinybus", tag = "v0.3.12", default-features = false }
@@ -61,6 +61,7 @@ categories = ["asynchronous", "api-bindings"]
 
 [features]
 default = []
+test-support = []
 # Retained so downstreams that request it keep resolving; the relay WebSocket
 # transport module is still gated on this cfg. `tokio-tungstenite` and
 # `tokio/net` are now unconditional dependencies (the ported channel providers
@@ -110,8 +111,8 @@ tinychannels-bus = { path = "crates/tinychannels-bus", features = ["storage"] }
 tinychannels-runtime = { path = "crates/tinychannels-runtime" }
 # Storage ports only: no driver crate and no database client. The host (or the
 # bus client in the module crate) supplies the backend.
-tinystoragedrivers-api = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
-tinystoragedrivers-types = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
+tinystoragedrivers-api = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-types = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.23"
@@ -162,6 +163,9 @@ bytes = { version = "1", optional = true }
 
 [dev-dependencies]
 bytes = "1"
+tinybus = { workspace = true, features = ["modules"] }
+tinychannels-conformance = { path = "crates/tinychannels-conformance" }
+tinyvoice-bus = { git = "https://github.com/tinyhumansai/tinyvoice", rev = "cf6444424149bbc8dc2303bddbd9b366abb29933" }
 # Dual-declared: the optional dependency above belongs to the `lark` provider,
 # but `providers/discord/api_tests.rs` spins an axum mock server to test the
 # Discord REST client — unrelated to Lark, and it must build with `lark` off.
@@ -169,6 +173,6 @@ axum = { version = "0.8", default-features = false, features = ["http1", "json",
 tempfile = "3"
 toml = "1"
 wiremock = "0.6"
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
-tinystoragedrivers-testkit = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
-tinystoragedrivers-document = { git = "https://github.com/senamakel/tinystoragedrivers", rev = "c447da3" }
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "test-util"] }
+tinystoragedrivers-testkit = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }
+tinystoragedrivers-document = { git = "https://github.com/tinyhumansai/tinystoragedrivers", rev = "bf1f0a97fbe6165a6edd9521659c7f6859700761" }

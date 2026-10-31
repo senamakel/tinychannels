@@ -107,15 +107,21 @@ fn configured_catalog_and_message_preparation_keep_wire_vocabulary() {
         "name": "linq", "ingress": "external_webhook",
         "interaction": {
             "capabilities": {
-                "account": { "proactiveTarget": null },
-                "progressiveEdits": false,
-                "reactions": false
+                "version": 2,
+                "remoteControl": true, "chatApprovals": true,
+                "progressiveEdits": false, "historyKeyIgnoresThread": false,
+                "reactions": false,
+                "account": {"proactiveTarget": null}
             }
         }
     });
     let typed: ConfiguredChannelInfo = serde_json::from_value(catalog.clone()).unwrap();
     assert_eq!(typed.ingress, ChannelIngressKind::ExternalWebhook);
-    assert_eq!(serde_json::to_value(typed).unwrap(), catalog);
+    assert_eq!(typed.interaction.capabilities.version, 2);
+    assert!(
+        typed.interaction.capabilities.remote_control
+            && typed.interaction.capabilities.chat_approvals
+    );
     let message = serde_json::json!({"kind":"legacy","message":{"text":"fixture"}});
     let typed: ChannelMessagePreparation = serde_json::from_value(message.clone()).unwrap();
     assert_eq!(serde_json::to_value(typed).unwrap(), message);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit the transport-free channel contract source and normal/build closure."""
+"""Audit contract source and independent normal/build dependency closures."""
 
 import argparse
 import json
@@ -13,7 +13,13 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 BUS_SOURCE = ROOT / "crates/tinychannels-bus/src"
 BUS_MANIFEST = ROOT / "crates/tinychannels-bus/Cargo.toml"
-TSD_SOURCE_PREFIX = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#"
+ALLOWED = frozenset({
+    "tinychannels-bus", "serde", "serde_core", "serde_derive", "serde_json",
+    "schemars", "schemars_derive", "thiserror", "thiserror-impl",
+    "proc-macro2", "quote", "syn", "unicode-ident", "itoa", "memchr", "zmij",
+    "serde_derive_internals", "dyn-clone", "ref-cast", "ref-cast-impl", "base64",
+})
+FORBIDDEN_DEPS = frozenset({"anyhow", "async-trait", "tokio"})
 
 # This is the observed default/all-feature normal + build closure. New packages
 # require review because this crate is consumed directly by host libraries.
@@ -26,11 +32,14 @@ FORBIDDEN_PACKAGES = frozenset({
     "tinystoragedrivers-secrets", "tinystoragedrivers-sqlite",
 })
 NORMAL_BUILD_KINDS = {None, "normal", "build"}
-TOKIO_FEATURES = frozenset({"sync"})
 
-# Async trait signatures and Tokio's sync-only sender type are contract
-# carriers. The source scan therefore targets concrete execution and I/O seams.
+# The contract is synchronous; execution and storage-driver types belong in
+# the implementation even when a runtime feature is disabled.
 FORBIDDEN_SOURCE = (
+    (re.compile(r"\basync\s+fn\b|\basync_trait\b"), "async contract interface or implementation"),
+    (re.compile(r"\btokio::"), "Tokio runtime dependency"),
+    (re.compile(r"\bstd::sync\b"), "runtime synchronization"),
+    (re.compile(r"\btinystoragedrivers_\w*::"), "storage driver dependency"),
     (re.compile(r"\bstd::net\b"), "socket/network implementation"),
     (re.compile(r"\btokio::net\b"), "Tokio network implementation"),
     (re.compile(r"\bstd::fs\b|\btokio::fs\b"), "filesystem implementation"),
@@ -77,16 +86,12 @@ def source_violations(source_text, source_path=None):
         for pattern, label in FORBIDDEN_SOURCE
         if pattern.search(source_text)
     ]
-    if source_path is not None and Path(source_path).name != "traits.rs":
-        if re.search(r"\basync\s+fn\b", source_text):
-            errors.append("async implementation outside the channel interface")
-        if re.search(r"\basync_trait\b", source_text):
-            errors.append("async trait macro outside the channel interface")
     return errors
 
 
-def source_tree_violations(source_root=BUS_SOURCE):
+def source_tree_violations(source_root=None):
     """Scan production Rust files while leaving colocated behavior tests alone."""
+    source_root = source_root if source_root is not None else ROOT / "crates/tinychannels-bus/src"
     errors = []
     storage = Path(source_root) / "storage"
     for name in ("migrate.rs", "migrate_tests.rs"):
@@ -164,7 +169,9 @@ def reachable_normal_build(metadata, root_package="tinychannels-bus"):
             errors.append(f"missing resolved normal/build node or package record for {package_id}")
             continue
         reachable.add(package_id)
-        if not isinstance(node.get("features"), list):
+        if not isinstance(node.get("features"), list) or any(
+            not isinstance(feature, str) for feature in node.get("features", [])
+        ):
             errors.append(f"resolved node {package_id} has no feature evidence")
         dependencies = node.get("deps")
         if not isinstance(dependencies, list):
@@ -180,7 +187,8 @@ def reachable_normal_build(metadata, root_package="tinychannels-bus"):
                 continue
             if any(
                 not isinstance(kind, dict)
-                or kind.get("kind") not in {None, "normal", "dev", "build"}
+                or "kind" not in kind
+                or kind.get("kind") not in (None, "normal", "dev", "build")
                 for kind in kinds
             ):
                 errors.append(f"resolved dependency from {package_id} has malformed kind evidence")
@@ -202,35 +210,43 @@ def reachable_normal_build(metadata, root_package="tinychannels-bus"):
 
 
 def dependency_violations(metadata):
-    packages_by_id, nodes_by_id, reachable, errors = reachable_normal_build(metadata)
+    packages_by_id, _, reachable, errors = reachable_normal_build(metadata)
     packages = [packages_by_id[package_id] for package_id in reachable]
     names = {package["name"] for package in packages}
-    forbidden = sorted(names & FORBIDDEN_PACKAGES)
-    if forbidden:
-        errors.append(f"unsafe contract dependencies: {forbidden}")
-    types_packages = [package for package in packages if package["name"] == "tinystoragedrivers-types"]
-    if len(types_packages) > 1:
-        errors.append("normal/build graph has duplicate TSD types packages")
-    if types_packages:
-        package = types_packages[0]
-        if package.get("version") != "2.1.2" or not str(package.get("source", "")).startswith(TSD_SOURCE_PREFIX):
-            errors.append("collection declarations must use fork TSD types v2.1.2")
-
-    tokio_packages = [package for package in packages if package["name"] == "tokio"]
-    if len(tokio_packages) != 1:
-        errors.append(f"expected one Tokio package, found {len(tokio_packages)}")
-    for package in tokio_packages:
-        node = nodes_by_id.get(package["id"])
-        features = node.get("features") if node else None
-        if not isinstance(features, list):
-            errors.append(f"Tokio resolve node {package['id']} is missing feature evidence")
-        elif set(features) != TOKIO_FEATURES:
-            errors.append(
-                "Tokio features must be exactly sync; found "
-                + ", ".join(sorted(features))
-            )
-
+    unsafe = sorted(names - ALLOWED)
+    if unsafe:
+        errors.append(f"unsafe contract dependencies: {unsafe}")
     return errors
+
+
+def declared_forbidden_dependencies(manifest):
+    """Reject runtime/TSD declarations, including unused optional and dev edges."""
+    tables = [manifest, *manifest.get("target", {}).values()]
+    found = set()
+    for table in tables:
+        for section in ("dependencies", "dev-dependencies", "build-dependencies"):
+            for alias, spec in table.get(section, {}).items():
+                package = spec.get("package", alias) if isinstance(spec, dict) else alias
+                if package in FORBIDDEN_DEPS or package in FORBIDDEN_PACKAGES or package.startswith("tinystoragedrivers-"):
+                    found.add(package)
+    return found
+
+
+def contract_features(manifest):
+    """Include Cargo's implicit optional-dependency features in the all probe."""
+    explicit = manifest.get("features", {})
+    features = set(explicit)
+    suppressed = {
+        member.removeprefix("dep:")
+        for members in explicit.values()
+        for member in members
+        if member.startswith("dep:")
+    }
+    for table in [manifest, *manifest.get("target", {}).values()]:
+        for alias, spec in table.get("dependencies", {}).items():
+            if isinstance(spec, dict) and spec.get("optional") and alias not in suppressed:
+                features.add(alias)
+    return sorted(features)
 
 
 def run_metadata(manifest, offline=False):
@@ -253,12 +269,16 @@ def main(argv=None):
         print("\n".join(f"- {error}" for error in source_errors), file=sys.stderr)
         return 1
 
-    features = [
-        feature
-        for feature in tomllib.loads(BUS_MANIFEST.read_text(encoding="utf-8")).get("features", {})
-        if feature != "storage"
-    ]
-    for mode in ("default", "all", "storage"):
+    manifest = tomllib.loads(BUS_MANIFEST.read_text(encoding="utf-8"))
+    forbidden_direct = declared_forbidden_dependencies(manifest)
+    if forbidden_direct:
+        print(f"contract manifest declares runtime dependencies: {sorted(forbidden_direct)}", file=sys.stderr)
+        return 1
+    features = contract_features(manifest)
+    modes = ["default", "all"]
+    if "storage" in features:
+        modes.append("storage")
+    for mode in modes:
         probe = ROOT / "target/bus-purity" / mode
         (probe / "src").mkdir(parents=True, exist_ok=True)
         (probe / "src/lib.rs").write_text("pub use tinychannels_bus::*;\n", encoding="utf-8")

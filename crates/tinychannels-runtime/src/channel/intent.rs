@@ -1,9 +1,11 @@
 //! Implementation helpers for channel intent.
+// This module is the explicit v21 DTO to typed-intent conversion boundary.
+#![allow(deprecated)]
+
 use crate::traits::SendMessage;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 pub use tinychannels_bus::channel::intent::*;
-use tinychannels_bus::{ContentPart, OutboundContentPart};
 
 /// Build a provider-neutral outbound intent from the legacy rich-message JSON
 /// accepted by the `channels.send_message` controller.
@@ -31,22 +33,24 @@ pub fn outbound_intent_from_legacy_message(
         ],
     );
     let thread_id = first_string_field(&message, &["threadId", "thread_id", "thread_ts"]);
+    let turn_id = first_string_field(&message, &["turnId", "turn_id", "originatingTurnId"]);
     let topic_id = first_string_field(&message, &["topicId", "topic_id"]);
-    let conversation_ref = topic_id.map(|topic_id| tinychannels_bus::ConversationRef {
+    let conversation_ref = tinychannels_bus::ConversationRef {
         id: conversation_id.clone(),
-        topic_id: Some(topic_id),
+        thread_id: thread_id.clone(),
+        topic_id,
         ..Default::default()
-    });
+    };
 
     ChannelOutboundIntent {
         idempotency_key,
         channel_id,
         conversation_id,
         channel_ref: None,
-        conversation_ref,
-        turn_id: None,
+        conversation_ref: Some(conversation_ref),
         reply_to_id,
         thread_id,
+        turn_id,
         durability: DeliveryDurability::BestEffort,
         payload: OutboundPayload::NativeChannelData { data: message },
     }
@@ -62,8 +66,8 @@ pub fn outbound_intent_from_send_message(
         "recipient": message.recipient,
         "subject": message.subject,
         "thread_ts": message.thread_ts,
-        "topic_id": message.topic_id,
-        "reply_to_id": message.reply_to_id,
+        "replyToId": message.reply_to_id,
+        "topicId": message.topic_id,
     });
     if let Some(idempotency_key) = message.idempotency_key.as_deref()
         && !idempotency_key.trim().is_empty()
@@ -75,21 +79,16 @@ pub fn outbound_intent_from_send_message(
 
 /// Render an outbound intent back to the legacy backend message payload.
 ///
-/// This keeps the old JSON shape for native channel data and inserts
-/// Typed parts without explicit text use their ordered text parts as the legacy
-/// text fallback. Rich parts are retained unchanged. Inserts `idempotencyKey`
-/// when the payload did not already carry either camelCase or
-/// snake_case idempotency.
+/// This keeps the old JSON shape for native channel data and preserves ordered
+/// typed parts without flattening them. It inserts `idempotencyKey` when the
+/// payload did not already carry either camelCase or snake_case idempotency.
 pub fn legacy_message_value_from_outbound_intent(intent: &ChannelOutboundIntent) -> Value {
     let payload = match &intent.payload {
         OutboundPayload::Text { text } => serde_json::json!({ "text": text }),
-        OutboundPayload::Parts { text, parts } => {
-            serde_json::json!({ "text": legacy_parts_text(text.as_deref(), parts), "parts": parts })
-        }
         OutboundPayload::Media { text, media_urls } => {
             serde_json::json!({ "text": text, "mediaUrls": media_urls })
         }
-        OutboundPayload::Voice { media_url } => serde_json::json!({ "voiceUrl": media_url }),
+        OutboundPayload::Voice { voice } => serde_json::json!({ "voice": voice }),
         OutboundPayload::Files { file_urls } => serde_json::json!({ "fileUrls": file_urls }),
         OutboundPayload::Poll { question, options } => {
             serde_json::json!({ "poll": { "question": question, "options": options } })
@@ -98,28 +97,13 @@ pub fn legacy_message_value_from_outbound_intent(intent: &ChannelOutboundIntent)
             serde_json::json!({ "blocks": blocks })
         }
         OutboundPayload::NativeChannelData { data } => data.clone(),
+        OutboundPayload::Parts { parts } => serde_json::json!({ "parts": parts }),
     };
-    with_idempotency_key(payload, &intent.idempotency_key)
-}
-
-// Preserve an explicit legacy rendering; otherwise project only portable text
-// parts. Rich content stays in `parts` for providers that support it.
-pub(crate) fn legacy_parts_text(
-    text: Option<&str>,
-    parts: &[OutboundContentPart],
-) -> Option<String> {
-    text.map(str::to_owned).or_else(|| {
-        let text_parts: Vec<&str> = parts
-            .iter()
-            .filter_map(|part| match part {
-                OutboundContentPart::Content {
-                    part: ContentPart::Text { text, .. },
-                } => Some(text.as_str()),
-                _ => None,
-            })
-            .collect();
-        (!text_parts.is_empty()).then(|| text_parts.join("\n"))
-    })
+    let mut message = with_idempotency_key(payload, &intent.idempotency_key);
+    if let Some(turn_id) = intent.turn_id.as_deref() {
+        message["turnId"] = Value::String(turn_id.to_owned());
+    }
+    message
 }
 
 fn explicit_idempotency_key(message: &Value) -> Option<String> {

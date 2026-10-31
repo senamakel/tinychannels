@@ -8,6 +8,22 @@ use tinystoragedrivers_types::{
     Version, Versioned, WriteOptions,
 };
 
+#[test]
+fn every_migration_step_source_is_declared_for_host_storage_grants() {
+    let declared: std::collections::HashSet<_> = crate::storage::collections()
+        .into_iter()
+        .map(|spec| spec.name)
+        .collect();
+
+    for step in steps() {
+        assert!(
+            declared.contains(step.source),
+            "migration step source not declared: {}",
+            step.source
+        );
+    }
+}
+
 // Hand-seeded underscore-collection rows below exercise historical schema
 // transforms. The released v0.1.38 public-writer fixture is tested separately.
 
@@ -951,4 +967,27 @@ async fn concurrent_owner_opens_complete_one_legacy_migration_safely() {
             .unwrap()
             .is_some()
     );
+}
+
+#[tokio::test]
+async fn an_over_capacity_legacy_pending_queue_still_loads_its_oldest_batch() {
+    use crate::delivery::DeliveryQueueStore as _;
+    let (_backend, storage) = storage().await;
+    let docs = storage.documents().clone();
+    let over = tinychannels_bus::module_delivery::DELIVERY_PENDING_CAPACITY + 1;
+    for index in 0..over {
+        let id = format!("op-{index}");
+        seed(
+            docs.as_ref(),
+            "channels_delivery_pending",
+            &id,
+            legacy_delivery(&id),
+        )
+        .await;
+    }
+    let store = crate::storage::DocumentDeliveryStore::new(docs);
+    let loaded = store.load_pending_all().await.unwrap_or_else(|error| {
+        panic!("{over} migrated legacy pending rows made the whole queue unloadable: {error:?}")
+    });
+    assert_eq!(loaded.len(), over - 1);
 }

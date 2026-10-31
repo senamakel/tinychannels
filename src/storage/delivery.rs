@@ -151,11 +151,15 @@ fn write_options() -> WriteOptions {
 }
 
 fn decode_entry(found: Versioned<Value>) -> Result<QueuedDelivery, DeliveryQueueError> {
-    let stored: StoredDelivery = serde_json::from_value(found.doc)
-        .map_err(|_| invalid("stored delivery record is unreadable"))?;
-    let entry = queued_from_stored_delivery(stored);
+    let entry = match serde_json::from_value::<StoredDelivery>(found.doc.clone()) {
+        Ok(stored) => queued_from_stored_delivery(stored),
+        Err(_) => serde_json::from_value::<QueuedDelivery>(found.doc)
+            .map_err(|_| invalid("stored delivery record is unreadable"))?,
+    };
     // The id is derived from the intent, so the document must sit under it.
-    if doc_id(&entry.id).ok().as_deref() != Some(found.id.as_str()) {
+    // Older records used the raw id as their document key; current records
+    // hash it so arbitrary idempotency keys remain valid storage identifiers.
+    if doc_id(&entry.id).ok().as_deref() != Some(found.id.as_str()) && entry.id != found.id {
         return Err(invalid("stored delivery record is unreadable"));
     }
     validate_entry(&entry)?;
@@ -234,16 +238,28 @@ impl DeliveryQueueStore for DocumentDeliveryStore {
 
     async fn load_pending_all(&self) -> Result<Vec<QueuedDelivery>, DeliveryQueueError> {
         let query = Query::all().sort(Sort::asc("enqueued_ms"));
-        let found = self
+        let mut found = self
             .docs()
             .await?
             .query_all(PENDING_COLLECTION, &query)
             .await
             .map_err(store_error)?;
-        if found.len() > DELIVERY_PENDING_CAPACITY {
-            return Err(invalid("stored pending queue is oversized"));
-        }
-        found.into_iter().map(decode_entry).collect()
+        // A queue over capacity (a legacy migration copies rows uncapped) or
+        // an unreadable row must not stop every other entry from draining:
+        // take the oldest batch and leave unreadable rows in place.
+        // ponytail: unreadable rows still count toward `save_pending`'s
+        // capacity; move them to the failed collection if that ever bites.
+        found.truncate(DELIVERY_PENDING_CAPACITY);
+        Ok(found
+            .into_iter()
+            .filter_map(|doc| {
+                decode_entry(doc)
+                    .inspect_err(|_| {
+                        tracing::warn!("{LOG_PREFIX} skipping unreadable pending delivery");
+                    })
+                    .ok()
+            })
+            .collect())
     }
 
     async fn remove_pending(&self, id: &str) -> Result<(), DeliveryQueueError> {

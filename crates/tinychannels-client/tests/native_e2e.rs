@@ -41,11 +41,7 @@ fn proxy(selector: &str) -> HttpProxyPolicy {
 fn assert_one_module_fault(reports: &support::Reports) {
     assert_eq!(
         reports.entries(),
-        [(
-            "tinychannels".into(),
-            "0.1.39".into(),
-            "module_fault".into()
-        )]
+        [("tinychannels".into(), "0.2.0".into(), "module_fault".into())]
     );
 }
 
@@ -138,7 +134,7 @@ async fn all_public_wrappers_route_to_the_pinned_peer_and_decode_typed_results()
 
     // The fixture validates full config, bot token, IDs, every proxy field,
     // and the non-default timeout before returning these typed results.
-    assert_eq!(record.version, "0.1.39");
+    assert_eq!(record.version, "0.2.0");
 }
 
 #[tokio::test]
@@ -196,7 +192,7 @@ async fn malformed_public_responses_report_one_sanitized_module_fault() {
         fixture.reports.entries(),
         [(
             "tinychannels".into(),
-            "0.1.39".into(),
+            "0.2.0".into(),
             "incompatible_contract".into()
         )]
     );

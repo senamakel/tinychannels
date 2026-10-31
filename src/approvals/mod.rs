@@ -14,9 +14,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::capabilities::capabilities_for;
 use crate::context::conversation_history_key_parts;
 use crate::traits::{Channel, ChannelSendExt, SendMessage};
+pub use tinychannels_bus::ReplyContext;
 
 const LOG_PREFIX: &str = "[channel-approval]";
 
@@ -25,13 +25,6 @@ pub fn format_approval_prompt(tool_name: &str, action_summary: &str) -> String {
     format!(
         "🔐 Approval needed\nTool: `{tool_name}`\nAction: {action_summary}\n\nReply `yes` to approve or `no` to deny."
     )
-}
-
-/// Where to deliver a prompt for a conversation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReplyContext {
-    pub reply_target: String,
-    pub thread_ts: Option<String>,
 }
 
 /// A parked tool call to ask about.
@@ -86,7 +79,11 @@ impl ApprovalSurface {
         reply_target: &str,
         thread_ts: Option<&str>,
     ) {
-        if !capabilities_for(channel).chat_approvals {
+        if !self
+            .channels_by_name
+            .get(channel)
+            .is_some_and(|provider| provider.capabilities().chat_approvals)
+        {
             return;
         }
         let key = conversation_history_key_parts(channel, sender, reply_target, thread_ts);
@@ -118,9 +115,6 @@ impl ApprovalSurface {
             channel: channel_name,
             ..
         } = prompt;
-        if !capabilities_for(channel_name).chat_approvals {
-            return SurfaceOutcome::Unsupported;
-        }
         let Some(reply_ctx) = self.reply_context(thread_id) else {
             tracing::warn!(
                 "{LOG_PREFIX} no reply context recorded for channel={channel_name} \
@@ -136,6 +130,9 @@ impl ApprovalSurface {
             );
             return SurfaceOutcome::ChannelNotRegistered;
         };
+        if !channel.capabilities().chat_approvals {
+            return SurfaceOutcome::Unsupported;
+        }
 
         let body = format_approval_prompt(tool_name, &prompt.action_summary);
         let send = SendMessage::new(body, &reply_ctx.reply_target).in_thread(reply_ctx.thread_ts);

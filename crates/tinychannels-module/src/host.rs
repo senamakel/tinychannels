@@ -48,7 +48,9 @@
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
+use std::time::Duration;
 use tinybus::{BusName, Connection, Error, Result};
+use tinychannels_bus::ChannelEvent;
 use tinychannels_bus::names::{HOST_BUS_NAME, HOST_OBJECT_PATH, host_methods};
 use tinychannels_bus::{ChannelBackendRequest, ChannelBackendResult};
 use tinychannels_bus::{HostEventPublication, HostTranscriptionRequest, HostTranscriptionResult};
@@ -58,8 +60,12 @@ use tokio::task::JoinHandle;
 const OUTBOX_CAPACITY: usize = 256;
 const MAX_CALLBACK_BYTES: usize = 128 * 1024;
 const MAX_TRANSCRIPTION_REQUEST_BYTES: usize = 12 * 1024 * 1024;
+// Base64 expands audio by 4/3. A 12 MiB serialized callback remains below
+// TinyBus's 16 MiB frame limit in both directions, including JSON overhead.
+const MAX_VOICE_CALLBACK_BYTES: usize = 12 * 1024 * 1024;
 const MAX_ACTIVE_HOST_CALLBACKS: usize = 16;
 const MAX_CONTROLLER_PAYLOAD_BYTES: usize = 1024 * 1024;
+const HOST_VOICE_CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[path = "host_dispatch.rs"]
 mod dispatch;
@@ -81,6 +87,10 @@ enum Notification {
     },
     PublishEvent {
         publication: HostEventPublication,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    DeliverEvent {
+        event: Box<ChannelEvent>,
         reply: oneshot::Sender<Result<()>>,
     },
     Barrier {
@@ -277,6 +287,26 @@ impl HostChannels {
                     let _ = reply.send(result);
                     continue;
                 }
+                if let Notification::DeliverEvent { event, reply } = notification {
+                    // Typed events share provider ingress order with messages.
+                    // Scoped runtimes may still be processing an earlier
+                    // message in the parallel dispatcher after its notification
+                    // left this queue, so drain that accepted frontier first.
+                    if let Some(dispatcher) = dispatcher.as_ref() {
+                        dispatcher.flush().await;
+                    }
+                    let result = async {
+                        let proxy = callback_connection.proxy(
+                            HOST_BUS_NAME,
+                            callback_path.as_ref(),
+                            HOST_BUS_NAME,
+                        )?;
+                        proxy.call::<()>(host_methods::DELIVER_EVENT, *event).await
+                    }
+                    .await;
+                    let _ = reply.send(result);
+                    continue;
+                }
                 let inbound = matches!(notification, Notification::DeliverInbound { .. });
                 let result = async {
                     let proxy = callback_connection.proxy(
@@ -301,6 +331,7 @@ impl HostChannels {
                         }
                         Notification::PersistAllowedIdentity { .. } => unreachable!(),
                         Notification::PublishEvent { .. } => unreachable!(),
+                        Notification::DeliverEvent { .. } => unreachable!(),
                         Notification::Barrier { .. } => Ok(()),
                     }
                 }
@@ -427,6 +458,191 @@ impl HostChannels {
             .map_err(|_| Error::failed("transcription callback was interrupted"))?
     }
 
+    /// Run a scoped voice callback with symmetric frame bounds, bounded
+    /// lifetime, and shutdown ownership. The spawned callback remains tracked
+    /// if the caller cancels its waiter.
+    async fn voice_callback<Request, Response>(
+        &self,
+        method: &'static str,
+        request: Request,
+    ) -> Result<Response>
+    where
+        Request: serde::Serialize + Send + 'static,
+        Response: serde::de::DeserializeOwned + serde::Serialize + Send + 'static,
+    {
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > MAX_VOICE_CALLBACK_BYTES)
+        {
+            return Err(Error::failed("voice callback request exceeds byte limit"));
+        }
+        let publication = self.owner.publication.lock().await;
+        if self.owner.terminal.load(Ordering::SeqCst) {
+            return Err(Error::failed("callback consumer is closed"));
+        }
+        if self.owner.active_callbacks.fetch_add(1, Ordering::SeqCst) >= MAX_ACTIVE_HOST_CALLBACKS {
+            self.owner.active_callbacks.fetch_sub(1, Ordering::SeqCst);
+            return Err(Error::failed("too many active voice callbacks"));
+        }
+        let owner = self.owner.clone();
+        let connection = self.connection.clone();
+        let object_path = self.object_path.clone();
+        let (reply, wait) = oneshot::channel();
+        drop(publication);
+        tokio::spawn(async move {
+            let _active = ActiveHostCallback(owner);
+            let result = tokio::time::timeout(HOST_VOICE_CALLBACK_TIMEOUT, async {
+                let proxy = connection.proxy(HOST_BUS_NAME, object_path.as_ref(), HOST_BUS_NAME)?;
+                let response: Response = proxy.call(method, request).await?;
+                if serde_json::to_vec(&response)
+                    .map_or(true, |bytes| bytes.len() > MAX_VOICE_CALLBACK_BYTES)
+                {
+                    return Err(Error::failed("voice callback response exceeds byte limit"));
+                }
+                Ok(response)
+            })
+            .await
+            .unwrap_or_else(|_| Err(Error::failed("voice callback timed out")));
+            let _ = reply.send(result);
+        });
+        wait.await
+            .map_err(|_| Error::failed("voice callback was interrupted"))?
+    }
+
+    /// Request scoped speech transcription from the host.
+    pub async fn transcribe_voice(
+        &self,
+        request: tinychannels_bus::HostVoiceTranscriptionRequest,
+    ) -> Result<HostTranscriptionResult> {
+        self.voice_callback(host_methods::TRANSCRIBE_VOICE, request)
+            .await
+    }
+
+    /// Request scoped speech synthesis from the host.
+    pub async fn synthesize_speech(
+        &self,
+        request: tinychannels_bus::HostSpeechSynthesisRequest,
+    ) -> Result<tinychannels_bus::HostSpeechSynthesisResult> {
+        let result: tinychannels_bus::HostSpeechSynthesisResult = self
+            .voice_callback(host_methods::SYNTHESIZE_SPEECH, request)
+            .await?;
+        if result.audio_base64.trim().is_empty() || result.mime_type.trim().is_empty() {
+            return Err(Error::failed(
+                "voice callback returned unusable speech audio",
+            ));
+        }
+        Ok(result)
+    }
+
+    /// Persist audio through the host and receive its opaque durable reference.
+    pub async fn store_voice_media(
+        &self,
+        request: tinychannels_bus::HostStoreVoiceMediaRequest,
+    ) -> Result<tinychannels_bus::HostStoreVoiceMediaResult> {
+        self.voice_callback(host_methods::STORE_VOICE_MEDIA, request)
+            .await
+    }
+
+    /// Resolve scoped media bytes for a provider-native upload.
+    pub async fn read_voice_media(
+        &self,
+        request: tinychannels_bus::HostReadVoiceMediaRequest,
+    ) -> Result<tinychannels_bus::HostReadVoiceMediaResult> {
+        let maximum = usize::try_from(request.max_bytes)
+            .map_err(|_| Error::failed("voice media byte limit is invalid"))?;
+        let result: tinychannels_bus::HostReadVoiceMediaResult = self
+            .voice_callback(host_methods::READ_VOICE_MEDIA, request)
+            .await?;
+        let decoded = base64::Engine::decode(
+            &base64::engine::general_purpose::STANDARD,
+            &result.audio_base64,
+        )
+        .map_err(|_| Error::failed("host returned invalid base64 voice media"))?;
+        if decoded.len() > maximum {
+            return Err(Error::failed(
+                "host returned voice media above requested limit",
+            ));
+        }
+        Ok(result)
+    }
+
+    /// Resolve host-authoritative voice policy for the active scoped turn.
+    pub async fn voice_reply_policy(
+        &self,
+        request: tinychannels_bus::HostVoiceReplyPolicyRequest,
+    ) -> Result<tinychannels_bus::HostVoiceReplyPolicy> {
+        self.voice_callback(host_methods::GET_VOICE_REPLY_POLICY, request)
+            .await
+    }
+
+    /// Call the loaded TinyVoice codec module over its minimal bus contract.
+    pub async fn transcode_voice(
+        &self,
+        request: tinyvoice_bus::codec::CodecTranscodeRequest,
+    ) -> Result<tinyvoice_bus::codec::CodecOutput> {
+        const LIMIT: usize = 12 * 1024 * 1024;
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > LIMIT) {
+            return Err(Error::failed("voice codec request exceeds byte limit"));
+        }
+        let proxy = self.connection.proxy(
+            tinyvoice_bus::BUS_NAME,
+            tinyvoice_bus::OBJECT_PATH,
+            tinyvoice_bus::BUS_NAME,
+        )?;
+        let response: tinyvoice_bus::codec::CodecOutput = tokio::time::timeout(
+            HOST_VOICE_CALLBACK_TIMEOUT,
+            proxy.call(tinyvoice_bus::names::methods::CODEC_TRANSCODE, (request,)),
+        )
+        .await
+        .map_err(|_| Error::failed("TinyVoice codec call timed out"))??;
+        if serde_json::to_vec(&response).map_or(true, |bytes| bytes.len() > LIMIT) {
+            return Err(Error::failed("voice codec response exceeds byte limit"));
+        }
+        Ok(response)
+    }
+
+    /// Probe media through the loaded TinyVoice codec module.
+    pub async fn probe_voice(
+        &self,
+        request: tinyvoice_bus::codec::CodecInput,
+    ) -> Result<tinyvoice_bus::codec::CodecInfo> {
+        const LIMIT: usize = 12 * 1024 * 1024;
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > LIMIT) {
+            return Err(Error::failed("voice codec probe exceeds byte limit"));
+        }
+        let proxy = self.connection.proxy(
+            tinyvoice_bus::BUS_NAME,
+            tinyvoice_bus::OBJECT_PATH,
+            tinyvoice_bus::BUS_NAME,
+        )?;
+        tokio::time::timeout(
+            HOST_VOICE_CALLBACK_TIMEOUT,
+            proxy.call(tinyvoice_bus::names::methods::CODEC_PROBE, (request,)),
+        )
+        .await
+        .map_err(|_| Error::failed("TinyVoice codec probe timed out"))?
+    }
+
+    /// Extract a bounded normalized waveform through TinyVoice.
+    pub async fn waveform_voice(
+        &self,
+        request: tinyvoice_bus::codec::WaveformRequest,
+    ) -> Result<tinyvoice_bus::codec::WaveformResult> {
+        const LIMIT: usize = 12 * 1024 * 1024;
+        if serde_json::to_vec(&request).map_or(true, |bytes| bytes.len() > LIMIT) {
+            return Err(Error::failed("voice waveform request exceeds byte limit"));
+        }
+        let proxy = self.connection.proxy(
+            tinyvoice_bus::BUS_NAME,
+            tinyvoice_bus::OBJECT_PATH,
+            tinyvoice_bus::BUS_NAME,
+        )?;
+        tokio::time::timeout(
+            HOST_VOICE_CALLBACK_TIMEOUT,
+            proxy.call(tinyvoice_bus::names::methods::CODEC_WAVEFORM, (request,)),
+        )
+        .await
+        .map_err(|_| Error::failed("TinyVoice waveform call timed out"))?
+    }
+
     /// Invoke one bounded host-owned credential, persistence, or managed API
     /// capability required by the module's controller adapter.
     pub async fn dispatch_controller_backend(
@@ -491,9 +707,83 @@ impl HostChannels {
             .map_err(|_| Error::failed("event publication was interrupted"))?
     }
 
+    /// Deliver one typed provider event over the scoped host callback.
+    pub async fn deliver_event(&self, event: ChannelEvent) -> Result<()> {
+        if serde_json::to_vec(&event).map_or(true, |bytes| bytes.len() > MAX_CALLBACK_BYTES) {
+            return Err(Error::failed("channel event callback byte limit exceeded"));
+        }
+        let (reply, wait) = oneshot::channel();
+        let _publication = self.owner.publication.lock().await;
+        if self.owner.terminal.load(Ordering::SeqCst) {
+            return Err(Error::failed("callback consumer is closed"));
+        }
+        self.outbox
+            .send(Notification::DeliverEvent {
+                event: Box::new(event),
+                reply,
+            })
+            .await
+            .map_err(|_| Error::failed("callback consumer is closed"))?;
+        drop(_publication);
+        match wait
+            .await
+            .map_err(|_| Error::failed("event delivery was interrupted"))?
+        {
+            Err(error)
+                if error.wire_name() == "ai.tinyhumans.tinybus.Error.NameHasNoOwner"
+                    || error.wire_name() == "ai.tinyhumans.tinybus.Error.MemberNotFound" =>
+            {
+                Ok(())
+            }
+            result => result,
+        }
+    }
+
+    /// Deliver one typed provider event and preserve whether failure came
+    /// from invalid ingress, a closed consumer, or the host callback itself.
+    pub async fn try_deliver_event(
+        &self,
+        event: ChannelEvent,
+    ) -> std::result::Result<(), tinychannels::channel::ChannelSendError> {
+        if serde_json::to_vec(&event).map_or(true, |bytes| bytes.len() > MAX_CALLBACK_BYTES) {
+            return Err(ingress_rejected_error());
+        }
+        if self.owner.terminal.load(Ordering::SeqCst) {
+            return Err(inbound_host_closed_error());
+        }
+        match self.deliver_event(event).await {
+            Ok(()) => Ok(()),
+            Err(error) if error.to_string() == "callback consumer is closed" => {
+                Err(inbound_host_closed_error())
+            }
+            Err(error) => {
+                tracing::warn!(%error, "channel host ingress callback failed");
+                Err(host_ingress_transient_error())
+            }
+        }
+    }
+
     /// Enqueue one inbound message; a flush observes delivery failures.
-    pub async fn deliver_inbound(&self, channel: &str, message: serde_json::Value) {
-        self.deliver_inbound_value(channel, message).await;
+    pub async fn deliver_inbound(
+        &self,
+        channel: &str,
+        envelope: tinychannels_bus::ChannelInboundEnvelope,
+    ) {
+        if let Err(error) = self.try_deliver_inbound(channel, envelope).await {
+            record_failure(&self.owner.failure, error.message);
+        }
+    }
+
+    /// Enqueue one inbound message and report rejection to an adapter that can
+    /// retry it. The legacy [`Self::deliver_inbound`] method retains its
+    /// fire-and-forget behavior for existing callers.
+    pub async fn try_deliver_inbound(
+        &self,
+        channel: &str,
+        envelope: tinychannels_bus::ChannelInboundEnvelope,
+    ) -> std::result::Result<(), tinychannels::channel::ChannelSendError> {
+        let message = serde_json::to_value(envelope).map_err(|_| ingress_rejected_error())?;
+        self.try_deliver_inbound_value(channel, message).await
     }
 
     /// Enqueue authenticated relay provenance with its normalized envelope.
@@ -513,18 +803,26 @@ impl HostChannels {
     }
 
     async fn deliver_inbound_value(&self, channel: &str, message: serde_json::Value) {
-        if serde_json::to_vec(&message).map_or(true, |bytes| bytes.len() > MAX_CALLBACK_BYTES) {
-            record_failure(
-                &self.owner.failure,
-                "inbound callback byte limit exceeded".into(),
-            );
-            return;
+        if let Err(error) = self.try_deliver_inbound_value(channel, message).await {
+            record_failure(&self.owner.failure, error.message);
         }
-        self.enqueue(Notification::DeliverInbound {
+    }
+
+    async fn try_deliver_inbound_value(
+        &self,
+        channel: &str,
+        message: serde_json::Value,
+    ) -> std::result::Result<(), tinychannels::channel::ChannelSendError> {
+        if serde_json::to_vec(&message).map_or(true, |bytes| bytes.len() > MAX_CALLBACK_BYTES) {
+            return Err(ingress_rejected_error());
+        }
+        self.enqueue_result(Notification::DeliverInbound {
             channel: channel.to_owned(),
             message,
         })
-        .await;
+        .await
+        .map_err(|_| inbound_host_closed_error())?;
+        Ok(())
     }
 
     /// Enqueue a status fact after preceding inbound messages.
@@ -568,12 +866,20 @@ impl HostChannels {
     }
 
     async fn enqueue(&self, notification: Notification) {
-        let _publication = self.owner.publication.lock().await;
-        if self.owner.terminal.load(Ordering::SeqCst)
-            || self.outbox.send(notification).await.is_err()
-        {
-            record_failure(&self.owner.failure, "callback consumer is closed".into());
+        if let Err(error) = self.enqueue_result(notification).await {
+            record_failure(&self.owner.failure, error.to_string());
         }
+    }
+
+    async fn enqueue_result(&self, notification: Notification) -> Result<()> {
+        let _publication = self.owner.publication.lock().await;
+        if self.owner.terminal.load(Ordering::SeqCst) {
+            return Err(Error::failed("callback consumer is closed"));
+        }
+        self.outbox
+            .send(notification)
+            .await
+            .map_err(|_| Error::failed("callback consumer is closed"))
     }
 
     /// Await all preceding callbacks, returning an observed terminal delivery error.
@@ -640,6 +946,32 @@ impl HostChannels {
         }
     }
 }
+
+fn ingress_rejected_error() -> tinychannels::channel::ChannelSendError {
+    tinychannels::channel::ChannelSendError {
+        kind: tinychannels::channel::SendErrorKind::BadFormat,
+        message: "channel host rejected ingress payload".into(),
+        ..Default::default()
+    }
+}
+
+fn inbound_host_closed_error() -> tinychannels::channel::ChannelSendError {
+    tinychannels::channel::ChannelSendError {
+        kind: tinychannels::channel::SendErrorKind::Unknown,
+        message: "channel host ingress consumer is closed".into(),
+        ..Default::default()
+    }
+}
+
+fn host_ingress_transient_error() -> tinychannels::channel::ChannelSendError {
+    tinychannels::channel::ChannelSendError {
+        kind: tinychannels::channel::SendErrorKind::Transient,
+        message: "channel host ingress callback failed".into(),
+        retryable: true,
+        ..Default::default()
+    }
+}
+
 fn record_failure(failure: &StdMutex<Option<String>>, error: String) {
     let mut failure = failure.lock().unwrap_or_else(|error| error.into_inner());
     if failure.is_none() {

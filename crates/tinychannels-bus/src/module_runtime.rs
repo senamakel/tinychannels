@@ -2,12 +2,21 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub const CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 180;
-pub const MIN_CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 1;
+/// Smallest accepted channel message timeout in seconds.
+///
+/// Hosts validate the module-prepared runtime limits against this contract
+/// value instead of depending on the runtime implementation crate.
+pub const MIN_CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 30;
+/// Default timeout for channel message processing, in seconds.
+pub const CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 300;
+/// Default interval for refreshing an active typing indicator, in seconds.
 pub const CHANNEL_TYPING_REFRESH_INTERVAL_SECS: u64 = 4;
-pub const DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS: u64 = 1;
+/// Default initial delay before restarting a failed channel listener, in seconds.
+pub const DEFAULT_CHANNEL_INITIAL_BACKOFF_SECS: u64 = 2;
+/// Default maximum delay before restarting a failed channel listener, in seconds.
 pub const DEFAULT_CHANNEL_MAX_BACKOFF_SECS: u64 = 60;
-pub const MAX_CHANNEL_HISTORY: usize = 100;
+/// Maximum number of legacy channel history messages retained per conversation.
+pub const MAX_CHANNEL_HISTORY: usize = 50;
 
 /// Inert reservation returned before any provider, callback worker or relay starts.
 ///
@@ -57,7 +66,7 @@ impl ChannelRuntimeReservation {
 }
 
 /// Opt-in turn dispatch for a reserved runtime. Legacy `StartRuntime` retains
-/// serial `DeliverInbound` notifications; this policy uses `ProcessInbound`
+/// serial `DeliverInbound` envelope notifications; this policy uses `ProcessInbound`
 /// callbacks with module-owned bounded concurrency and stop/drain ownership.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -90,6 +99,10 @@ pub struct ConfiguredChannelInfo {
 }
 
 /// Legacy message vocabulary whose normalization and hashing stay in the module.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "message preparation variants retain their established serialized contract"
+)]
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", content = "message", rename_all = "snake_case")]
 pub enum ChannelMessagePreparation {

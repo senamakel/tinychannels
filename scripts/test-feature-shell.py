@@ -30,7 +30,8 @@ class FeatureShellTests(unittest.TestCase):
                 ]), "feature-shell", str(ROOT / "scripts/test-features.sh")],
                 env=dict(os.environ, PATH=directory + os.pathsep + os.environ["PATH"],
                          FEATURE_TEST_PYTHON=sys.executable,
-                         FEATURE_TEST_SKIP_CLIENT_PREPARE="1", RUNNER_OS="Linux"),
+                         FEATURE_TEST_SKIP_CLIENT_PREPARE="1",
+                         FEATURE_TEST_BASH=shutil.which("bash"), RUNNER_OS="Linux"),
                 capture_output=True, text=True,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

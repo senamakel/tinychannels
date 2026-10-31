@@ -1,6 +1,6 @@
 //! Requests for module-owned channel command and presentation preparation.
-use crate::module_remote::RemoteRoute;
-use crate::{ChannelCapabilities, ChannelMessage};
+use crate::module_remote::{RemoteRoute, RemoteSessionScope};
+use crate::{ChannelCapabilities, ChannelMessage, LegacyChannelCapabilities};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -11,10 +11,13 @@ pub struct ProviderDescriptor {
     pub aliases: Vec<String>,
 }
 
-/// One configured channel instance available to a module command.
+/// Module-described authority for the exact configured instance associated
+/// with a route-preparation request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ConfiguredControlChannel {
+    /// Configured instance name, which may include an account suffix.
     pub name: String,
+    /// Capabilities returned by the module's configured-instance descriptor.
     pub capabilities: ChannelCapabilities,
 }
 
@@ -25,8 +28,20 @@ pub enum ChannelControlRequest {
     Route {
         workspace_dir: String,
         message: Box<ChannelMessage>,
+        /// Capabilities of the configured channel instance selected by the host.
+        /// Isolated turn runtimes do not own provider instances themselves.
+        /// Missing values retain compatibility with callers that rely on the
+        /// module's own configured provider registry.
+        #[serde(default)]
+        capabilities: Option<Box<ChannelCapabilities>>,
         route: RemoteRoute,
         history_len: usize,
+        session_scope: Option<Box<RemoteSessionScope>>,
+        /// Trusted descriptor facts for the exact active configured channel.
+        /// The host supplies them when preparing a command through a
+        /// temporary callback object that has no running provider map.
+        #[serde(default)]
+        configured_channel: Option<Box<ConfiguredControlChannel>>,
         providers: Vec<ProviderDescriptor>,
     },
     RuntimeLimits {
@@ -42,6 +57,11 @@ pub enum ChannelControlRequest {
         message: String,
     },
     Capabilities {
+        channel: String,
+    },
+    /// Return the canonical configured-instance descriptor without changing
+    /// the frozen `Capabilities` response payload.
+    CapabilitiesV2 {
         channel: String,
     },
     Acknowledgment {
@@ -67,7 +87,8 @@ pub enum ChannelControlResult {
     },
     Connected(bool),
     Overflow(bool),
-    Capabilities(ChannelCapabilities),
+    Capabilities(LegacyChannelCapabilities),
+    CapabilitiesV2(Box<ChannelCapabilities>),
     Approval(String),
     Acknowledgment(String),
 }

@@ -8,7 +8,7 @@ use tinychannels_bus::module_web_output::{
     BeginWebTurn, EndWebTurn, ProjectWebOutput, WebOutputEvents, WebTurnHandle,
 };
 use tinychannels_bus::web::WebChannelEvent;
-use tinychannels_runtime::web::WebTurnProjector;
+use tinychannels_runtime::adapters::web::WebTurnProjector;
 
 const MAX_ACTIVE_WEB_TURNS: usize = 256;
 const MAX_WEB_TURN_CONTEXT_FIELD_BYTES: usize = 1024;

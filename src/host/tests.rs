@@ -19,11 +19,14 @@ impl TurnDispatcher for MockDispatcher {
             let _ = tx
                 .send(ChannelOutputEvent::TextDelta {
                     text: "thinking".into(),
+                    iteration: None,
                 })
                 .await;
             let _ = tx
                 .send(ChannelOutputEvent::FinalMessage {
                     text: format!("done:{echoed}"),
+                    parts: vec![],
+                    receipt: None,
                 })
                 .await;
         });
@@ -50,6 +53,30 @@ impl Transcriber for MockTranscriber {
     }
 }
 
+struct MockMediaRepository;
+
+#[async_trait]
+impl MediaRepository for MockMediaRepository {
+    async fn store_media(
+        &self,
+        _: MediaStoreRequest,
+    ) -> anyhow::Result<tinychannels_bus::MediaReference> {
+        Ok(tinychannels_bus::MediaReference::default())
+    }
+    async fn store_media_stream(
+        &self,
+        _: MediaStreamRequest,
+    ) -> anyhow::Result<tinychannels_bus::MediaReference> {
+        Ok(tinychannels_bus::MediaReference::default())
+    }
+    async fn read_media(&self, _: MediaScope, _: String, _: u64) -> anyhow::Result<StoredMedia> {
+        anyhow::bail!("not implemented in host fixture")
+    }
+    async fn delete_media(&self, _: MediaScope, _: String) -> anyhow::Result<bool> {
+        Ok(false)
+    }
+}
+
 struct YesApprovals;
 
 #[async_trait]
@@ -73,6 +100,7 @@ fn noop_host_advertises_nothing() {
     let host = NoopHost;
     assert!(host.dispatcher().is_none());
     assert!(host.transcriber().is_none());
+    assert!(host.media_repository().is_none());
     assert!(host.approvals().is_none());
     assert!(host.ledger().is_none());
     assert!(host.capabilities().is_lean());
@@ -97,6 +125,7 @@ fn builder_advertises_only_plugged_capabilities() {
     let host = ChannelHostBuilder::new()
         .dispatcher(Arc::new(MockDispatcher))
         .transcriber(Arc::new(MockTranscriber))
+        .media_repository(Arc::new(MockMediaRepository))
         .approvals(Arc::new(YesApprovals))
         .build();
 
@@ -104,6 +133,8 @@ fn builder_advertises_only_plugged_capabilities() {
     assert!(caps.turn_dispatch);
     assert!(caps.stt);
     assert!(caps.approvals);
+    assert!(caps.media_repository);
+    assert!(host.media_repository().is_some());
     // Not plugged:
     assert!(!caps.tts);
     assert!(!caps.reaction_gate);
@@ -133,7 +164,7 @@ async fn dispatch_streams_output_events() {
     assert_eq!(events.len(), 2);
     assert!(matches!(events[0], ChannelOutputEvent::TextDelta { .. }));
     match &events[1] {
-        ChannelOutputEvent::FinalMessage { text } => assert_eq!(text, "done:m42"),
+        ChannelOutputEvent::FinalMessage { text, .. } => assert_eq!(text, "done:m42"),
         other => panic!("unexpected final event: {other:?}"),
     }
 }

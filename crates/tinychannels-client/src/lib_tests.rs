@@ -22,7 +22,7 @@ use tinychannels_bus::{
 #[path = "lib_runtime_tests.rs"]
 mod runtime_tests;
 
-const MODULE_ID: &str = "tinychannels";
+const MODULE_ID: &str = tinychannels_bus::MODULE_ID;
 type Calls = Arc<Mutex<Vec<String>>>;
 
 struct NoFailures;
@@ -129,7 +129,7 @@ async fn unattested_client() -> (TinyChannelsClient, Calls, Proxy) {
         id: MODULE_ID,
         bus_name: tinychannels_bus::BUS_NAME,
         object_path: tinychannels_bus::OBJECT_PATH,
-        version: "0.1.39",
+        version: "0.2.0",
         release_url: "https://example.invalid/tinychannels",
         assets,
     }));

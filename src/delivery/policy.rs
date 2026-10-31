@@ -91,10 +91,9 @@ pub fn required_durable_final_capabilities(
         OutboundPayload::Poll { .. } => {
             requirements.insert(DurableFinalDeliveryCapability::Poll, true);
         }
-        OutboundPayload::PresentationBlocks { .. } | OutboundPayload::NativeChannelData { .. } => {
-            requirements.insert(DurableFinalDeliveryCapability::Payload, true);
-        }
-        OutboundPayload::Parts { .. } => {
+        OutboundPayload::PresentationBlocks { .. }
+        | OutboundPayload::NativeChannelData { .. }
+        | OutboundPayload::Parts { .. } => {
             requirements.insert(DurableFinalDeliveryCapability::Payload, true);
         }
     }

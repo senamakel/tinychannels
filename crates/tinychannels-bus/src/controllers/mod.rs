@@ -24,4 +24,13 @@ pub use types::{
 };
 
 pub use discord::{BotPermissionCheck, DiscordGuild, DiscordTextChannel};
-pub use requests::*;
+pub use requests::{
+    ChannelConnectRequest, ChannelCreateThreadRequest, ChannelDescribeRequest,
+    ChannelDisconnectRequest, ChannelListThreadsRequest, ChannelSendMessageRequest,
+    ChannelSendReactionRequest, ChannelSetDefaultRequest, ChannelStatusRequest, ChannelTestRequest,
+    ChannelUpdateThreadRequest, DiscordCheckPermissionsRequest, DiscordListChannelsRequest,
+};
+
+#[cfg(test)]
+#[path = "requests_tests.rs"]
+mod requests_tests;

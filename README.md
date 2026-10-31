@@ -15,6 +15,25 @@ schema, connection metadata, route helpers, and backend delegation layer used to
 connect channel surfaces to OpenHuman harnesses without coupling this crate to
 the OpenHuman application crate.
 
+> **Channel contract:** the normative v2 target and migration rules are in
+> [docs/spec/contract-v2.md](docs/spec/contract-v2.md). This README describes
+> the current crate and implementation; it does not define the v2 wire
+> contract.
+
+The configured-provider factory returns adapter-backed `BuiltChannel` values
+to the module runtime. `ChannelAdapter` and its optional ports define that
+runtime surface; legacy `Channel` APIs remain for source compatibility and are
+not the production factory path. The v2 bus types, account-specific capability
+descriptors, relay transport, and progressive delivery operations are in use.
+Support still varies by configured provider and installed host services. See
+the [architecture](docs/channel-architecture.md),
+[capability index](docs/channel-capabilities.md),
+[contracts](docs/channel-contracts.md), [delivery](docs/channel-delivery.md),
+and [provider capability and conformance matrix](docs/channel-providers.md).
+The [contract specification](docs/spec/contract-v2.md) records the normative
+wire contract and historical migration requirements; use the current provider
+matrix and runtime descriptors for implementation status.
+
 Configured provider discovery, legacy intent normalization, and external-webhook
 outbound startup are confidential module operations. The catalog returns provider
 facts without listening; outbound-only startup preserves Linq and WhatsApp Cloud
@@ -57,9 +76,11 @@ preparation payload limit and fail after module shutdown.
 - adapters for OpenHuman channel surfaces
 - observability and lifecycle hooks around channel traffic
 
-Runtime side effects are pluggable through `ChannelBackend`. OpenHuman owns the
-actual backend implementation for REST/JWT/config storage, while this crate
-validates channel metadata and delegates operations through that trait.
+Provider runtime work runs through TinyChannels module operations. OpenHuman
+owns application policy, identity, authorization, and agent/session behavior;
+it supplies scoped host services such as media, voice, events, and storage
+through the module boundary. TinyChannels owns provider transports,
+normalization, and delivery policy.
 
 ## Provider Features
 

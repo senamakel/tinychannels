@@ -1,10 +1,14 @@
+use crate::channel::ChannelInboundEnvelope;
 use serde::{Deserialize, Serialize};
 
-/// A message received from or sent to a channel
+/// Legacy v21 message projection retained for one release during v22 migration.
+/// New `DeliverInbound` callbacks carry [`crate::ChannelInboundEnvelope`].
 ///
-/// Serde-derived because this type crosses the bus: the module forwards it to
-/// the host's `DeliverInbound` callback. Field names are the wire contract —
-/// renaming one is a decode failure at the far end, not a compile error.
+/// Serde field names remain the v21 wire contract for compatibility shims.
+#[deprecated(
+    since = "0.1.34",
+    note = "v21 compatibility shim; use ChannelInboundEnvelope for canonical v22 inbound content"
+)]
 ///
 /// `Default` is derived so a caller that fills only some fields can spread
 /// `..Default::default()` and keep compiling when an optional field is added.
@@ -19,12 +23,22 @@ pub struct ChannelMessage {
     /// Platform thread identifier (e.g. Slack `ts`, Discord thread ID).
     /// When set, replies should be posted as threaded responses.
     pub thread_ts: Option<String>,
-    /// Provider topic identifier when distinct from the conversation/thread.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub topic_id: Option<String>,
-    /// Message identifier this message replies to.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Provider message identifier this inbound message replies to.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "replyToId",
+        alias = "reply_to_id"
+    )]
     pub reply_to_id: Option<String>,
+    /// Independent provider topic identifier where supported.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "topicId",
+        alias = "topic_id"
+    )]
+    pub topic_id: Option<String>,
     /// The sender's display name as the platform gives it (WhatsApp push
     /// name, Telegram first and last name, Signal profile name, ...). Never
     /// a saved contact name: no channel exposes one. `None` when the
@@ -34,10 +48,22 @@ pub struct ChannelMessage {
     pub sender_name: Option<String>,
 }
 
-/// Message to send through a channel
-///
-/// Serde-derived for the same reason as [`ChannelMessage`]: it is the payload
-/// of the module's `SendMessage` member.
+/// One ordered provider ingress item. Providers submit messages and lifecycle
+/// events through the same sink when the module host supplies it.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "kind", content = "item", rename_all = "snake_case")]
+pub enum ChannelIngress {
+    Inbound(ChannelInboundEnvelope),
+    Event(crate::ChannelEvent),
+}
+
+/// Legacy v21 text-only send projection retained for one release.
+/// Canonical sends use [`crate::ChannelOutboundMessage`] through
+/// `SendChannelIntent`.
+#[deprecated(
+    since = "0.1.34",
+    note = "v21 compatibility shim; use ChannelOutboundMessage for canonical v22 sends"
+)]
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SendMessage {
     pub content: String,
@@ -45,11 +71,21 @@ pub struct SendMessage {
     pub subject: Option<String>,
     /// Platform thread identifier for threaded replies (e.g. Slack `thread_ts`).
     pub thread_ts: Option<String>,
-    /// Provider topic identifier when it is distinct from the thread address.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Independent provider topic identifier where supported.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "topicId",
+        alias = "topic_id"
+    )]
     pub topic_id: Option<String>,
-    /// Provider message this send explicitly replies to.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Source message identifier for a provider reply.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "replyToId",
+        alias = "reply_to_id"
+    )]
     pub reply_to_id: Option<String>,
     /// Caller-provided or generated idempotency key for retry-safe delivery.
     pub idempotency_key: Option<String>,

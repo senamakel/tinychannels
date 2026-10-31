@@ -58,11 +58,11 @@ install -m 755 "$fixture_library" "$cache/$library_name"
 install -m 755 "$native_module_library" "$native_cache/$native_library_name"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  library_sha256="$(sha256sum "$cache/$library_name" | awk '{print $1}')"
-  archive_sha256() { sha256sum "$1" | awk '{print $1}'; }
+  library_sha256="$(sha256sum < "$cache/$library_name" | awk '{print $1}')"
+  archive_sha256() { sha256sum < "$1" | awk '{print $1}'; }
 else
-  library_sha256="$(shasum -a 256 "$cache/$library_name" | awk '{print $1}')"
-  archive_sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
+  library_sha256="$(shasum -a 256 < "$cache/$library_name" | awk '{print $1}')"
+  archive_sha256() { shasum -a 256 < "$1" | awk '{print $1}'; }
 fi
 printf '"%s" = "%s"\n' "$library_name" "$library_sha256" > "$cache/modules.toml"
 tar -C "$cache" -czf "$archive" "$library_name" modules.toml
@@ -70,9 +70,9 @@ install -m 644 "$archive" "$cache/$archive_name"
 archive_hash="$(archive_sha256 "$archive")"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  native_library_sha256="$(sha256sum "$native_cache/$native_library_name" | awk '{print $1}')"
+  native_library_sha256="$(sha256sum < "$native_cache/$native_library_name" | awk '{print $1}')"
 else
-  native_library_sha256="$(shasum -a 256 "$native_cache/$native_library_name" | awk '{print $1}')"
+  native_library_sha256="$(shasum -a 256 < "$native_cache/$native_library_name" | awk '{print $1}')"
 fi
 printf '"%s" = "%s"\n' "$native_library_name" "$native_library_sha256" > "$native_cache/modules.toml"
 tar -C "$native_cache" -czf "$native_archive" "$native_library_name" modules.toml
@@ -87,7 +87,7 @@ export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_CACHE="$native_cache"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_NAME="$native_archive_name"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_ARCHIVE_SHA256="$native_archive_hash"
 export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_LIBRARY_SHA256="$native_library_sha256"
-export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.1.39"
+export TINYCHANNELS_CLIENT_NATIVE_MODULE_TEST_RELEASE_URL="https://github.com/tinyhumansai/tinychannels/releases/tag/v0.2.0"
 
 write_environment_file() {
   local env_file="$TASK_TARGET_ROOT/tinychannels-client-e2e.env"

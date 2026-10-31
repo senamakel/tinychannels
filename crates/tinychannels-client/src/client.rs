@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 use tinybus::module::{ModuleCallError, ModuleCallFailure, ModuleClient};
 use tinychannels_bus::{
     ChannelControllerRequest, ChannelControllerResult, ChannelRuntimeDispatchPolicy,
-    ChannelsConfig, HttpProxyPolicy,
+    ChannelsConfig, HttpProxyPolicy, MODULE_ID,
     controllers::{BotPermissionCheck, DiscordGuild, DiscordTextChannel},
     methods,
 };
@@ -63,7 +63,7 @@ impl TinyChannelsClient {
     ) -> Result<ChannelRuntimeDriver, ChannelRuntimeError> {
         let bound = self
             .module
-            .bind_attested("tinychannels")
+            .bind_attested(MODULE_ID)
             .await
             .map_err(|failure| {
                 ChannelRuntimeError::module(ChannelRuntimeOperation::Bind, failure.kind)
@@ -139,7 +139,7 @@ impl TinyChannelsClient {
     ) -> Result<Vec<tinychannels_bus::ChannelHealthReport>, ModuleCallFailure> {
         self.module
             .call_attested_detailed(
-                "tinychannels",
+                MODULE_ID,
                 methods::CHECK_CHANNEL_HEALTH,
                 (config, proxy, timeout_ms),
             )
@@ -153,13 +153,13 @@ impl TinyChannelsClient {
     ) -> Result<T, ModuleCallFailure> {
         let response: ChannelControllerResult = self
             .module
-            .call_attested_detailed("tinychannels", methods::CHANNEL_CONTROLLER, (request,))
+            .call_attested_detailed(MODULE_ID, methods::CHANNEL_CONTROLLER, (request,))
             .await?;
         Self::decode_discord(response, expected).ok_or_else(|| self.malformed_reply())
     }
 
     fn malformed_reply(&self) -> ModuleCallFailure {
-        self.module.report_malformed_reply("tinychannels");
+        self.module.report_malformed_reply(MODULE_ID);
         ModuleCallFailure {
             kind: ModuleCallError::ModuleFault,
             wire_name: "ai.tinyhumans.tinybus.Error.Failed".into(),

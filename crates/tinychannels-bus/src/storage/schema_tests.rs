@@ -5,7 +5,12 @@ fn collections_is_a_unique_complete_owner_inventory() {
     let specs = collections();
     let names: Vec<_> = specs.iter().map(|spec| spec.name.as_str()).collect();
     assert_eq!(names, COLLECTIONS);
-    assert_eq!(names.len(), 16);
+    assert_eq!(names.len(), 30);
+    let unique: std::collections::HashSet<_> = names.iter().collect();
+    assert_eq!(unique.len(), names.len());
+    for legacy in MIGRATION_SOURCE_COLLECTIONS {
+        assert!(names.contains(&legacy));
+    }
     for name in [MEDIA_METADATA, MIGRATIONS] {
         assert!(names.contains(&name));
     }

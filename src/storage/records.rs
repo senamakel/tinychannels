@@ -73,6 +73,7 @@ pub fn stored_delivery_from_queued(entry: &QueuedDelivery) -> StoredDelivery {
         last_error: entry.last_error.clone(),
         platform_send_started_ms: entry.platform_send_started_at_unix_ms.map(to_stored_ms),
         recovery_state: entry.recovery_state,
+        partial_receipt: entry.partial_receipt.clone(),
     }
 }
 
@@ -89,6 +90,7 @@ pub fn queued_from_stored_delivery(stored: StoredDelivery) -> QueuedDelivery {
         last_error: stored.last_error,
         platform_send_started_at_unix_ms: stored.platform_send_started_ms.map(from_stored_ms),
         recovery_state: stored.recovery_state,
+        partial_receipt: stored.partial_receipt,
     }
 }
 
@@ -99,6 +101,7 @@ pub fn stored_result_from_terminal(result: &DeliveryTerminalResult) -> StoredRes
         id: result.id.clone(),
         intent_fingerprint: result.intent_fingerprint.clone(),
         completed_ms: to_stored_ms(result.completed_at_unix_ms),
+        receipt: result.receipt.clone(),
     }
 }
 
@@ -109,5 +112,10 @@ pub fn terminal_result_from_stored(stored: StoredResult) -> DeliveryTerminalResu
         id: stored.id,
         intent_fingerprint: stored.intent_fingerprint,
         completed_at_unix_ms: from_stored_ms(stored.completed_ms),
+        receipt: stored.receipt,
     }
 }
+
+#[cfg(test)]
+#[path = "records_tests.rs"]
+mod tests;

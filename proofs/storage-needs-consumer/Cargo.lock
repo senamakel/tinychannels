@@ -3,23 +3,6 @@
 version = 4
 
 [[package]]
-name = "anyhow"
-version = "1.0.104"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
-name = "async-trait"
-version = "0.1.92"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82f6aeea286b8eb4dd3431a1be1b59d290ace00f5bfd8e2a159bc2a05e2c1667"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "base64"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -42,12 +25,6 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
-
-[[package]]
-name = "pin-project-lite"
-version = "0.2.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "proc-macro2"
@@ -199,17 +176,13 @@ dependencies = [
 
 [[package]]
 name = "tinychannels-bus"
-version = "0.1.39"
+version = "0.2.0"
 dependencies = [
- "anyhow",
- "async-trait",
  "base64",
  "schemars",
  "serde",
  "serde_json",
  "thiserror",
- "tinystoragedrivers-types",
- "tokio",
 ]
 
 [[package]]
@@ -217,26 +190,6 @@ name = "tinychannels-storage-needs-consumer"
 version = "0.1.0"
 dependencies = [
  "tinychannels-bus",
- "tinystoragedrivers-types",
-]
-
-[[package]]
-name = "tinystoragedrivers-types"
-version = "2.1.2"
-source = "git+https://github.com/senamakel/tinystoragedrivers?rev=c447da3#c447da319e41dfe17bba4afb1831fe0cf0eef154"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "tokio"
-version = "1.53.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
-dependencies = [
- "pin-project-lite",
 ]
 
 [[package]]

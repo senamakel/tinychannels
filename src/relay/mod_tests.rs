@@ -306,9 +306,9 @@ fn relay_send_action_projects_text_outbound_intent() {
         conversation_id: "channel-123".into(),
         channel_ref: None,
         conversation_ref: None,
-        turn_id: None,
         reply_to_id: Some("message-1".into()),
         thread_id: Some("thread-2".into()),
+        turn_id: None,
         durability: DeliveryDurability::Required,
         payload: OutboundPayload::Text { text: "hi".into() },
     };
@@ -454,6 +454,8 @@ struct MemoryRelayIo {
     inbound: Mutex<VecDeque<ConnectorToGatewayFrame>>,
     sent_notify: Notify,
     inbound_notify: Notify,
+    received: std::sync::atomic::AtomicUsize,
+    received_notify: Notify,
     closed: AtomicBool,
 }
 
@@ -476,6 +478,18 @@ impl MemoryRelayIo {
         }
     }
 
+    async fn wait_for_received_len(&self, len: usize) {
+        loop {
+            let notified = self.received_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.received.load(Ordering::SeqCst) >= len {
+                return;
+            }
+            notified.await;
+        }
+    }
+
     fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
         self.inbound_notify.notify_waiters();
@@ -493,6 +507,8 @@ impl RelayFrameIo for MemoryRelayIo {
     async fn recv(&self) -> Result<Option<ConnectorToGatewayFrame>, RelayTransportError> {
         loop {
             if let Some(frame) = self.inbound.lock().expect("inbound lock").pop_front() {
+                self.received.fetch_add(1, Ordering::SeqCst);
+                self.received_notify.notify_waiters();
                 return Ok(Some(frame));
             }
             if self.closed.load(Ordering::SeqCst) {
@@ -582,6 +598,191 @@ async fn relay_transport_connect_sends_hello_and_handshake_reads_descriptor() {
     assert_eq!(
         transport.handshake().await.expect("handshake"),
         telegram_descriptor()
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn relay_transport_negotiates_v2_and_returns_the_canonical_descriptor() {
+    let io = Arc::new(MemoryRelayIo::default());
+    let transport = Arc::new(RelayTransport::new(
+        vec![
+            RelayIdentity {
+                platform: "discord".into(),
+                bot_id: "a".into(),
+            },
+            RelayIdentity {
+                platform: "discord".into(),
+                bot_id: "b".into(),
+            },
+        ],
+        io.clone(),
+        short_relay_timeouts(),
+    ));
+    transport.connect_v2().await.expect("connect v2");
+    let negotiation = {
+        let transport = transport.clone();
+        tokio::spawn(async move { transport.negotiate_v2().await })
+    };
+    io.wait_for_sent_len(2).await;
+    assert!(matches!(
+        io.sent().last(),
+        Some(GatewayToConnectorFrame::HelloV2 {
+            contract_version: 2,
+            ..
+        })
+    ));
+    let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+    capabilities.progressive_edits = true;
+    capabilities.text.text_limit = Some(4096);
+    // Unrelated descriptors and the v1 descriptor cannot satisfy the v2 wait.
+    let mut unrelated = tinychannels_bus::ChannelCapabilities::unknown();
+    unrelated.progressive_edits = true;
+    io.push(ConnectorToGatewayFrame::DescriptorV2 {
+        platform: "discord".into(),
+        bot_id: "other".into(),
+        capabilities: Box::new(unrelated),
+    })
+    .await;
+    io.push(ConnectorToGatewayFrame::Descriptor {
+        descriptor: telegram_descriptor(),
+    })
+    .await;
+    let mut second_capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+    second_capabilities.reactions = true;
+    io.push(ConnectorToGatewayFrame::DescriptorV2 {
+        platform: "discord".into(),
+        bot_id: "b".into(),
+        capabilities: Box::new(second_capabilities.clone()),
+    })
+    .await;
+    io.push(ConnectorToGatewayFrame::DescriptorV2 {
+        platform: "discord".into(),
+        bot_id: "a".into(),
+        capabilities: Box::new(capabilities.clone()),
+    })
+    .await;
+    let negotiated = negotiation.await.unwrap().unwrap();
+    assert_eq!(
+        negotiated.get(&RelayIdentity {
+            platform: "discord".into(),
+            bot_id: "a".into()
+        }),
+        Some(&capabilities)
+    );
+    assert_eq!(
+        negotiated.get(&RelayIdentity {
+            platform: "discord".into(),
+            bot_id: "b".into()
+        }),
+        Some(&second_capabilities)
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn relay_v2_ignores_unsupported_versions_and_times_out_at_one_deadline() {
+    let io = Arc::new(MemoryRelayIo::default());
+    let transport = Arc::new(RelayTransport::new(
+        vec![RelayIdentity {
+            platform: "discord".into(),
+            bot_id: "a".into(),
+        }],
+        io.clone(),
+        RelayTransportTimeouts {
+            handshake_ms: 60,
+            outbound_ms: 500,
+            idle_ms: 500,
+        },
+    ));
+    transport.connect_v2().await.expect("connect v2");
+    let started = tokio::time::Instant::now();
+    let negotiation = {
+        let transport = transport.clone();
+        tokio::spawn(async move { transport.negotiate_v2().await })
+    };
+    io.wait_for_sent_len(1).await;
+    let mut wrong_version = tinychannels_bus::ChannelCapabilities::unknown();
+    wrong_version.version = 99;
+    tokio::task::yield_now().await;
+    let mut received = 0;
+    for _ in 0..4 {
+        io.push(ConnectorToGatewayFrame::DescriptorV2 {
+            platform: "discord".into(),
+            bot_id: "other".into(),
+            capabilities: Box::new(wrong_version.clone()),
+        })
+        .await;
+        io.push(ConnectorToGatewayFrame::Descriptor {
+            descriptor: telegram_descriptor(),
+        })
+        .await;
+        received += 2;
+        io.wait_for_received_len(received).await;
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_millis(15)).await;
+    }
+    assert_eq!(
+        negotiation.await.unwrap(),
+        Err(RelayTransportError::Timeout {
+            operation: "handshake_v2"
+        })
+    );
+    assert_eq!(
+        started.elapsed(),
+        Duration::from_millis(60),
+        "unrelated frames must not restart the handshake deadline"
+    );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn relay_v2_rejects_an_unsupported_version_for_a_configured_identity() {
+    let io = Arc::new(MemoryRelayIo::default());
+    let transport = Arc::new(discord_transport(io.clone()));
+    transport.connect_v2().await.expect("connect v2");
+    let negotiation = {
+        let transport = transport.clone();
+        tokio::spawn(async move { transport.negotiate_v2().await })
+    };
+    io.wait_for_sent_len(1).await;
+    let mut unsupported = tinychannels_bus::ChannelCapabilities::unknown();
+    unsupported.version = 7;
+    io.push(ConnectorToGatewayFrame::DescriptorV2 {
+        platform: "discord".into(),
+        bot_id: "appShared".into(),
+        capabilities: Box::new(unsupported),
+    })
+    .await;
+    assert_eq!(
+        negotiation.await.unwrap(),
+        Err(RelayTransportError::UnsupportedCapabilitiesVersion {
+            actual: 7,
+            expected: tinychannels_bus::ChannelCapabilities::VERSION,
+        })
+    );
+}
+
+#[tokio::test]
+async fn relay_v2_refuses_cached_capabilities_after_terminal_shutdown() {
+    let io = Arc::new(MemoryRelayIo::default());
+    let transport = Arc::new(discord_transport(io.clone()));
+    transport.connect_v2().await.expect("connect v2");
+    let negotiation = {
+        let transport = transport.clone();
+        tokio::spawn(async move { transport.negotiate_v2().await })
+    };
+    io.wait_for_sent_len(1).await;
+    let mut capabilities = tinychannels_bus::ChannelCapabilities::unknown();
+    capabilities.progressive_edits = true;
+    io.push(ConnectorToGatewayFrame::DescriptorV2 {
+        platform: "discord".into(),
+        bot_id: "appShared".into(),
+        capabilities: Box::new(capabilities),
+    })
+    .await;
+    assert!(negotiation.await.unwrap().is_ok());
+    transport.shutdown().await;
+    assert_eq!(
+        transport.negotiate_v2().await,
+        Err(RelayTransportError::Closed)
     );
 }
 
@@ -753,7 +954,6 @@ async fn relay_transport_reconnect_supervisor_redials_and_rehandshakes() {
     handle.abort();
 }
 
-#[cfg(feature = "relay-websocket")]
 #[test]
 fn websocket_dial_url_matches_hermes_normalization() {
     assert_eq!(
@@ -770,7 +970,6 @@ fn websocket_dial_url_matches_hermes_normalization() {
     );
 }
 
-#[cfg(feature = "relay-websocket")]
 #[test]
 fn websocket_upgrade_authorization_uses_relay_hmac_token() {
     let config = crate::relay::WebSocketRelayConfig {
@@ -787,7 +986,6 @@ fn websocket_upgrade_authorization_uses_relay_hmac_token() {
     );
 }
 
-#[cfg(feature = "relay-websocket")]
 #[test]
 fn websocket_config_projects_from_relay_runtime_config() {
     let config = crate::config::RelayRuntimeConfig {
@@ -810,7 +1008,6 @@ fn websocket_config_projects_from_relay_runtime_config() {
 /// End-to-end loopback tests that dial the real WebSocket relay I/O against an
 /// in-process `tokio-tungstenite` server, exercising newline-delimited frame
 /// sequencing, upgrade-token authorization, and reconnect through the dialer.
-#[cfg(feature = "relay-websocket")]
 mod websocket_loopback {
     use super::{SECRET, telegram_descriptor};
     use crate::relay::{
@@ -988,6 +1185,55 @@ mod websocket_loopback {
 
         server.await.expect("join server");
     }
+
+    #[tokio::test]
+    async fn wss_dialer_rejects_a_self_signed_server_certificate() {
+        use std::sync::Arc;
+        use tokio::net::TcpListener;
+        use tokio_rustls::TlsAcceptor;
+
+        let _ = tokio_rustls::rustls::crypto::ring::default_provider().install_default();
+        let certificate = include_bytes!("../../tests/fixtures/tls/cert.der");
+        let private_key = include_bytes!("../../tests/fixtures/tls/key.der");
+        let server_config = tokio_rustls::rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(
+                vec![tokio_rustls::rustls::pki_types::CertificateDer::from(
+                    certificate.to_vec(),
+                )],
+                tokio_rustls::rustls::pki_types::PrivatePkcs8KeyDer::from(private_key.to_vec())
+                    .into(),
+            )
+            .expect("test certificate and key");
+        let acceptor = TlsAcceptor::from(Arc::new(server_config));
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let port = listener.local_addr().expect("local address").port();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.expect("accept TCP");
+            assert!(
+                acceptor.accept(socket).await.is_err(),
+                "client should abort its handshake when the self-signed certificate is rejected"
+            );
+        });
+
+        let dialer = WebSocketRelayDialer::new(WebSocketRelayConfig::new(format!(
+            "https://localhost:{port}"
+        )));
+        let error = tokio::time::timeout(std::time::Duration::from_secs(3), dialer.dial())
+            .await
+            .expect("TLS certificate rejection is bounded")
+            .err()
+            .expect("the native-root WSS connector must reject the self-signed certificate");
+        let message = error.to_string().to_ascii_lowercase();
+        assert!(
+            message.contains("certificate") || message.contains("unknownissuer"),
+            "expected a certificate-verification error, got {message}"
+        );
+        tokio::time::timeout(std::time::Duration::from_secs(3), server)
+            .await
+            .expect("TLS fixture shuts down")
+            .expect("TLS fixture task");
+    }
 }
 // Pins the public paths previous releases published.
 //
@@ -1061,4 +1307,31 @@ async fn relay_shutdown_joins_reader_and_refuses_reconnect() {
         RelayReconnectPolicy::default(),
     );
     supervisor.shutdown().await;
+}
+
+#[test]
+fn relay_send_action_preserves_ordered_typed_parts_in_payload_metadata() {
+    let parts = ["first", "second"]
+        .into_iter()
+        .map(|text| tinychannels_bus::OutboundContentPart::Content {
+            part: tinychannels_bus::ContentPart::Text {
+                text: text.into(),
+                markdown_dialect: None,
+            },
+        })
+        .collect::<Vec<_>>();
+    let intent = ChannelOutboundIntent {
+        idempotency_key: "typed-relay-key".into(),
+        payload: OutboundPayload::Parts {
+            parts: parts.clone(),
+        },
+        ..Default::default()
+    };
+    let action = relay_send_action_from_outbound_intent(&intent);
+    assert_eq!(
+        action["metadata"]["payload"]["parts"],
+        serde_json::to_value(&parts).unwrap()
+    );
+    assert_eq!(action["metadata"]["idempotency_key"], "typed-relay-key");
+    assert_eq!(action["content"], "");
 }

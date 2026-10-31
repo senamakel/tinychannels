@@ -5,6 +5,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Original provider data, preserving the normalized envelope when available.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the legacy and envelope variants preserve the established serialized request shape"
+)]
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelInboundSource {
@@ -19,26 +23,38 @@ pub enum ChannelInboundSource {
     },
 }
 
+/// Controls whether inbound preparation must fit the legacy text-only view or
+/// may preserve typed content for a host that consumes the full envelope.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelInboundPreparationMode {
+    /// Require a complete legacy text projection; reject content it cannot
+    /// represent so existing callers remain fail closed.
+    #[default]
+    LegacyText,
+    /// Return the complete typed envelope and its text-compatible routing
+    /// projection for a host that also handles the typed parts.
+    Typed,
+}
+
+impl ChannelInboundPreparationMode {
+    fn is_legacy_text(&self) -> bool {
+        *self == Self::LegacyText
+    }
+}
+
 /// Host-selected namespace and session isolation applied to provider data.
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PrepareChannelInboundRequest {
     pub source: ChannelInboundSource,
     pub namespace: String,
     pub session_policy: SessionKeyPolicy,
-    #[serde(default)]
+    /// Existing callers remain text-only unless they explicitly opt in.
+    #[serde(
+        default,
+        skip_serializing_if = "ChannelInboundPreparationMode::is_legacy_text"
+    )]
     pub preparation_mode: ChannelInboundPreparationMode,
-}
-
-/// Selects the stable typed projection or the one-release legacy message projection.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ChannelInboundPreparationMode {
-    #[default]
-    Typed,
-    Legacy,
-    /// Compatibility spelling used by the host adapter for legacy text-only
-    /// channels. It has the same projection semantics as `Legacy`.
-    LegacyText,
 }
 
 /// Facts used by the host without repeating channel projection or key algorithms.
@@ -49,6 +65,10 @@ pub struct PreparedChannelInbound {
     pub message: ChannelMessage,
     pub envelope: ChannelInboundEnvelope,
     pub history_key: String,
+    /// Whether the configured provider treats its thread identifier as a
+    /// reply target rather than a distinct persisted conversation.
+    #[serde(default)]
+    pub history_key_ignores_thread: bool,
     pub thread_id: String,
     pub client_id: String,
     pub session_key: String,

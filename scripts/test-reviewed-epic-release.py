@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import tomllib
 import unittest
 
 
@@ -12,7 +13,7 @@ WORKFLOW = ROOT / ".github/workflows/release.yml"
 CANONICAL = "tinyhumansai/tinychannels"
 EPIC_REF = "refs/heads/epic/8056-modules-wiring"
 REVIEWED_RELEASE = "tinyhumansai/.github/.github/workflows/module-reviewed-epic-release.yml@6ed83b04aab2d8977ec62e966cb914531e534fa4"
-TINYBUS_REV = "85345114f3066e94d5d70161ea8dc43252b83ae6"
+TINYBUS_REV = "61dce96aac5d20d8b6fc7cfe27daef559c7d54c9"
 
 
 def workflow_run_block(step_name):
@@ -231,12 +232,16 @@ class ReviewedEpicReleaseTests(unittest.TestCase):
             'tinybus-module = { path = "vendor/tinybus/crates/tinybus-module" }',
             workspace,
         )
-        self.assertIn(
-            'tinybus = { version = "=0.3.12", git = '
-            '"https://github.com/senamakel/tinybus", tag = "v0.3.12", '
-            'default-features = false, features = ["test-support"] }',
-            module,
-        )
+        workspace_manifest = tomllib.loads(workspace)
+        module_manifest = tomllib.loads(module)
+        test_bus = module_manifest["dev-dependencies"]["tinybus"]
+        self.assertTrue(test_bus["workspace"])
+        self.assertIn("test-support", test_bus["features"])
+        shared_bus = workspace_manifest["workspace"]["dependencies"]["tinybus"]
+        self.assertEqual(shared_bus["version"], "=0.3.12")
+        self.assertEqual(shared_bus["git"], "https://github.com/senamakel/tinybus")
+        self.assertEqual(shared_bus["tag"], "v0.3.12")
+        self.assertFalse(shared_bus["default-features"])
         self.assertIn(
             'tinybus = { version = "0.3.12", path = "../../../vendor/tinybus/crates/tinybus"',
             fixture,

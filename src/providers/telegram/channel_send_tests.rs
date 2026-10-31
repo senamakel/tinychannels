@@ -1,6 +1,8 @@
 use super::*;
+use crate::providers::telegram::attachments::{TelegramAttachment, TelegramAttachmentKind};
 use crate::providers::telegram::fixtures::*;
 use crate::providers::telegram::text::TELEGRAM_MAX_MESSAGE_LENGTH;
+use crate::traits::SendMessage;
 use std::sync::Arc;
 use wiremock::matchers::{body_partial_json, method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -48,8 +50,12 @@ async fn send_message_reaction_success_publishes_reaction_sent_event() {
     let recorded = events.events.lock().unwrap().clone();
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].0, "channel");
-    assert_eq!(recorded[0].1, "reaction_sent");
-    assert_eq!(recorded[0].2["target_message_id"], "telegram_55_7");
+    assert_eq!(recorded[0].1, "outbound_reaction");
+    assert_eq!(recorded[0].2["type"], "outbound_reaction");
+    assert_eq!(recorded[0].2["messageId"], "telegram_55_7");
+    assert_eq!(recorded[0].2["providerMessageId"], "7");
+    assert_eq!(recorded[0].2["conversation"]["id"], "55");
+    assert_eq!(recorded[0].2["reaction"]["value"], "👍");
     assert_eq!(recorded[0].2["success"], true);
 }
 
@@ -59,7 +65,10 @@ async fn send_message_reaction_rejection_is_not_an_error_and_reports_failure() {
     mount_post(
         &server,
         "setMessageReaction",
-        ResponseTemplate::new(400).set_body_string("REACTION_INVALID"),
+        ResponseTemplate::new(400).set_body_json(serde_json::json!({
+            "ok": false,
+            "description": "REACTION_INVALID"
+        })),
     )
     .await;
     let events = Arc::new(RecordingEvents::default());
@@ -68,6 +77,7 @@ async fn send_message_reaction_rejection_is_not_an_error_and_reports_failure() {
     assert!(!ch.send_message_reaction("55", 7, "🦄").await.unwrap());
     let recorded = events.events.lock().unwrap().clone();
     assert_eq!(recorded.len(), 1);
+    assert_eq!(recorded[0].1, "outbound_reaction");
     assert_eq!(recorded[0].2["success"], false);
 }
 
@@ -102,11 +112,79 @@ async fn send_text_chunks_single_chunk_carries_thread_and_reply_ids() {
         vec![serde_json::json!({
             "chat_id": "100",
             "text": "hello *world*",
-            "parse_mode": "Markdown",
+            "parse_mode": "MarkdownV2",
             "message_thread_id": "9",
             "reply_to_message_id": 42,
         })]
     );
+}
+
+#[tokio::test]
+async fn send_text_chunks_does_not_retry_unknown_or_non_format_rejections() {
+    for status in [429, 500] {
+        let server = mock_api().await;
+        mount_post(
+            &server,
+            "sendMessage",
+            ResponseTemplate::new(status).set_body_json(serde_json::json!({
+                "ok": false,
+                "description": "not a markdown formatting rejection"
+            })),
+        )
+        .await;
+        let ch = channel_for(&server, &["*"]);
+        let error = ch
+            .send_text_chunks_with_ids("hello", "1", None, None)
+            .await
+            .unwrap_err();
+        assert!(error.downcast_ref::<PartialTextSendError>().is_some());
+        assert_eq!(
+            json_bodies(&server, "sendMessage").await.len(),
+            1,
+            "status {status}"
+        );
+        let error = error.downcast_ref::<PartialTextSendError>().unwrap();
+        assert_eq!(error.sent_before_error, status >= 500, "status {status}");
+    }
+}
+
+#[tokio::test]
+async fn send_text_chunks_retries_only_explicit_markdown_parse_rejection() {
+    let server = mock_api().await;
+    let markdown_failure = ResponseTemplate::new(400).set_body_json(serde_json::json!({
+        "ok": false,
+        "description": "Bad Request: can't parse entities: can't find end of the entity"
+    }));
+    Mock::given(method("POST"))
+        .and(path(api_path("sendMessage")))
+        .and(body_partial_json(
+            serde_json::json!({"parse_mode":"MarkdownV2"}),
+        ))
+        .respond_with(markdown_failure)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(api_path("sendMessage")))
+        .and(body_partial_json(
+            serde_json::json!({"chat_id":"1","text":"hello"}),
+        ))
+        .respond_with(ok_with(serde_json::json!({"message_id": 9})))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    let ch = channel_for(&server, &["*"]);
+
+    assert_eq!(
+        ch.send_text_chunks_with_ids("hello", "1", None, None)
+            .await
+            .unwrap(),
+        ["9"]
+    );
+    let bodies = json_bodies(&server, "sendMessage").await;
+    assert_eq!(bodies.len(), 2);
+    assert_eq!(bodies[0]["parse_mode"], "MarkdownV2");
+    assert!(bodies[1].get("parse_mode").is_none());
 }
 
 #[tokio::test]
@@ -123,10 +201,17 @@ async fn send_text_chunks_marks_continuations_and_replies_only_on_first_chunk() 
     let bodies = json_bodies(&server, "sendMessage").await;
     assert_eq!(bodies.len(), 3, "message splits into three chunks");
     let texts: Vec<&str> = bodies.iter().map(|b| b["text"].as_str().unwrap()).collect();
-    assert!(texts[0].ends_with("(continues...)"));
-    assert!(!texts[0].starts_with("(continued)"));
-    assert!(texts[1].starts_with("(continued)") && texts[1].ends_with("(continues...)"));
-    assert!(texts[2].starts_with("(continued)") && !texts[2].ends_with("(continues...)"));
+    assert!(
+        texts
+            .iter()
+            .all(|text| text.len() <= TELEGRAM_MAX_MESSAGE_LENGTH)
+    );
+    assert!(
+        texts
+            .iter()
+            .all(|text| { !text.starts_with("(continued)") && !text.ends_with("(continues...)") })
+    );
+    assert_eq!(texts.concat(), message);
     assert_eq!(bodies[0]["reply_to_message_id"], 42);
     assert!(bodies[1].get("reply_to_message_id").is_none());
     assert!(bodies[2].get("reply_to_message_id").is_none());
@@ -138,9 +223,12 @@ async fn send_text_chunks_retries_without_markdown_when_markdown_rejected() {
     Mock::given(method("POST"))
         .and(path(api_path("sendMessage")))
         .and(body_partial_json(
-            serde_json::json!({ "parse_mode": "Markdown" }),
+            serde_json::json!({ "parse_mode": "MarkdownV2" }),
         ))
-        .respond_with(ResponseTemplate::new(400).set_body_string("can't parse entities"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+            "ok": false,
+            "description": "Bad Request: can't parse entities: can't find end of the entity"
+        })))
         .with_priority(1)
         .mount(&server)
         .await;
@@ -165,14 +253,256 @@ async fn send_text_chunks_retries_without_markdown_when_markdown_rejected() {
 }
 
 #[tokio::test]
-async fn send_text_chunks_fails_when_markdown_and_plain_both_rejected() {
+async fn channel_send_short_message_retries_plain_preserving_thread_and_reply() {
+    let server = mock_api().await;
+    Mock::given(method("POST"))
+        .and(path(api_path("sendMessage")))
+        .and(body_partial_json(
+            serde_json::json!({ "parse_mode": "MarkdownV2" }),
+        ))
+        .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+            "ok": false,
+            "description": "Bad Request: can't parse entities"
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    mount_post(&server, "sendMessage", ok()).await;
+    let ch = channel_for(&server, &["*"]);
+
+    ch.send_compat_message(
+        &SendMessage::new("**markdown fallback**", "100:3").in_thread(Some("5".into())),
+    )
+    .await
+    .unwrap();
+
+    let bodies = json_bodies(&server, "sendMessage").await;
+    assert_eq!(
+        bodies,
+        vec![
+            serde_json::json!({
+                "chat_id": "100",
+                "text": "**markdown fallback**",
+                "parse_mode": "MarkdownV2",
+                "message_thread_id": "3",
+                "reply_to_message_id": 5,
+            }),
+            serde_json::json!({
+                "chat_id": "100",
+                "text": "**markdown fallback**",
+                "message_thread_id": "3",
+                "reply_to_message_id": 5,
+            }),
+        ],
+        "short messages retry once without Markdown while preserving reply routing"
+    );
+    assert!(bodies[1].get("parse_mode").is_none());
+}
+
+#[tokio::test]
+async fn media_upload_includes_routing_caption_title_and_rounded_duration() {
     let server = mock_api().await;
     mount_post(
         &server,
-        "sendMessage",
-        ResponseTemplate::new(403).set_body_string("bot was blocked"),
+        "sendAudio",
+        ok_with(serde_json::json!({"message_id": 84})),
     )
     .await;
+    let ch = channel_for(&server, &["*"]);
+
+    let id = ch
+        .send_media_bytes_with_id(TelegramMediaUpload {
+            method: "sendAudio",
+            field: "audio",
+            chat_id: "chat-1",
+            thread_id: Some("topic-2"),
+            reply_to_id: Some("17"),
+            caption: Some("A recording"),
+            title: Some("Meeting"),
+            duration_ms: Some(1_001),
+            bytes: vec![1, 2, 3],
+            content_type: "audio/ogg",
+            file_name: "voice.ogg",
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(id, "84");
+    let bodies = raw_bodies(&server, "sendAudio").await;
+    assert_eq!(bodies.len(), 1);
+    for field in [
+        "name=\"chat_id\"\r\n\r\nchat-1",
+        "name=\"message_thread_id\"\r\n\r\ntopic-2",
+        "name=\"reply_parameters\"\r\n\r\n{\"message_id\":17}",
+        "name=\"caption\"\r\n\r\nA recording",
+        "name=\"title\"\r\n\r\nMeeting",
+        "name=\"duration\"\r\n\r\n2",
+        "filename=\"voice.ogg\"",
+        "Content-Type: audio/ogg",
+    ] {
+        assert!(
+            bodies[0].contains(field),
+            "multipart body missing {field:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn media_and_voice_uploads_reject_invalid_inputs_before_network_access() {
+    let server = mock_api().await;
+    let ch = channel_for(&server, &["*"]);
+    let media = |bytes, reply_to_id, content_type| TelegramMediaUpload {
+        method: "sendPhoto",
+        field: "photo",
+        chat_id: "chat-1",
+        thread_id: None,
+        reply_to_id,
+        caption: None,
+        title: None,
+        duration_ms: None,
+        bytes,
+        content_type,
+        file_name: "image.png",
+    };
+
+    assert!(
+        ch.send_media_bytes_with_id(media(vec![], None, "image/png"))
+            .await
+            .is_err()
+    );
+    assert!(
+        ch.send_media_bytes_with_id(media(vec![1], Some("not-an-id"), "image/png"))
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("reply target is invalid")
+    );
+    assert!(
+        ch.send_media_bytes_with_id(media(vec![1], None, "not a mime type"))
+            .await
+            .is_err()
+    );
+
+    assert!(
+        ch.send_voice_bytes_with_id(TelegramVoiceUpload {
+            method: "sendVoice",
+            field: "voice",
+            chat_id: "chat-1",
+            thread_id: None,
+            reply_to_id: Some("bad"),
+            caption: None,
+            bytes: vec![1],
+            file_name: "voice.ogg",
+        })
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("reply target is invalid")
+    );
+
+    let too_large = vec![0; 20 * 1024 * 1024 + 1];
+    assert!(
+        ch.send_media_bytes_with_id(media(too_large, None, "image/png"))
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("inline limit")
+    );
+    let too_large = vec![0; 8 * 1024 * 1024 + 1];
+    assert!(
+        ch.send_voice_bytes_with_id(TelegramVoiceUpload {
+            method: "sendVoice",
+            field: "voice",
+            chat_id: "chat-1",
+            thread_id: None,
+            reply_to_id: None,
+            caption: None,
+            bytes: too_large,
+            file_name: "voice.ogg",
+        })
+        .await
+        .unwrap_err()
+        .to_string()
+        .contains("inline limit")
+    );
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn upload_receipt_requires_success_status_and_a_message_id() {
+    for response in [
+        ResponseTemplate::new(400).set_body_json(serde_json::json!({"ok": false})),
+        ResponseTemplate::new(200).set_body_json(serde_json::json!({"ok": true, "result": {}})),
+    ] {
+        let server = mock_api().await;
+        mount_post(&server, "sendVoice", response).await;
+        let ch = channel_for(&server, &["*"]);
+        let error = ch
+            .send_voice_bytes_with_id(TelegramVoiceUpload {
+                method: "sendVoice",
+                field: "voice",
+                chat_id: "chat-1",
+                thread_id: Some("topic-3"),
+                reply_to_id: Some("12"),
+                caption: Some("spoken"),
+                bytes: vec![1, 2],
+                file_name: "voice.ogg",
+            })
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("unsuccessful or unknown receipt")
+                || error.to_string().contains("omitted message receipt")
+        );
+        let body = raw_bodies(&server, "sendVoice").await;
+        assert!(body[0].contains("name=\"message_thread_id\"\r\n\r\ntopic-3"));
+        assert!(body[0].contains("name=\"reply_parameters\""));
+        assert!(body[0].contains("name=\"caption\"\r\n\r\nspoken"));
+    }
+}
+
+#[tokio::test]
+async fn custom_reaction_uses_custom_emoji_id_and_rejects_blank_values() {
+    let server = mock_api().await;
+    mount_post(&server, "setMessageReaction", ok()).await;
+    let ch = channel_for(&server, &["*"]);
+
+    assert!(!ch.send_message_custom_reaction("1", 2, "  ").await.unwrap());
+    assert!(
+        ch.send_message_custom_reaction("1", 2, " custom-emoji ")
+            .await
+            .unwrap()
+    );
+    let bodies = json_bodies(&server, "setMessageReaction").await;
+    assert_eq!(bodies.len(), 1);
+    assert_eq!(bodies[0]["reaction"][0]["type"], "custom_emoji");
+    assert_eq!(bodies[0]["reaction"][0]["custom_emoji_id"], "custom-emoji");
+}
+
+#[tokio::test]
+async fn send_text_chunks_fails_when_markdown_and_plain_both_rejected() {
+    let server = mock_api().await;
+    Mock::given(method("POST"))
+        .and(path(api_path("sendMessage")))
+        .and(body_partial_json(
+            serde_json::json!({"parse_mode":"MarkdownV2"}),
+        ))
+        .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+            "ok": false,
+            "description": "Bad Request: can't parse entities: can't find end of the entity"
+        })))
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path(api_path("sendMessage")))
+        .and(body_partial_json(serde_json::json!({"text":"hi"})))
+        .respond_with(ResponseTemplate::new(403).set_body_string("bot was blocked"))
+        .with_priority(2)
+        .mount(&server)
+        .await;
     let ch = channel_for(&server, &["*"]);
 
     let err = ch
@@ -180,8 +510,14 @@ async fn send_text_chunks_fails_when_markdown_and_plain_both_rejected() {
         .await
         .unwrap_err()
         .to_string();
-    assert!(err.contains("Telegram sendMessage failed"), "{err}");
-    assert!(err.contains("bot was blocked"), "{err}");
+    assert!(
+        err.contains("Telegram sendMessage rejected with HTTP 403"),
+        "{err}"
+    );
+    assert!(
+        !err.contains("bot was blocked"),
+        "provider body must remain private: {err}"
+    );
     assert_eq!(json_bodies(&server, "sendMessage").await.len(), 2);
 }
 
@@ -195,9 +531,27 @@ async fn send_attachment_by_url_routes_each_kind_to_its_method() {
 
     for (kind, api_method, field) in ALL_KINDS {
         let url = format!("https://cdn.example/{field}");
-        ch.send_attachment("100", Some("4"), &attachment(kind, &format!(" {url} ")))
-            .await
-            .unwrap();
+        let attachment = attachment(kind, &format!(" {url} "));
+        let target = attachment.target.trim();
+        match kind {
+            TelegramAttachmentKind::Image => {
+                ch.send_photo_by_url("100", Some("4"), target, None).await
+            }
+            TelegramAttachmentKind::Document => {
+                ch.send_document_by_url("100", Some("4"), target, None)
+                    .await
+            }
+            TelegramAttachmentKind::Video => {
+                ch.send_video_by_url("100", Some("4"), target, None).await
+            }
+            TelegramAttachmentKind::Audio => {
+                ch.send_audio_by_url("100", Some("4"), target, None).await
+            }
+            TelegramAttachmentKind::Voice => {
+                ch.send_voice_by_url("100", Some("4"), target, None).await
+            }
+        }
+        .unwrap();
         let bodies = json_bodies(&server, api_method).await;
         let body = bodies.last().expect("request sent");
         assert_eq!(body[field], url, "{api_method}");
@@ -218,9 +572,14 @@ async fn send_attachment_from_local_path_uploads_multipart_for_each_kind() {
     for (kind, api_method, field) in ALL_KINDS {
         let file = dir.path().join(format!("{field}.bin"));
         std::fs::write(&file, b"payload-bytes").unwrap();
-        ch.send_attachment("100", None, &attachment(kind, file.to_str().unwrap()))
-            .await
-            .unwrap();
+        match kind {
+            TelegramAttachmentKind::Image => ch.send_photo("100", None, &file, None).await,
+            TelegramAttachmentKind::Document => ch.send_document("100", None, &file, None).await,
+            TelegramAttachmentKind::Video => ch.send_video("100", None, &file, None).await,
+            TelegramAttachmentKind::Audio => ch.send_audio("100", None, &file, None).await,
+            TelegramAttachmentKind::Voice => ch.send_voice("100", None, &file, None).await,
+        }
+        .unwrap();
         let bodies = raw_bodies(&server, api_method).await;
         let body = bodies.last().expect("upload sent");
         assert!(body.contains(&format!("name=\"{field}\"")), "{api_method}");
@@ -234,16 +593,10 @@ async fn send_attachment_from_local_path_uploads_multipart_for_each_kind() {
 async fn send_attachment_missing_local_path_errors_without_network() {
     let server = mock_api().await;
     let ch = channel_for(&server, &["*"]);
-    let err = ch
-        .send_attachment(
-            "100",
-            None,
-            &attachment(TelegramAttachmentKind::Document, "/no/such/file.pdf"),
-        )
-        .await
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("attachment path not found"), "{err}");
+    let result = ch
+        .send_document("100", None, std::path::Path::new("/no/such/file.pdf"), None)
+        .await;
+    assert!(result.is_err());
     assert!(server.received_requests().await.unwrap().is_empty());
 }
 
@@ -370,6 +723,14 @@ async fn send_by_url_includes_caption_and_surfaces_rejections() {
         .unwrap();
     ch.send_voice_by_url("1", None, url, None).await.unwrap();
 
+    for (_, api_method, _) in ALL_KINDS {
+        assert_eq!(
+            json_bodies(&server, api_method).await.len(),
+            1,
+            "{api_method}"
+        );
+    }
+
     assert_eq!(
         json_bodies(&server, "sendDocument").await[0],
         serde_json::json!({
@@ -410,10 +771,47 @@ async fn send_by_url_includes_caption_and_surfaces_rejections() {
     }
 }
 
-#[test]
-fn parse_reaction_marker_without_closing_bracket_is_plain_text() {
-    assert_eq!(
-        TelegramChannel::parse_reaction_marker("[REACTION:👍 no close"),
-        ("[REACTION:👍 no close".to_string(), None)
-    );
+#[tokio::test]
+async fn byte_uploads_preserve_configured_filenames_and_optional_thread() {
+    let server = mock_api().await;
+    mount_post(&server, "sendDocument", ok()).await;
+    mount_post(&server, "sendPhoto", ok()).await;
+    let ch = channel_for(&server, &["*"]);
+
+    ch.send_document_bytes(
+        "100",
+        Some("3"),
+        b"document-payload".to_vec(),
+        "document.txt",
+        Some("document caption"),
+    )
+    .await
+    .unwrap();
+    ch.send_photo_bytes(
+        "100",
+        None,
+        b"photo-payload".to_vec(),
+        "photo.png",
+        Some("photo caption"),
+    )
+    .await
+    .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 2);
+
+    let documents = raw_bodies(&server, "sendDocument").await;
+    assert_eq!(documents.len(), 1);
+    assert!(documents[0].contains("filename=\"document.txt\""));
+    assert!(documents[0].contains("document-payload"));
+    assert!(documents[0].contains("document caption"));
+    assert!(documents[0].contains("name=\"message_thread_id\""));
+    assert!(documents[0].contains("\r\n3\r\n"));
+
+    let photos = raw_bodies(&server, "sendPhoto").await;
+    assert_eq!(photos.len(), 1);
+    assert!(photos[0].contains("filename=\"photo.png\""));
+    assert!(photos[0].contains("photo-payload"));
+    assert!(photos[0].contains("photo caption"));
+    assert!(!photos[0].contains("name=\"message_thread_id\""));
 }

@@ -2,14 +2,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Stable host-owned identity for operations scoped to a remote channel session.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct RemoteSessionScope {
-    pub channel: crate::ChannelRef,
-    pub conversation: crate::ConversationRef,
-    pub session_key: String,
-}
-
 /// A remote-control slash command.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -42,7 +34,21 @@ pub struct NewRemoteThread {
     pub created_at: String,
     pub labels: Vec<String>,
 }
+/// Trusted ingress identity carried back to the host for a remote conversation
+/// reset. The host validates it against the callback's captured ingress before
+/// applying any durable session operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct RemoteSessionScope {
+    pub channel: crate::ChannelRef,
+    pub conversation: crate::ConversationRef,
+    /// Opaque deterministic identity produced by host channel preparation.
+    pub session_key: String,
+}
 /// Host-validated state root and one incoming command context.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "remote operation variants retain their established wire representation"
+)]
 #[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "operation", content = "request", rename_all = "snake_case")]
 pub enum RemoteOperation {
@@ -51,6 +57,7 @@ pub enum RemoteOperation {
         message: Box<crate::ChannelMessage>,
         route: RemoteRoute,
         history_len: usize,
+        session_scope: Option<RemoteSessionScope>,
     },
     MarkTurn {
         workspace_dir: String,
@@ -70,7 +77,7 @@ pub struct RemoteOperationResult {
 pub enum RemoteHostRequest {
     ListThreads,
     CreateThread(NewRemoteThread),
-    ClearHistory { sender_key: String },
+    ClearHistory { session_scope: RemoteSessionScope },
     InvalidateThread { thread_id: String },
 }
 /// Results supplied by the host's conversation and session stores.

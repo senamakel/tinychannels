@@ -12,6 +12,7 @@ pub(super) struct Request {
     pub target: String,
     pub headers: String,
     pub body: serde_json::Value,
+    pub raw_body: Vec<u8>,
 }
 
 pub(super) struct HttpsServer {
@@ -19,6 +20,8 @@ pub(super) struct HttpsServer {
     pub requests: Arc<Mutex<Vec<Request>>>,
     /// Loopback address the fixture listens on, for clients that need to
     /// resolve hosts outside the bundled certificate's names.
+    // Some all-targets checks compile this fixture without those features.
+    #[allow(dead_code)]
     pub address: std::net::SocketAddr,
     task: tokio::task::JoinHandle<()>,
 }
@@ -27,6 +30,21 @@ impl HttpsServer {
     pub async fn start(
         respond: impl Fn(&Request) -> (u16, String) + Send + Sync + 'static,
     ) -> Self {
+        Self::start_with_body(
+            move |request| {
+                let (status, body) = respond(request);
+                (status, body.into_bytes())
+            },
+            "application/json",
+        )
+        .await
+    }
+
+    async fn start_with_body(
+        respond: impl Fn(&Request) -> (u16, Vec<u8>) + Send + Sync + 'static,
+        content_type: &str,
+    ) -> Self {
+        let content_type = content_type.to_owned();
         let _ = rustls::crypto::ring::default_provider().install_default();
         let cert = include_bytes!("../../tests/fixtures/tls/cert.der");
         let key = include_bytes!("../../tests/fixtures/tls/key.der");
@@ -48,6 +66,7 @@ impl HttpsServer {
         for host in [
             "slack.com",
             "api.dingtalk.com",
+            "oapi.dingtalk.com",
             "bots.qq.com",
             "api.sgroup.qq.com",
             "open.feishu.cn",
@@ -66,6 +85,7 @@ impl HttpsServer {
                 let acceptor = acceptor.clone();
                 let captured = captured.clone();
                 let respond = respond.clone();
+                let content_type = content_type.clone();
                 connections.spawn(async move {
                     tokio::time::timeout(std::time::Duration::from_secs(5), async {
                         let mut stream = acceptor.accept(socket).await.unwrap();
@@ -97,14 +117,16 @@ impl HttpsServer {
                             headers,
                             body: serde_json::from_slice(&bytes[header_end..header_end + length])
                                 .unwrap_or(serde_json::Value::Null),
+                            raw_body: bytes[header_end..header_end + length].to_vec(),
                         };
                         let (status, body) = respond(&request);
                         captured.lock().unwrap().push(request);
-                        let response = format!(
-                            "HTTP/1.1 {status} Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        let header = format!(
+                            "HTTP/1.1 {status} Fixture\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                             body.len()
                         );
-                        stream.write_all(response.as_bytes()).await.unwrap();
+                        stream.write_all(header.as_bytes()).await.unwrap();
+                        stream.write_all(&body).await.unwrap();
                     }).await.unwrap();
                 });
                 while let Some(result) = connections.try_join_next() {
@@ -118,6 +140,13 @@ impl HttpsServer {
             requests,
             task,
         }
+    }
+
+    pub async fn start_with_bytes(
+        respond: impl Fn(&Request) -> (u16, Vec<u8>) + Send + Sync + 'static,
+        content_type: &str,
+    ) -> Self {
+        Self::start_with_body(respond, content_type).await
     }
 }
 

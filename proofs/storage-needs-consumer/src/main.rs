@@ -1,9 +1,11 @@
-use tinystoragedrivers_types::CollectionSpec;
-use tinychannels_bus::storage::collections;
+use tinychannels_bus::storage::{CollectionSpec, collections};
 
 fn main() {
     let needs = collections();
-    let names: Vec<_> = needs.iter().map(|collection| collection.name.as_str()).collect();
+    let names: Vec<_> = needs
+        .iter()
+        .map(|collection| collection.name.as_str())
+        .collect();
     assert_eq!(
         names,
         [
@@ -23,9 +25,23 @@ fn main() {
             "channels.whatsapp_sender_key",
             "channels.whatsapp_sync_key",
             "channels.whatsapp_lid_mapping",
+            "channels_delivery_pending",
+            "channels_delivery_failed",
+            "channels_delivery_results",
+            "channel_remote_bindings",
+            "channel_remote_busy",
+            "channel_remote_meta",
+            "whatsapp_device",
+            "whatsapp_identity",
+            "whatsapp_session",
+            "whatsapp_prekey",
+            "whatsapp_signed_prekey",
+            "whatsapp_sender_key",
+            "whatsapp_sync_key",
+            "whatsapp_lid_mapping",
         ]
     );
-    assert_eq!(needs.len(), 16);
+    assert_eq!(needs.len(), 30);
     let _: &CollectionSpec = &needs[0];
     assert!(needs.iter().all(|collection| {
         collection.indexes.is_empty()

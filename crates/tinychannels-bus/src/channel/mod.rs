@@ -2,6 +2,7 @@
 
 pub mod adapter;
 pub mod capabilities;
+/// Compatibility paths to the canonical content vocabulary.
 pub mod content;
 pub mod envelope;
 pub mod error;
@@ -18,20 +19,20 @@ pub use capabilities::{
     DurableFinalDeliveryCapability, DurableFinalDeliveryRequirementMap, LengthUnit,
     MarkdownDialect, channel_message_action_names, durable_final_delivery_capabilities,
 };
-pub use content::{
-    ContentPart, OutboundContentPart, OutboundVoice, VoiceNote, VoiceTranscript,
-    VoiceTranscriptSource, VoiceTranscriptState,
-};
 pub use envelope::{
-    AccessContext, ChannelInboundEnvelope, GroupAccessPolicy, InboundMediaPayload, MediaKind,
-    MediaReference, MentionGate, SenderDmDecision,
+    AccessContext, ButtonAction, ButtonStyle, ChannelInboundEnvelope, ContactMethod, ContentPart,
+    GroupAccessPolicy, InboundMediaPayload, MediaKind, MediaReference, MentionGate,
+    SenderDmDecision, VoiceNote, VoiceTranscript, VoiceTranscriptSource, VoiceTranscriptState,
 };
 pub use error::{ChannelSendError, SendErrorKind};
-pub use event::{ChannelEvent, ChannelEventKind, ChannelReaction};
+pub use event::{
+    ChannelEvent, ChannelEventKind, ChannelReaction, approval_action_id, parse_approval_action_id,
+};
 pub use intent::{ChannelOutboundIntent, DeliveryDurability, OutboundPayload};
-pub use intent::{ChannelOutboundMessage, ChannelSendOutcome};
+pub use intent::{ChannelOutboundMessage, OutboundContentPart, OutboundVoice};
 pub use receipt::{
-    MessageReceipt, MessageReceiptPart, MessageReceiptPartKind, MessageReceiptSourceResult,
+    ChannelSendOutcome, MessageReceipt, MessageReceiptPart, MessageReceiptPartKind,
+    MessageReceiptSourceResult,
 };
 pub use session::{LegacySessionKeys, SessionKeyPolicy};
 pub use types::{

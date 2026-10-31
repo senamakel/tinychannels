@@ -1,3 +1,6 @@
+// Scoped allowance for the one-release v21 wire DTO compatibility surface.
+#![allow(deprecated)]
+
 use super::*;
 use serde_json::json;
 use tinychannels_bus::{ContentPart, OutboundContentPart};
@@ -17,16 +20,16 @@ fn durable_final_delivery_capabilities_match_openclaw_order() {
 
 #[test]
 fn message_action_names_preserve_openclaw_contract_order() {
-    assert_eq!(channel_message_action_names().len(), 57);
+    assert_eq!(channel_message_action_names().len(), 56);
     assert_eq!(channel_message_action_names()[0], "send");
     assert_eq!(channel_message_action_names()[20], "list-pins");
-    assert_eq!(channel_message_action_names()[56], "upload-file");
+    assert_eq!(channel_message_action_names()[55], "upload-file");
     assert_eq!(
         channel_message_action_names()
             .iter()
             .filter(|name| **name == "set-profile")
             .count(),
-        2
+        1
     );
 }
 
@@ -164,6 +167,25 @@ fn receipt_platform_ids_include_part_ids_without_an_aggregate_list() {
 }
 
 #[test]
+fn receipt_uses_provider_message_id_as_scoped_telegram_operation_tokens() {
+    let receipt = create_message_receipt_from_outbound_results(
+        vec![MessageReceiptSourceResult {
+            channel: Some("telegram".into()),
+            message_id: Some("42".into()),
+            ..Default::default()
+        }],
+        Some(MessageReceiptPartKind::Text),
+        None,
+        None,
+        123,
+    );
+    assert_eq!(receipt.parts[0].edit_token.as_deref(), Some("42"));
+    assert_eq!(receipt.parts[0].delete_token.as_deref(), Some("42"));
+    assert_eq!(receipt.edit_token.as_deref(), Some("42"));
+    assert_eq!(receipt.delete_token.as_deref(), Some("42"));
+}
+
+#[test]
 fn receipt_preserves_nested_receipts() {
     let nested = MessageReceipt {
         primary_platform_message_id: Some("platform-1".into()),
@@ -272,7 +294,10 @@ fn session_keys_include_scope_topic_and_default_thread_sharing() {
         &sender,
         SessionKeyPolicy::default(),
     );
-    assert_eq!(key, "main:telegram:bot-a:group:tenant-a:-100123:topic-99");
+    assert_eq!(
+        key,
+        "v22|namespace=p4:main|channel=p8:telegram|account=p5:bot-a|kind=p5:group|scope=p8:tenant-a|conversation=p7:-100123|parent=a|topic=p8:topic-99|thread=a|participant=a"
+    );
 
     let isolated = build_session_key(
         "main",
@@ -286,7 +311,7 @@ fn session_keys_include_scope_topic_and_default_thread_sharing() {
     );
     assert_eq!(
         isolated,
-        "main:telegram:bot-a:group:tenant-a:-100123:topic-99:alice"
+        "v22|namespace=p4:main|channel=p8:telegram|account=p5:bot-a|kind=p5:group|scope=p8:tenant-a|conversation=p7:-100123|parent=a|topic=p8:topic-99|thread=a|participant=p5:alice"
     );
 }
 
@@ -325,7 +350,7 @@ fn session_keys_do_not_collide_when_components_contain_separators() {
 }
 
 #[test]
-fn empty_topic_falls_back_to_a_nonempty_thread_id() {
+fn empty_topic_and_nonempty_thread_are_both_preserved() {
     let key = build_session_key(
         "main",
         &ChannelRef {
@@ -343,7 +368,10 @@ fn empty_topic_falls_back_to_a_nonempty_thread_id() {
         SessionKeyPolicy::default(),
     );
 
-    assert_eq!(key, "main:discord:default:group:room:thread-1");
+    assert_eq!(
+        key,
+        "v22|namespace=p4:main|channel=p7:discord|account=a|kind=p5:group|scope=a|conversation=p4:room|parent=a|topic=p0:|thread=p8:thread-1|participant=a"
+    );
 }
 
 #[test]
@@ -371,7 +399,7 @@ fn session_keys_build_from_inbound_envelopes() {
         build_session_key_for_inbound_envelope("default", &envelope, SessionKeyPolicy::default());
     assert_eq!(
         shared,
-        "main:telegram:bot-a:group:tenant-a:-100123:topic-99"
+        "v22|namespace=p4:main|channel=p8:telegram|account=p5:bot-a|kind=p5:group|scope=p8:tenant-a|conversation=p7:-100123|parent=a|topic=p8:topic-99|thread=a|participant=a"
     );
 
     let isolated = build_session_key_for_inbound_envelope(
@@ -384,7 +412,7 @@ fn session_keys_build_from_inbound_envelopes() {
     );
     assert_eq!(
         isolated,
-        "main:telegram:bot-a:group:tenant-a:-100123:topic-99:alice"
+        "v22|namespace=p4:main|channel=p8:telegram|account=p5:bot-a|kind=p5:group|scope=p8:tenant-a|conversation=p7:-100123|parent=a|topic=p8:topic-99|thread=a|participant=p5:alice"
     );
 }
 
@@ -397,9 +425,9 @@ fn legacy_inbound_envelope_preserves_telegram_topics_separately_from_threads() {
         content: "hello".into(),
         reply_target: "-100123".into(),
         timestamp: 123,
-        thread_ts: Some(" topic-99 ".into()),
         topic_id: None,
         reply_to_id: None,
+        thread_ts: Some(" topic-99 ".into()),
         sender_name: None,
     };
 
@@ -412,9 +440,36 @@ fn legacy_inbound_envelope_preserves_telegram_topics_separately_from_threads() {
     assert_eq!(envelope.conversation.topic_id.as_deref(), Some("topic-99"));
     assert_eq!(envelope.sender.id, "alice");
     assert_eq!(envelope.text, "hello");
+    assert_eq!(
+        envelope.parts,
+        vec![ContentPart::Text {
+            text: "hello".into(),
+            markdown_dialect: None,
+        }]
+    );
 
     let keys = conversation_history_key_candidates(&msg);
     assert_eq!(keys.conversation_history_key, "telegram_alice_-100123");
+}
+
+#[test]
+fn legacy_inbound_timestamp_seconds_are_normalized_to_unix_milliseconds() {
+    let seconds = 1_700_000_000;
+    let millis = 1_700_000_000_123;
+    let mut msg = ChannelMessage {
+        timestamp: seconds,
+        ..Default::default()
+    };
+    assert_eq!(
+        inbound_envelope_from_legacy_message(&msg).timestamp_unix_ms,
+        Some(millis - 123)
+    );
+
+    msg.timestamp = millis;
+    assert_eq!(
+        inbound_envelope_from_legacy_message(&msg).timestamp_unix_ms,
+        Some(millis)
+    );
 }
 
 #[test]
@@ -422,6 +477,8 @@ fn legacy_inbound_envelope_recognizes_qualified_telegram_channel_ids() {
     for channel in ["tg:123", "telegram:123"] {
         let msg = ChannelMessage {
             channel: channel.into(),
+            topic_id: None,
+            reply_to_id: None,
             thread_ts: Some("topic-99".into()),
             ..Default::default()
         };
@@ -440,22 +497,133 @@ fn legacy_inbound_envelope_projects_back_to_legacy_messages() {
         content: "hello".into(),
         reply_target: "-100123".into(),
         timestamp: 123,
-        thread_ts: Some("topic-99".into()),
         topic_id: None,
         reply_to_id: None,
+        thread_ts: Some("topic-99".into()),
         sender_name: None,
     };
     let envelope = inbound_envelope_from_legacy_message(&msg);
 
-    let projected = legacy_message_from_inbound_envelope(&envelope, 456);
+    let projected = legacy_message_from_inbound_envelope(&envelope, 456).unwrap();
 
     assert_eq!(projected.id, "msg-1");
     assert_eq!(projected.channel, "telegram");
     assert_eq!(projected.sender, "alice");
     assert_eq!(projected.content, "hello");
     assert_eq!(projected.reply_target, "-100123");
-    assert_eq!(projected.thread_ts.as_deref(), Some("topic-99"));
+    assert_eq!(projected.thread_ts, None);
+    assert_eq!(projected.topic_id.as_deref(), Some("topic-99"));
+    assert_eq!(projected.reply_to_id, msg.reply_to_id);
     assert_eq!(projected.timestamp, 456);
+}
+
+#[test]
+fn inbound_envelope_roundtrip_keeps_reply_thread_and_topic_distinct() {
+    let msg = ChannelMessage {
+        channel: "slack:account-1".into(),
+        id: "source".into(),
+        sender: "alice".into(),
+        reply_target: "room".into(),
+        content: "reply".into(),
+        timestamp: 123,
+        reply_to_id: Some("parent-message".into()),
+        thread_ts: Some("thread-a".into()),
+        topic_id: Some("topic-b".into()),
+        ..Default::default()
+    };
+    let envelope = inbound_envelope_from_legacy_message(&msg);
+    assert_eq!(envelope.reply_to_id.as_deref(), Some("parent-message"));
+    assert_eq!(envelope.conversation.thread_id.as_deref(), Some("thread-a"));
+    assert_eq!(envelope.conversation.topic_id.as_deref(), Some("topic-b"));
+    let projected = legacy_message_from_inbound_envelope(&envelope, 456).unwrap();
+    assert_eq!(projected.reply_to_id, msg.reply_to_id);
+    assert_eq!(projected.thread_ts, msg.thread_ts);
+    assert_eq!(projected.topic_id, msg.topic_id);
+}
+
+#[test]
+fn typed_text_parts_are_authoritative_over_stale_compatibility_text() {
+    let envelope = ChannelInboundEnvelope {
+        text: "stale projection".into(),
+        parts: vec![
+            ContentPart::Text {
+                text: "first".into(),
+                markdown_dialect: None,
+            },
+            ContentPart::Text {
+                text: "second".into(),
+                markdown_dialect: None,
+            },
+        ],
+        ..Default::default()
+    };
+
+    let projected = legacy_message_from_inbound_envelope(&envelope, 1).unwrap();
+
+    assert_eq!(projected.content, "first\nsecond");
+}
+
+#[test]
+fn legacy_inbound_projection_rejects_rich_parts_instead_of_dropping_them() {
+    let envelope = ChannelInboundEnvelope {
+        text: "compat text".into(),
+        parts: vec![ContentPart::Image {
+            media: MediaReference {
+                url: Some("https://example.test/image.png".into()),
+                kind: MediaKind::Image,
+                ..Default::default()
+            },
+            caption: None,
+            alt_text: None,
+        }],
+        ..Default::default()
+    };
+
+    assert!(legacy_message_from_inbound_envelope(&envelope, 1).is_err());
+}
+
+#[test]
+fn missing_inbound_parts_fall_back_to_the_legacy_text_field() {
+    let envelope = ChannelInboundEnvelope {
+        text: "legacy text".into(),
+        ..Default::default()
+    };
+
+    let projected = legacy_message_from_inbound_envelope(&envelope, 1).unwrap();
+
+    assert_eq!(projected.content, "legacy text");
+}
+
+#[test]
+fn telegram_legacy_projection_keeps_simultaneous_thread_and_topic_ids() {
+    let envelope = ChannelInboundEnvelope {
+        channel: ChannelRef {
+            id: "telegram:account".into(),
+            account_id: Some("account".into()),
+        },
+        message_id: "message".into(),
+        reply_to_id: Some("reply-parent".into()),
+        conversation: ConversationRef {
+            id: "chat".into(),
+            thread_id: Some("thread-opaque".into()),
+            topic_id: Some("topic-opaque".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let legacy = legacy_message_from_inbound_envelope(&envelope, 1).unwrap();
+    let roundtrip = inbound_envelope_from_legacy_message(&legacy);
+
+    assert_eq!(roundtrip.reply_to_id.as_deref(), Some("reply-parent"));
+    assert_eq!(
+        roundtrip.conversation.thread_id.as_deref(),
+        Some("thread-opaque")
+    );
+    assert_eq!(
+        roundtrip.conversation.topic_id.as_deref(),
+        Some("topic-opaque")
+    );
 }
 
 #[test]
@@ -470,7 +638,7 @@ fn the_sender_name_survives_the_envelope_both_ways() {
     let envelope = inbound_envelope_from_legacy_message(&msg);
     assert_eq!(envelope.sender.name.as_deref(), Some("Alice"));
 
-    let projected = legacy_message_from_inbound_envelope(&envelope, 1);
+    let projected = legacy_message_from_inbound_envelope(&envelope, 1).unwrap();
     assert_eq!(projected.sender_name.as_deref(), Some("Alice"));
 }
 
@@ -506,9 +674,9 @@ fn legacy_inbound_envelope_preserves_non_telegram_threads() {
         content: "hello".into(),
         reply_target: "channel-123".into(),
         timestamp: 123,
-        thread_ts: Some(" thread-99 ".into()),
         topic_id: None,
         reply_to_id: None,
+        thread_ts: Some(" thread-99 ".into()),
         sender_name: None,
     };
 
@@ -533,6 +701,8 @@ fn legacy_inbound_envelope_preserves_non_telegram_threads() {
 fn legacy_inbound_envelope_discards_whitespace_only_thread_ids() {
     let msg = ChannelMessage {
         channel: "discord".into(),
+        topic_id: None,
+        reply_to_id: None,
         thread_ts: Some(" \t ".into()),
         ..Default::default()
     };
@@ -552,9 +722,9 @@ fn legacy_session_key_candidates_match_openhuman_helpers() {
         content: "hello".into(),
         reply_target: "-100123".into(),
         timestamp: 123,
-        thread_ts: Some("topic-99".into()),
         topic_id: None,
         reply_to_id: None,
+        thread_ts: Some("topic-99".into()),
         sender_name: None,
     };
     let keys = conversation_history_key_candidates(&msg);
@@ -569,6 +739,8 @@ fn legacy_session_key_candidates_preserve_unescaped_stored_keys() {
         channel: "a_b".into(),
         sender: "c".into(),
         reply_target: "room_part".into(),
+        topic_id: None,
+        reply_to_id: None,
         thread_ts: Some("thread_part".into()),
         ..Default::default()
     };
@@ -592,15 +764,30 @@ fn outbound_intent_carries_idempotency_key() {
         conversation_id: "-100123".into(),
         channel_ref: None,
         conversation_ref: None,
-        turn_id: None,
         reply_to_id: None,
         thread_id: Some("topic-99".into()),
+        turn_id: None,
         durability: DeliveryDurability::Required,
         payload: OutboundPayload::NativeChannelData {
             data: json!({"x": 1}),
         },
     };
     assert_eq!(intent.idempotency_key, "idem-1");
+}
+
+#[test]
+fn legacy_outbound_adapter_preserves_originating_turn_identity() {
+    let intent = outbound_intent_from_legacy_message(
+        "telegram",
+        json!({"text": "hello", "turnId": "turn-42"}),
+    );
+    assert_eq!(intent.turn_id.as_deref(), Some("turn-42"));
+    assert_eq!(
+        legacy_message_value_from_outbound_intent(&intent)["turnId"],
+        "turn-42"
+    );
+    let typed = tinychannels_bus::ChannelOutboundMessage::from_intent(&intent);
+    assert_eq!(typed.turn_id.as_deref(), Some("turn-42"));
 }
 
 #[test]
@@ -701,8 +888,8 @@ fn send_message_intent_preserves_legacy_typed_fields() {
             .as_deref(),
         Some("topic-2")
     );
-    assert_eq!(payload["topic_id"], "topic-2");
-    assert_eq!(payload["reply_to_id"], "message-3");
+    assert_eq!(payload["topicId"], "topic-2");
+    assert_eq!(payload["replyToId"], "message-3");
     assert_eq!(payload["idempotencyKey"], intent.idempotency_key);
 }
 
@@ -847,7 +1034,6 @@ fn outbound_payload_variants_keep_legacy_and_relay_content() {
         ),
         (
             OutboundPayload::Parts {
-                text: Some("typed parts".into()),
                 parts: vec![OutboundContentPart::Content {
                     part: ContentPart::Text {
                         text: "typed parts".into(),
@@ -855,8 +1041,8 @@ fn outbound_payload_variants_keep_legacy_and_relay_content() {
                     },
                 }],
             },
-            json!({"text":"typed parts","parts":[{"kind":"content","part":{"kind":"text","text":"typed parts","markdown_dialect":null}}]}),
-            "typed parts",
+            json!({"parts":[{"kind":"content","part":{"kind":"text","text":"typed parts"}}]}),
+            "",
         ),
         (
             OutboundPayload::Media {
@@ -868,9 +1054,12 @@ fn outbound_payload_variants_keep_legacy_and_relay_content() {
         ),
         (
             OutboundPayload::Voice {
-                media_url: "audio".into(),
+                voice: tinychannels_bus::OutboundVoice::Synthesize {
+                    text: "audio".into(),
+                    voice: None,
+                },
             },
-            json!({"voiceUrl":"audio"}),
+            json!({"voice":{"kind":"synthesize","text":"audio","voice":null}}),
             "audio",
         ),
         (
@@ -957,63 +1146,76 @@ fn nested_receipt_ids_recover_parts_and_delivery_time() {
 }
 
 #[test]
-fn typed_text_parts_supply_legacy_text_without_losing_the_typed_payload() {
-    let parts = vec![
-        OutboundContentPart::Content {
+fn typed_text_parts_preserve_order_and_delivery_identity_without_flattening() {
+    let parts = ["first", "second"]
+        .into_iter()
+        .map(|text| OutboundContentPart::Content {
             part: ContentPart::Text {
-                text: "first".into(),
+                text: text.into(),
                 markdown_dialect: None,
             },
-        },
-        OutboundContentPart::Content {
-            part: ContentPart::Text {
-                text: "second".into(),
-                markdown_dialect: None,
-            },
-        },
-    ];
-    for (text, expected) in [
-        (None, "first\nsecond"),
-        (Some("explicit".into()), "explicit"),
-    ] {
-        let intent = ChannelOutboundIntent {
-            idempotency_key: "stable-key".into(),
-            payload: OutboundPayload::Parts {
-                text,
-                parts: parts.clone(),
-            },
-            ..Default::default()
-        };
-        let legacy = legacy_message_value_from_outbound_intent(&intent);
-        assert_eq!(legacy["text"], expected);
-        assert_eq!(
-            crate::relay::relay_send_action_from_outbound_intent(&intent)["content"],
-            expected
-        );
-        assert_eq!(legacy["parts"], serde_json::to_value(&parts).unwrap());
-        assert_eq!(legacy["idempotencyKey"], "stable-key");
-    }
-}
-
-#[test]
-fn legacy_text_fallback_leaves_non_text_parts_intact() {
-    let parts = vec![OutboundContentPart::Content {
-        part: ContentPart::Native {
-            data: json!({"text":"not portable text"}),
-        },
-    }];
+        })
+        .collect::<Vec<_>>();
     let intent = ChannelOutboundIntent {
+        idempotency_key: "stable-key".into(),
+        turn_id: Some("turn-42".into()),
         payload: OutboundPayload::Parts {
-            text: None,
             parts: parts.clone(),
         },
         ..Default::default()
     };
     let legacy = legacy_message_value_from_outbound_intent(&intent);
-    assert!(legacy["text"].is_null());
-    assert_eq!(legacy["parts"], serde_json::to_value(parts).unwrap());
+    assert_eq!(legacy["parts"], serde_json::to_value(&parts).unwrap());
+    assert_eq!(legacy["idempotencyKey"], "stable-key");
+    assert_eq!(legacy["turnId"], "turn-42");
+    let typed = tinychannels_bus::ChannelOutboundMessage::from_intent(&intent);
+    assert_eq!(typed.parts, parts);
+    assert_eq!(typed.idempotency_key, "stable-key");
+    assert_eq!(typed.turn_id.as_deref(), Some("turn-42"));
+}
+
+#[test]
+fn typed_projection_keeps_non_text_parts_intact() {
+    let parts = vec![OutboundContentPart::Content {
+        part: ContentPart::Native {
+            provider: "fixture".into(),
+            data: json!({"text":"not portable text"}),
+        },
+    }];
+    let intent = ChannelOutboundIntent {
+        payload: OutboundPayload::Parts {
+            parts: parts.clone(),
+        },
+        ..Default::default()
+    };
+    let legacy = legacy_message_value_from_outbound_intent(&intent);
+    assert!(legacy.get("text").is_none());
+    assert_eq!(legacy["parts"], serde_json::to_value(&parts).unwrap());
     assert_eq!(
-        crate::relay::relay_send_action_from_outbound_intent(&intent)["content"],
-        ""
+        tinychannels_bus::ChannelOutboundMessage::from_intent(&intent).parts,
+        parts
     );
+}
+
+#[test]
+fn typed_inbound_projection_keeps_reply_thread_and_topic_distinct() {
+    let envelope = ChannelInboundEnvelope {
+        reply_to_id: Some("source-message".into()),
+        conversation: ConversationRef {
+            id: "chat".into(),
+            thread_id: Some("thread-id".into()),
+            topic_id: Some("topic-id".into()),
+            ..Default::default()
+        },
+        parts: vec![ContentPart::Text {
+            text: "typed text".into(),
+            markdown_dialect: None,
+        }],
+        ..Default::default()
+    };
+    let projected = typed_message_from_inbound_envelope(&envelope, 42);
+    assert_eq!(projected.content, "typed text");
+    assert_eq!(projected.reply_to_id.as_deref(), Some("source-message"));
+    assert_eq!(projected.thread_ts.as_deref(), Some("thread-id"));
+    assert_eq!(projected.topic_id.as_deref(), Some("topic-id"));
 }

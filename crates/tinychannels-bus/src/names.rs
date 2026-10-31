@@ -9,6 +9,9 @@
 /// Well-known bus name exported by the TinyChannels module.
 pub const BUS_NAME: &str = "ai.tinyhumans.tinychannels.Channels";
 
+/// Stable module registry identifier for the TinyChannels module.
+pub const MODULE_ID: &str = "tinychannels";
+
 /// Object path served by the TinyChannels module.
 pub const OBJECT_PATH: &str = "/ai/tinyhumans/tinychannels/Channels";
 
@@ -54,10 +57,14 @@ pub mod methods {
     pub const RESERVE_RELAY: &str = "ReserveRelay";
     /// Start a reserved relay using confidential hydrated configuration.
     pub const START_RELAY: &str = "StartRelay";
+    /// Start a relay using the canonical v2 identity-scoped capability handshake.
+    pub const START_RELAY_V2: &str = "StartRelayV2";
     /// Stop and join one reserved relay, including pending startup.
     pub const STOP_RELAY: &str = "StopRelay";
     /// Return safe lifecycle facts for one relay reservation.
     pub const RELAY_STATUS: &str = "RelayStatus";
+    /// Query negotiated canonical v2 relay capabilities by reservation.
+    pub const RELAY_CAPABILITIES_V2: &str = "RelayCapabilitiesV2";
     /// Submit an ordered relay outbound intent.
     pub const SEND_RELAY_INTENT: &str = "SendRelayIntent";
     /// Freeze publication and drain every owned provider, relay and callback.
@@ -74,12 +81,6 @@ pub mod methods {
     pub const SEND_EMAIL_UPLOAD: &str = "SendEmailUpload";
     /// Abort an upload that has not entered SMTP delivery.
     pub const ABORT_EMAIL_UPLOAD: &str = "AbortEmailUpload";
-    pub const BEGIN_MEDIA_UPLOAD: &str = "BeginMediaUpload";
-    pub const APPEND_MEDIA_UPLOAD_CHUNK: &str = "AppendMediaUploadChunk";
-    pub const FINISH_MEDIA_UPLOAD: &str = "FinishMediaUpload";
-    pub const BEGIN_MEDIA_READ: &str = "BeginMediaRead";
-    pub const READ_MEDIA_CHUNK: &str = "ReadMediaChunk";
-    pub const ABORT_MEDIA_READ: &str = "AbortMediaRead";
     /// `StartChannel` — connect and begin receiving on one configured provider.
     pub const START_CHANNEL: &str = "StartChannel";
     /// `StopChannel` — disconnect one running provider.
@@ -96,17 +97,36 @@ pub mod methods {
     pub const CHANNEL_CONTROLLER: &str = "ChannelController";
     /// Run typing, draft and capability operations on one running provider.
     pub const CHANNEL_INTERACTION: &str = "ChannelInteraction";
+    /// Begin a bounded host-owned media upload.
+    pub const BEGIN_MEDIA_UPLOAD: &str = "BeginMediaUpload";
+    /// Append a confidential, ordered chunk to a media upload.
+    pub const APPEND_MEDIA_UPLOAD_CHUNK: &str = "AppendMediaUploadChunk";
+    /// Finalize a media upload and return an opaque scoped reference.
+    pub const FINISH_MEDIA_UPLOAD: &str = "FinishMediaUpload";
+    /// Abort a buffered media upload; retries are idempotent.
+    pub const ABORT_MEDIA_UPLOAD: &str = "AbortMediaUpload";
+    /// Resolve a scoped opaque reference into a bounded read handle.
+    pub const BEGIN_MEDIA_READ: &str = "BeginMediaRead";
+    /// Read the next bounded chunk from a media handle.
+    pub const READ_MEDIA_CHUNK: &str = "ReadMediaChunk";
+    /// Abort a media read and release its temporary bytes.
+    pub const ABORT_MEDIA_READ: &str = "AbortMediaRead";
+    /// Begin module-owned projection state for one host-authorized web turn.
     pub const BEGIN_WEB_TURN: &str = "BeginWebTurn";
-    pub const END_WEB_TURN: &str = "EndWebTurn";
+    /// Project a canonical provider output event into ordered web events.
     pub const PROJECT_WEB_OUTPUT: &str = "ProjectWebOutput";
+    /// Retire module-owned state for one web turn.
+    pub const END_WEB_TURN: &str = "EndWebTurn";
 }
 
 /// One constant per method name on [`HOST_BUS_NAME`].
 pub mod host_methods {
-    /// `DeliverInbound` — hand the host one authenticated inbound envelope.
+    /// `DeliverEvent` — deliver one typed provider event to the host.
+    pub const DELIVER_EVENT: &str = "DeliverEvent";
+    /// `DeliverInbound` — hand the host one authenticated v22 inbound envelope.
     pub const DELIVER_INBOUND: &str = "DeliverInbound";
-    /// Complete one admitted turn. Opt-in runtimes invoke bounded concurrent
-    /// callbacks and retain each call until flush/stop has drained it.
+    /// Complete one admitted v22 inbound envelope turn. Opt-in runtimes invoke
+    /// bounded concurrent callbacks and retain each call until flush/stop has drained it.
     pub const PROCESS_INBOUND: &str = "ProcessInbound";
     /// `ReportStatus` — report a provider connection state transition.
     pub const REPORT_STATUS: &str = "ReportStatus";
@@ -114,6 +134,16 @@ pub mod host_methods {
     pub const PERSIST_ALLOWED_IDENTITY: &str = "PersistAllowedIdentity";
     /// `Transcribe` — use the host's configured speech recognition provider.
     pub const TRANSCRIBE: &str = "Transcribe";
+    /// Request a scoped speech transcription from the host.
+    pub const TRANSCRIBE_VOICE: &str = "TranscribeVoice";
+    /// Request scoped speech synthesis from the host.
+    pub const SYNTHESIZE_SPEECH: &str = "SynthesizeSpeech";
+    /// Persist scoped voice media through the host.
+    pub const STORE_VOICE_MEDIA: &str = "StoreVoiceMedia";
+    /// Read scoped voice media through the host.
+    pub const READ_VOICE_MEDIA: &str = "ReadVoiceMedia";
+    /// Resolve host voice reply policy for a scoped turn.
+    pub const GET_VOICE_REPLY_POLICY: &str = "GetVoiceReplyPolicy";
     /// `PublishEvent` — publish one provider event through the host event sink.
     pub const PUBLISH_EVENT: &str = "PublishEvent";
     /// Call a narrow host credential or managed API capability. Durable state is not
@@ -122,7 +152,7 @@ pub mod host_methods {
 }
 
 /// All module method names in the declaration order used by the interface.
-pub const METHODS: [&str; 38] = [
+pub const METHODS: [&str; 47] = [
     methods::START_CHANNEL,
     methods::STOP_CHANNEL,
     methods::SEND_MESSAGE,
@@ -130,8 +160,10 @@ pub const METHODS: [&str; 38] = [
     methods::CHANNEL_STATUS,
     methods::RESERVE_RELAY,
     methods::START_RELAY,
+    methods::START_RELAY_V2,
     methods::STOP_RELAY,
     methods::RELAY_STATUS,
+    methods::RELAY_CAPABILITIES_V2,
     methods::SEND_RELAY_INTENT,
     methods::SHUTDOWN,
     methods::SEND_CHANNEL_INTENT,
@@ -151,9 +183,6 @@ pub const METHODS: [&str; 38] = [
     methods::DESCRIBE_CONFIGURED_CHANNELS,
     methods::START_OUTBOUND_CHANNEL,
     methods::PREPARE_OUTBOUND_INTENT,
-    methods::BEGIN_WEB_TURN,
-    methods::PROJECT_WEB_OUTPUT,
-    methods::END_WEB_TURN,
     methods::PREPARE_CHANNEL_INBOUND,
     methods::PREPARE_CHANNEL_IDENTITY,
     methods::EXECUTE_PROGRESSIVE,
@@ -161,10 +190,20 @@ pub const METHODS: [&str; 38] = [
     methods::PREPARE_CHANNEL_CONTROL,
     methods::START_RUNTIME_WITH_DISPATCH,
     methods::PREPARE_RUNTIME_COMMAND,
+    methods::BEGIN_MEDIA_UPLOAD,
+    methods::APPEND_MEDIA_UPLOAD_CHUNK,
+    methods::FINISH_MEDIA_UPLOAD,
+    methods::ABORT_MEDIA_UPLOAD,
+    methods::BEGIN_MEDIA_READ,
+    methods::READ_MEDIA_CHUNK,
+    methods::ABORT_MEDIA_READ,
+    methods::BEGIN_WEB_TURN,
+    methods::PROJECT_WEB_OUTPUT,
+    methods::END_WEB_TURN,
 ];
 
 /// All host-callback method names in declaration order.
-pub const HOST_METHODS: [&str; 7] = [
+pub const HOST_METHODS: [&str; 13] = [
     host_methods::DELIVER_INBOUND,
     host_methods::REPORT_STATUS,
     host_methods::PERSIST_ALLOWED_IDENTITY,
@@ -172,6 +211,12 @@ pub const HOST_METHODS: [&str; 7] = [
     host_methods::PUBLISH_EVENT,
     host_methods::DISPATCH_CONTROLLER_BACKEND,
     host_methods::PROCESS_INBOUND,
+    host_methods::DELIVER_EVENT,
+    host_methods::TRANSCRIBE_VOICE,
+    host_methods::SYNTHESIZE_SPEECH,
+    host_methods::STORE_VOICE_MEDIA,
+    host_methods::READ_VOICE_MEDIA,
+    host_methods::GET_VOICE_REPLY_POLICY,
 ];
 
 #[cfg(test)]
