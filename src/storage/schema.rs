@@ -41,8 +41,12 @@ pub fn collections() -> Vec<DriverCollectionSpec> {
 fn to_driver_spec(spec: CollectionSchema) -> DriverCollectionSpec {
     let mut driver = DriverCollectionSpec::new(spec.name);
     for index in spec.indexes {
-        let index = DriverIndexSpec::new(index.name, index.fields);
-        driver = driver.index(if index.unique { index.unique() } else { index });
+        let driver_index = DriverIndexSpec::new(index.name, index.fields);
+        driver = driver.index(if index.unique {
+            driver_index.unique()
+        } else {
+            driver_index
+        });
     }
     if let Some(ttl_field) = spec.ttl_field {
         driver = driver.ttl(ttl_field);
